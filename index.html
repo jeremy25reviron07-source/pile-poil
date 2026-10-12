@@ -2592,6 +2592,7 @@ function overlayEl() {
   if (OV) return OV;
   OV = document.createElement('div'); OV.id = 'ov';
   OV.innerHTML = `<style>
+#ov[hidden],#ov [hidden]{display:none!important}
 #ov{position:fixed;left:50%;bottom:4vh;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;max-width:92vw;font-family:Inter,system-ui,sans-serif;z-index:5}
 #ov input{font:800 18px Inter,sans-serif;padding:12px 16px;border-radius:12px;border:2px solid #ffc21a;background:#0c1220;color:#fff;width:220px}
 #ov button{font:900 17px Inter,sans-serif;padding:12px 18px;border-radius:12px;border:0;background:#3cf29b;color:#06210f;cursor:pointer}
@@ -2805,6 +2806,7 @@ function liveOverlayEl() {
   if (LVO) return LVO;
   LVO = document.createElement('div'); LVO.id = 'lvo';
   LVO.innerHTML = `<style>
+#lvo[hidden],#lvo [hidden]{display:none!important}
 #lvo{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;max-width:94vw;font-family:Inter,system-ui,sans-serif;z-index:6}
 #lvo input{font:800 18px Inter,sans-serif;padding:12px 16px;border-radius:12px;border:2px solid #5fa8ff;background:#0c1220;color:#fff;width:200px}
 #lvo input#lvCode{width:120px;text-transform:uppercase;letter-spacing:3px}
@@ -2939,6 +2941,12 @@ function act(id) {
   setTimeout(() => { showLiveOverlay(); LVO.querySelector('#lvCode').value = code; }, 0);
 })();
 window.addEventListener('beforeunload', () => liveLeave());
+
+// Les panneaux HTML (pseudo, code, lien) ne s'affichent que sur leur écran
+setInterval(() => {
+  if (G.screen !== 'liveLobby' && LVO && !LVO.hidden) hideLiveOverlay();
+  if (G.screen !== 'runEnd' && typeof OV !== 'undefined' && OV && !OV.hidden) hideOverlay();
+}, 120);
 
 </script>
 </body></html>
