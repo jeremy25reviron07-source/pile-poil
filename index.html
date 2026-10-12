@@ -2845,7 +2845,7 @@ function drawTitle() {
   button('daily', 980, 400, 480, 96, 'DÉFI DU JOUR', '#ffd447', '#c98d00', '#2a1a00');
   button('live', 460, 512, 480, 96, 'DUEL EN DIRECT', '#ff6a55', '#c4281a', '#ffffff');
   button('duel', 980, 512, 480, 96, 'DUEL DIFFÉRÉ', '#5fa8ff', '#2a62c4', '#061a3a');
-  button('board', 460, 624, 480, 84, 'CLASSEMENT DU JOUR', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  button('board', 460, 624, 480, 84, 'CLASSEMENTS', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
   if (cp > 1) button('restart', 980, 624, 480, 84, 'RECOMMENCER LA CARRIÈRE', 'rgba(255,255,255,.14)', 'rgba(255,255,255,.06)', '#fff');
   txt('Défis et duels : 5 chantiers, 3 vies, le même tirage pour chaque joueur', 960, 770, '#9fb7cf', 22, 700, 'center');
   if (DEMO) txt('Mode démo : scores et duels restent sur cet appareil (ajoute tes clés Supabase pour jouer en ligne)', 960, 806, '#ffb36b', 17, 700, 'center');
@@ -2947,6 +2947,389 @@ setInterval(() => {
   if (G.screen !== 'liveLobby' && LVO && !LVO.hidden) hideLiveOverlay();
   if (G.screen !== 'runEnd' && typeof OV !== 'undefined' && OV && !OV.hidden) hideOverlay();
 }, 120);
+
+// =====================================================================
+//  PILE POIL — MOTEUR SONORE (100 % synthétisé, aucun fichier audio)
+//  Bruitages de grue, ambiance de chantier, météo, et musique générative
+//  Touches : M = bruitages · N = musique (aussi dans la pause et les menus)
+// =====================================================================
+const AU = { ctx: null, sound: save.sound !== false, music: save.music !== false, lastOm: 0, nextEvt: 0, step: 0, nextT: 0, bar: 0 };
+MUTED = !AU.sound;
+
+function auNoise(sec, brown) {
+  const a = AU.ctx, n = Math.floor(a.sampleRate * sec), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0); let last = 0;
+  for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; if (brown) { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; }
+  return b;
+}
+function auLoop(buf, out) { const s = AU.ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(out); s.start(); return s; }
+function auGain(v, out) { const g = AU.ctx.createGain(); g.gain.value = v; if (out) g.connect(out); return g; }
+function auFilter(type, f, q, out) { const fl = AU.ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; if (q) fl.Q.value = q; if (out) fl.connect(out); return fl; }
+function auSet(param, v, tc = .08) { if (param) param.setTargetAtTime(v, AU.ctx.currentTime, tc); }
+
+function auInit() {
+  if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
+  try { AU.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  const a = AU.ctx; AC = a;
+  const comp = a.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .25; comp.connect(a.destination);
+  AU.master = auGain(TOUCH ? 1.4 : 1, comp);
+  AU.sfx = auGain(AU.sound ? 1 : 0, AU.master);
+  AU.mus = auGain(0, AU.master);
+  AU.white = auNoise(2, false); AU.brown = auNoise(4, true);
+  // --- moteur de la grue : diesel grave (chenilles) + sifflement électrique du chariot
+  AU.motorG = auGain(0, AU.sfx); const mlp = auFilter('lowpass', 650, 1.2, AU.motorG);
+  AU.m1 = a.createOscillator(); AU.m1.type = 'sawtooth'; AU.m1.frequency.value = 42; AU.m1.connect(mlp); AU.m1.start();
+  AU.m2 = a.createOscillator(); AU.m2.type = 'square'; AU.m2.frequency.value = 63; const m2g = auGain(.35, mlp); AU.m2.connect(m2g); AU.m2.start();
+  auLoop(AU.brown, auGain(.8, mlp));
+  AU.whineG = auGain(0, AU.sfx); const wbp = auFilter('bandpass', 900, 6, AU.whineG);
+  AU.wh = a.createOscillator(); AU.wh.type = 'triangle'; AU.wh.frequency.value = 220; AU.wh.connect(wbp); AU.wh.start();
+  AU.wh2 = a.createOscillator(); AU.wh2.type = 'sine'; AU.wh2.frequency.value = 660; AU.wh2.connect(auGain(.4, AU.whineG)); AU.wh2.start();
+  // --- treuil du câble : grondement modulé (cliquetis du tambour)
+  AU.winchG = auGain(0, AU.sfx); const wam = auGain(.6, AU.winchG); const wlp = auFilter('bandpass', 520, 2, wam);
+  AU.wn = a.createOscillator(); AU.wn.type = 'sawtooth'; AU.wn.frequency.value = 75; AU.wn.connect(wlp); AU.wn.start();
+  AU.wlfo = a.createOscillator(); AU.wlfo.frequency.value = 16; const lfoG = auGain(.4, wam.gain); AU.wlfo.connect(lfoG); AU.wlfo.start();
+  // --- jauge de puissance : montée hydraulique
+  AU.chG = auGain(0, AU.sfx); const chf = auFilter('lowpass', 900, 3, AU.chG);
+  AU.ch = a.createOscillator(); AU.ch.type = 'sawtooth'; AU.ch.frequency.value = 110; AU.ch.connect(chf); AU.ch.start();
+  AU.chF = chf;
+  // --- météo et ville
+  AU.windG = auGain(0, AU.sfx); AU.windF = auFilter('bandpass', 500, .9, AU.windG); auLoop(AU.white, AU.windF);
+  AU.rainG = auGain(0, AU.sfx); auLoop(AU.white, auFilter('highpass', 2600, .5, AU.rainG));
+  AU.cityG = auGain(0, AU.sfx); auLoop(AU.brown, auFilter('lowpass', 170, .7, AU.cityG));
+  setInterval(auMusicTick, 25);
+  requestAnimationFrame(auFrame);
+}
+// la fonction d'ambiance d'origine démarre maintenant le moteur complet
+startAmbience = auInit;
+// iPhone : sans ça, le bouton « silencieux » coupe tout le son du jeu
+const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+let auTag = null;
+function auUnlock() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  auInit();
+  if (!AU.ctx) return;
+  if (AU.ctx.state !== 'running') AU.ctx.resume().catch(() => {});
+  if (!auTag) { auTag = document.createElement('audio'); auTag.src = SILENT_WAV; auTag.loop = true; auTag.setAttribute('playsinline', ''); auTag.volume = .01; }
+  if (auTag.paused) auTag.play().catch(() => {});
+  // petit « bip » muet pour débloquer Safari
+  try { const b = AU.ctx.createBuffer(1, 1, 22050), src = AU.ctx.createBufferSource(); src.buffer = b; src.connect(AU.ctx.destination); src.start(0); } catch (e) {}
+}
+['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(ev => addEventListener(ev, auUnlock, { passive: true, capture: true }));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && AU.ctx && AU.ctx.state !== 'running') AU.ctx.resume().catch(() => {}); });
+
+// ---------- sons ponctuels ----------
+function auOut() { return AU.ctx && AU.sound ? AU.sfx : null; }
+tone = function (f, d = .12, type = 'sine', vol = .08, delay = 0, dest) {
+  const out = dest || auOut(); if (!out) return;
+  const a = AU.ctx, t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + d + .03);
+};
+function sweep(f0, f1, d, type, vol, delay = 0, dest) {
+  const out = dest || auOut(); if (!out) return;
+  const a = AU.ctx, t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + d);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g); g.connect(out); o.start(t); o.stop(t + d + .03);
+}
+function burstN(d, ftype, f, q, vol, delay = 0, dest, brown) {
+  const out = dest || auOut(); if (!out) return;
+  const a = AU.ctx, t = a.currentTime + delay, s = a.createBufferSource(), fl = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = brown ? AU.brown : AU.white; fl.type = ftype; fl.frequency.value = f; fl.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  s.connect(fl); fl.connect(g); g.connect(out); s.start(t, Math.random() * .9); s.stop(t + d + .03);
+}
+// métal qui sonne : partiels inharmoniques
+function metal(f, vol, d, delay = 0) { [1, 2.32, 3.86, 5.4].forEach((k, i) => tone(f * k, d / (1 + i * .5), 'sine', vol / (1 + i * .8), delay)); }
+function bell(f, vol, delay = 0, dest) { tone(f, .9, 'sine', vol, delay, dest); tone(f * 2.01, .5, 'sine', vol * .35, delay, dest); tone(f * 3.01, .25, 'triangle', vol * .12, delay, dest); }
+
+Object.assign(sfx, {
+  click() { tone(1800, .03, 'square', .025); tone(900, .05, 'sine', .04); },
+  drop() { // déclenchement du crochet : claquement métallique + chaîne qui se détend
+    burstN(.05, 'highpass', 3000, .7, .25); metal(620, .07, .35); metal(410, .05, .3, .04);
+    for (let i = 0; i < 6; i++) metal(900 + Math.random() * 700, .018, .08, .06 + i * .045 + Math.random() * .02);
+    burstN(.5, 'bandpass', 700, .8, .05, .02);
+  },
+  thud(k = 1) { // charge qui touche le sol : coup sourd + terre qui retombe
+    k = clamp(k, .2, 1.6);
+    sweep(95, 38, .45, 'sine', .55 * k); sweep(180, 60, .12, 'triangle', .18 * k); sweep(320, 140, .18, 'triangle', .14 * k); burstN(.2, 'bandpass', 450, 1, .3 * k);
+    burstN(.32, 'lowpass', 520, .8, .45 * k, 0, null, true); burstN(.12, 'bandpass', 1400, .7, .12 * k);
+    for (let i = 0; i < Math.round(8 * k); i++) burstN(.04, 'bandpass', 1800 + Math.random() * 2500, 2, .03 * k, .08 + Math.random() * .5);
+  },
+  crash(k = 1) { // béton qui se brise
+    burstN(.9, 'bandpass', 900, .6, .5 * k); burstN(.5, 'lowpass', 300, .7, .6 * k, 0, null, true); sweep(70, 30, .6, 'sine', .5 * k);
+    for (let i = 0; i < 14; i++) burstN(.05, 'bandpass', 1500 + Math.random() * 4000, 3, .05 * k, .05 + Math.random() * .7);
+    metal(330, .05 * k, .6, .02);
+  },
+  win() { bell(784, .08); bell(1047, .07, .1); burstN(.25, 'highpass', 6000, .5, .03, .05); },
+  perfect() { [784, 988, 1175, 1568].forEach((f, i) => bell(f, .075, i * .075)); for (let i = 0; i < 8; i++) tone(2600 + Math.random() * 2400, .12, 'sine', .02, .25 + i * .04); },
+  fail() { sweep(320, 140, .5, 'sawtooth', .06); tone(98, .5, 'square', .05, .05); burstN(.2, 'lowpass', 400, .7, .1); },
+  siren() { // coup de sifflet de sécurité + alarme
+    const a = AU.ctx; if (!auOut()) return;
+    [0, .45].forEach(dl => { const t = a.currentTime + dl, o = a.createOscillator(), lfo = a.createOscillator(), lg2 = a.createGain(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = 2900; lfo.frequency.value = 32; lg2.gain.value = 140; lfo.connect(lg2); lg2.connect(o.frequency);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.09, t + .02); g.gain.setValueAtTime(.09, t + .32); g.gain.exponentialRampToValueAtTime(.0001, t + .4);
+      o.connect(g); g.connect(auOut()); o.start(t); lfo.start(t); o.stop(t + .42); lfo.stop(t + .42); });
+    for (let i = 0; i < 6; i++) tone(i % 2 ? 660 : 880, .3, 'square', .025, 1 + i * .34);
+  },
+  creak(k) { sweep(260 + Math.random() * 120, 180, .28, 'sawtooth', .012 * k); burstN(.2, 'bandpass', 1200, 8, .02 * k); },
+  beeper() { for (let i = 0; i < 6; i++) tone(1040, .22, 'square', .012, i * .5); },
+  horn() { [0, .32].forEach(d => { tone(311, .26, 'sawtooth', .02, d); tone(392, .26, 'sawtooth', .016, d); }); },
+  hammer() { const f = 1600 + Math.random() * 1200; for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) metal(f, .012, .07, i * .28); },
+  cricket() { for (let i = 0; i < 3; i++) tone(4300, .03, 'sine', .01, i * .06); },
+  drip() { tone(1200 + Math.random() * 1600, .04, 'sine', .015); },
+});
+
+// ---------- sons continus, mis à jour à chaque image ----------
+function auFrame() {
+  requestAnimationFrame(auFrame);
+  const a = AU.ctx; if (!a) return; auMusicTick();
+  const play = G.screen === 'play' && L && !G.paused, C = L && L.C;
+  let mot = 0, whine = 0, winch = 0, wd = 0, rain = 0, city = 0, charge = 0, sp = 0;
+  if (play) {
+    const master = C.t === 5;
+    sp = master ? ((keys.ArrowLeft || keys.ArrowRight) ? .7 : .1) : clamp(Math.abs(L.cr.v) / 320, 0, 1.3);
+    if (C.crane === 'crawler') { mot = .05 + .07 * sp; } else { mot = .012 + .02 * sp; whine = sp > .05 ? .02 + .035 * sp : 0; }
+    if (master) { mot = .03 + .04 * sp; whine = .02 * sp; }
+    if ((keys.ArrowUp || keys.ArrowDown) && L.phase === 'hang') winch = .07;
+    wd = clamp(Math.abs(C.wind || 0) / 40, 0, 1) * .13 * (.75 + .25 * Math.sin(G.t * .7) * Math.sin(G.t * 1.9));
+    rain = C.rain === 'forte' ? .085 : C.rain === 'pluie' ? .055 : C.rain === 'bruine' ? .025 : 0;
+    city = C.t === 3 ? .02 : .035;
+    if (L.charging) charge = .05 + .03 * L.power;
+    // grincement du câble aux points morts du balancement
+    if (!master && L.phase === 'hang') { if (Math.sign(L.om) !== Math.sign(AU.lastOm) && Math.abs(L.th) > .1 && Math.random() < .6) sfx.creak(clamp(Math.abs(L.th) * 4, .3, 1.5)); AU.lastOm = L.om; }
+    // petits événements de chantier
+    const now = a.currentTime;
+    if (!AU.nextEvt) AU.nextEvt = now + 6;
+    if (now > AU.nextEvt) {
+      const r = Math.random();
+      if (C.night) (r < .6 ? sfx.cricket : sfx.hammer)();
+      else if (r < .3) sfx.beeper(); else if (r < .45) sfx.horn(); else sfx.hammer();
+      AU.nextEvt = now + 5 + Math.random() * (C.night ? 6 : 12);
+    }
+    if (rain && Math.random() < rain * .9) sfx.drip();
+  }
+  const k = AU.sound ? 1 : 0;
+  auSet(AU.motorG.gain, mot * k, .12); auSet(AU.m1.frequency, 38 + sp * 22, .2); auSet(AU.m2.frequency, 57 + sp * 33, .2);
+  auSet(AU.whineG.gain, whine * k, .1); auSet(AU.wh.frequency, 180 + sp * 260, .15); auSet(AU.wh2.frequency, 540 + sp * 780, .15);
+  auSet(AU.winchG.gain, winch * k, .05); auSet(AU.wn.frequency, keys.ArrowUp ? 95 : 70, .1);
+  auSet(AU.chG.gain, charge * k, .03); if (L) { auSet(AU.ch.frequency, 90 + (L.power || 0) * 260, .03); auSet(AU.chF.frequency, 500 + (L.power || 0) * 2200, .03); }
+  auSet(AU.windG.gain, wd * k, .4); auSet(AU.windF.frequency, 380 + 320 * (.5 + .5 * Math.sin(G.t * .45)), .4);
+  auSet(AU.rainG.gain, rain * k, .5); auSet(AU.cityG.gain, city * k, .6);
+  // musique : forte dans les menus, discrète en jeu, coupée pendant la pause
+  const menu = G.screen !== 'play', target = !AU.music ? 0 : menu ? .5 : G.paused ? .12 : .2;
+  auSet(AU.mus.gain, target, .5);
+}
+
+// ---------- musique générative (groove « chantier », 96 BPM) ----------
+const MUS = { bpm: 96,
+  prog: [[57, [57, 60, 64]], [53, [53, 57, 60]], [60, [55, 60, 64]], [55, [55, 59, 62]]],   // La m · Fa · Do · Sol
+  bass: [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0], bassOct: [0, 0, 0, 12, 0, 0, 0, 0, 7, 0, 0, 12, 0, 0, 0, 0],
+  stab: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+  kick: [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0], snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  scale: [0, 3, 5, 7, 10, 12, 15], lead: null };
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function mNote(f, t, d, type, vol, cutoff) {
+  const a = AU.ctx, o = a.createOscillator(), g = a.createGain(), fl = a.createBiquadFilter();
+  o.type = type; o.frequency.value = f; fl.type = 'lowpass'; fl.frequency.value = cutoff; fl.Q.value = 2;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(fl); fl.connect(g); g.connect(AU.mus); o.start(t); o.stop(t + d + .05);
+}
+function mDrum(kind, t) {
+  const a = AU.ctx;
+  if (kind === 'kick') { const o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + .14); g.gain.setValueAtTime(.55, t); g.gain.exponentialRampToValueAtTime(.0001, t + .3); o.connect(g); g.connect(AU.mus); o.start(t); o.stop(t + .32); return; }
+  const s = a.createBufferSource(), fl = a.createBiquadFilter(), g = a.createGain(); s.buffer = AU.white;
+  const hat = kind === 'hat', d = hat ? .04 : .16; fl.type = hat ? 'highpass' : 'bandpass'; fl.frequency.value = hat ? 7000 : 1800; fl.Q.value = hat ? .5 : .8;
+  g.gain.setValueAtTime(hat ? .07 : .22, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); s.connect(fl); fl.connect(g); g.connect(AU.mus); s.start(t, Math.random()); s.stop(t + d + .02);
+  if (!hat) { const o = a.createOscillator(), g2 = a.createGain(); o.frequency.value = 190; g2.gain.setValueAtTime(.12, t); g2.gain.exponentialRampToValueAtTime(.0001, t + .08); o.connect(g2); g2.connect(AU.mus); o.start(t); o.stop(t + .1); }
+}
+function auMusicTick() {
+  const a = AU.ctx; if (!a || a.state !== 'running') return;
+  if (!AU.music) { AU.nextT = 0; return; }
+  const sixteenth = 60 / MUS.bpm / 4;
+  if (!AU.nextT || AU.nextT < a.currentTime - .2) AU.nextT = a.currentTime + .05;
+  const inGame = G.screen === 'play', night = inGame && L && L.C.night;
+  while (AU.nextT < a.currentTime + .3) {
+    const t = AU.nextT, s = AU.step % 16, bar = Math.floor(AU.step / 16), [root, chord] = MUS.prog[bar % 4];
+    if (s === 0 && bar % 4 === 0) { // nouveau motif de mélodie toutes les 4 mesures
+      MUS.lead = Array.from({ length: 16 }, (_, i) => (i % 2 === 0 && Math.random() < .42) ? MUS.scale[Math.floor(Math.random() * MUS.scale.length)] : null);
+    }
+    const swing = s % 2 ? sixteenth * .16 : 0, tt = t + swing;
+    if (MUS.bass[s]) { mNote(mtof(root - 24 + MUS.bassOct[s]), tt, sixteenth * 1.8, 'triangle', .3, 600); mNote(mtof(root - 12 + MUS.bassOct[s]), tt, sixteenth * 1.6, 'sawtooth', .07, 900); }
+    if (MUS.stab[s]) chord.forEach(m => mNote(mtof(m), tt, .22, 'sawtooth', .045, night ? 900 : 1600));
+    if (s === 0) chord.forEach(m => mNote(mtof(m - 12), t, sixteenth * 15, 'sine', .03, 800));
+    if (!inGame || bar % 2 === 1) { if (MUS.kick[s]) mDrum('kick', tt); if (MUS.snare[s]) mDrum('snare', tt); }
+    if (s % 2 === 0 || Math.random() < .3) mDrum('hat', tt);
+    if (!inGame && MUS.lead && MUS.lead[s] != null && bar % 8 >= 4) mNote(mtof(69 + MUS.lead[s]), tt, .28, 'square', .03, 2400);
+    AU.nextT += sixteenth; AU.step++;
+  }
+}
+
+// ---------- réglages son / musique ----------
+function setSound(on) { AU.sound = on; MUTED = !on; save.sound = on; writeSave(save); if (AU.ctx) auSet(AU.sfx.gain, on ? 1 : 0, .05); }
+function setMusic(on) { AU.music = on; save.music = on; writeSave(save); }
+setMuted = m => setSound(!m);
+addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  if (e.key === 'n' || e.key === 'N') setMusic(!AU.music);
+});
+// boutons ronds en haut à droite dans les menus et la pause
+function soundButtons() {
+  const B = (id, x, on, glyph) => {
+    ell(x + 32, 62, 32, 32, on ? 'rgba(255,194,26,.9)' : 'rgba(12,18,32,.75)'); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2; c.beginPath(); c.arc(x + 32, 62, 32, 0, 7); c.stroke();
+    txt(glyph, x + 32, 74, on ? '#1a1300' : '#fff', 30, 900, 'center', 'sans-serif');
+    if (!on) ln(x + 12, 42, x + 52, 82, '#ff5a48', 4);
+    G.buttons.push({ id, x, y: 30, w: 64, h: 64 });
+  };
+  B('tgSound', 1744, AU.sound, '🔊'); B('tgMusic', 1824, AU.music, '♪');
+}
+const withSoundBtns = prev => function () { const r = prev.apply(this, arguments); soundButtons(); return r; };
+drawTitle = withSoundBtns(drawTitle); drawCheckpoint = withSoundBtns(drawCheckpoint); drawGameOver = withSoundBtns(drawGameOver);
+drawVictory = withSoundBtns(drawVictory); drawPause = withSoundBtns(drawPause); drawOnline = withSoundBtns(drawOnline);
+// barre des commandes : ajoute la touche N pour la musique
+controlsBar = function () {
+  if (TOUCH) return;
+  const items = [['← →', 'Déplacer'], ['↑ ↓', 'Câble'], ['ESPACE maintenu', 'Puissance'], ['ESPACE relâché', 'Lâcher'], ['ÉCHAP', 'Pause'], ['M', AU.sound ? 'Sons' : 'Sons coupés'], ['N', AU.music ? 'Musique' : 'Musique coupée']];
+  let total = 0; const ws = items.map(([k, l]) => { c.font = '900 18px Inter'; const kw = c.measureText(k).width + 28; c.font = '700 20px Inter'; const lw = c.measureText(l).width; total += kw + lw + 34; return [kw, lw]; });
+  let x = 960 - total / 2; rr(x - 16, 1004, total + 12, 56, 22); c.fillStyle = 'rgba(12,18,32,.74)'; c.fill();
+  items.forEach(([k, l], i) => { const [kw, lw] = ws[i]; rr(x, 1015, kw, 34, 8); c.fillStyle = 'rgba(255,255,255,.92)'; c.fill(); txt(k, x + kw / 2, 1039, '#121a2c', 18, 900, 'center'); txt(l, x + kw + 10, 1040, '#e6eef8', 20, 700); x += kw + lw + 34; });
+};
+act = (prev => function (id) {
+  if (id === 'tgSound') { setSound(!AU.sound); sfx.click(); return; }
+  if (id === 'tgMusic') { setMusic(!AU.music); sfx.click(); return; }
+  return prev(id);
+})(act);
+
+// =====================================================================
+//  PILE POIL — CLASSEMENT MONDIAL (meilleur score de carrière de chaque joueur)
+//  + classement du jour, dans un même écran à onglets
+// =====================================================================
+const WB = { list: null, msg: '', tab: 'world', page: 0, rank: null, total: null, top: null, sending: false };
+const CAREER_MAX = lvl => 225 * lvl * (lvl + 1);   // plafond théorique (tout parfait, combo ×3)
+
+if (SB) {
+  DB.career = async () => { const { data, error } = await SB.from('career').select('name,score,level').order('score', { ascending: false }).limit(100); err(error, 'Classement mondial indisponible'); return data; };
+  DB.submitCareer = async b => { const { data, error } = await SB.rpc('submit_career', { p_name: b.name, p_score: b.score, p_level: b.level }); err(error); return data; };
+} else {
+  DB.career = async () => (DB._r('career') || []).slice(0, 100);
+  DB.submitCareer = async b => { const l = DB._r('career') || [], i = l.findIndex(s => s.name.toLowerCase() === b.name.toLowerCase()), row = { name: b.name, score: b.score, level: b.level };
+    if (i < 0) l.push(row); else if (b.score > l[i].score) l[i] = row; l.sort((a, c2) => c2.score - a.score); DB._w('career', l); const me = l.find(s => s.name.toLowerCase() === b.name.toLowerCase());
+    return { rank: l.indexOf(me) + 1, total: l.length, best: me.score }; };
+}
+
+async function loadWorld() { try { WB.list = await DB.career(); WB.top = WB.list[0] || null; WB.msg = '';
+  const i = playerName() ? WB.list.findIndex(s => s.name === playerName()) : -1; if (i >= 0) { WB.rank = i + 1; WB.total = Math.max(WB.total || 0, WB.list.length); } } catch (e) { WB.list = []; WB.msg = e.message; } }
+async function sendCareer(force) {
+  const b = save.cbest, name = playerName();
+  if (!b || !b.score || name.length < 2 || WB.sending || (b.sent && !force)) return;
+  WB.sending = true;
+  try {
+    const r = await DB.submitCareer({ name, score: Math.min(b.score, CAREER_MAX(b.level)), level: b.level });
+    b.sent = true; writeSave(save); WB.rank = r.rank; WB.total = r.total; WB.msg = `Record envoyé · tu es ${r.rank}e sur ${r.total} au classement mondial`;
+    loadWorld();
+  } catch (e) { WB.msg = e.message; }
+  WB.sending = false;
+}
+
+// suivi du record de carrière (uniquement en mode Carrière) et envoi automatique aux étapes clés
+let wbPrevScreen = G.screen;
+setInterval(() => {
+  if ((G.mode || 'career') === 'career' && G.score > 0) {
+    const b = save.cbest || { score: 0, level: 1 };
+    if (G.score > b.score) { save.cbest = { score: G.score, level: G.level, sent: false }; writeSave(save); }
+  }
+  if (G.screen !== wbPrevScreen) {
+    if (wbPrevScreen === 'play' && ['checkpoint', 'gameover', 'victory', 'title'].includes(G.screen) && (G.mode || 'career') === 'career') sendCareer();
+    wbPrevScreen = G.screen;
+  }
+}, 400);
+loadWorld().then(() => sendCareer());
+
+// ---------- panneau HTML : pseudo pour le classement mondial ----------
+let BDO = null;
+function boardOverlayEl() {
+  if (BDO) return BDO;
+  BDO = document.createElement('div'); BDO.id = 'bdo';
+  BDO.innerHTML = `<style>
+#bdo[hidden],#bdo [hidden]{display:none!important}
+#bdo{position:fixed;left:50%;bottom:3vh;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;max-width:92vw;font-family:Inter,system-ui,sans-serif;z-index:5}
+#bdo input{font:800 18px Inter,sans-serif;padding:12px 16px;border-radius:12px;border:2px solid #ffc21a;background:#0c1220;color:#fff;width:220px}
+#bdo button{font:900 17px Inter,sans-serif;padding:12px 18px;border-radius:12px;border:0;background:#3cf29b;color:#06210f;cursor:pointer}
+#bdo button:focus-visible,#bdo input:focus-visible{outline:3px solid #fff}</style>
+<input id="bdName" maxlength="16" placeholder="Ton pseudo" aria-label="Pseudo"><button id="bdSend">Publier mon record</button>`;
+  document.body.appendChild(BDO);
+  const n = BDO.querySelector('#bdName');
+  n.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') BDO.querySelector('#bdSend').click(); });
+  n.addEventListener('keyup', e => e.stopPropagation());
+  BDO.querySelector('#bdSend').onclick = () => {
+    const v = n.value.replace(/[^\p{L}\p{N} _\-.]/gu, '').slice(0, 16);
+    if (v.length < 2) { WB.msg = 'Entre un pseudo (2 à 16 caractères)'; return; }
+    save.name = v; writeSave(save); sendCareer(true);
+  };
+  return BDO;
+}
+function needPseudoPanel() { return G.screen === 'board' && WB.tab === 'world' && save.cbest && save.cbest.score > 0 && (!save.cbest.sent || playerName().length < 2); }
+setInterval(() => {
+  const show = needPseudoPanel();
+  if (show) { const o = boardOverlayEl(); if (o.hidden || !o.dataset.init) { o.hidden = false; o.dataset.init = 1; const n = o.querySelector('#bdName'); if (!n.value) n.value = playerName(); } }
+  else if (BDO && !BDO.hidden) BDO.hidden = true;
+}, 150);
+
+// ---------- écran CLASSEMENTS ----------
+drawBoard = function () {
+  screenBg();
+  txt('CLASSEMENTS', 960, 110, '#ffc21a', 60, 900, 'center');
+  const tab = (id, x, label, on) => { rr(x, 140, 300, 60, 30); c.fillStyle = on ? '#ffc21a' : 'rgba(255,255,255,.12)'; c.fill(); txt(label, x + 150, 180, on ? '#1a1300' : '#fff', 22, 900, 'center'); G.buttons.push({ id, x, y: 140, w: 300, h: 60 }); };
+  tab('tabWorld', 640, '🌍  MONDIAL', WB.tab === 'world'); tab('tabDay', 980, '📅  DÉFI DU JOUR', WB.tab === 'day');
+  const x = 400, y = 230, w = 1120;
+  if (WB.tab === 'day') { drawBoardList(x, y, w, (ON.board || []).slice(0, 15)); if (ON.msg) txt(ON.msg, 960, 960, '#ffd447', 22, 800, 'center'); }
+  else {
+    const rows = WB.list || [], per = 11, pages = Math.max(1, Math.ceil(rows.length / per)); WB.page = clamp(WB.page, 0, pages - 1);
+    const vis = rows.slice(WB.page * per, WB.page * per + per);
+    rr(x, y, w, 110 + per * 44, 22); c.fillStyle = 'rgba(12,18,32,.82)'; c.fill();
+    txt('MEILLEUR SCORE EN CARRIÈRE', x + 30, y + 44, '#ffc21a', 24, 900); txt('NIVEAU', x + w - 260, y + 44, '#9fb7cf', 18, 900, 'right'); txt('SCORE', x + w - 30, y + 44, '#9fb7cf', 18, 900, 'right');
+    if (!rows.length) txt(WB.list === null ? 'Chargement…' : 'Aucun record pour l\'instant : sois le premier grutier classé !', x + 30, y + 100, '#cfe0ff', 22, 700);
+    vis.forEach((s, i) => {
+      const rank = WB.page * per + i + 1, yy = y + 96 + i * 44, me = s.name === playerName();
+      if (me) { rr(x + 14, yy - 30, w - 28, 42, 10); c.fillStyle = 'rgba(255,194,26,.2)'; c.fill(); }
+      const medal = rank === 1 ? '#ffd447' : rank === 2 ? '#d7dee8' : rank === 3 ? '#e09a5a' : null;
+      if (medal) ell(x + 46, yy - 8, 17, 17, medal);
+      txt(String(rank), x + 46, yy, medal ? '#1a1300' : '#9fb7cf', 20, 900, 'center');
+      txt(s.name, x + 84, yy, '#fff', 24, 800);
+      txt(s.level >= 50 ? 'MASTER ✓' : `${s.level}/50`, x + w - 260, yy, s.level >= 50 ? '#3cf29b' : '#9fb7cf', 20, 800, 'right');
+      txt(s.score.toLocaleString('fr-FR'), x + w - 30, yy, '#fff', 24, 900, 'right');
+    });
+    if (pages > 1) {
+      txt(`Page ${WB.page + 1} / ${pages}`, 960, y + 110 + per * 44 + 50, '#9fb7cf', 20, 800, 'center');
+      if (WB.page > 0) button('pgPrev', 660, y + 110 + per * 44 + 14, 140, 56, '◀', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+      if (WB.page < pages - 1) button('pgNext', 1120, y + 110 + per * 44 + 14, 140, 56, '▶', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+    }
+    const b = save.cbest;
+    const info = !b || !b.score ? 'Joue en Carrière : ton meilleur score y sera publié automatiquement'
+      : needPseudoPanel() ? `Ton record : ${b.score.toLocaleString('fr-FR')} pts (niveau ${b.level}) · choisis un pseudo pour le publier`
+      : WB.rank ? `Ton record : ${b.score.toLocaleString('fr-FR')} pts · ${WB.rank === 1 ? '1er' : WB.rank + 'e'} sur ${WB.total} grutier${WB.total > 1 ? 's' : ''}` : `Ton record : ${b.score.toLocaleString('fr-FR')} pts (niveau ${b.level})`;
+    txt(WB.msg && !WB.msg.startsWith('Record') ? WB.msg : info, 960, 945, WB.msg && !WB.msg.startsWith('Record') ? '#ffd447' : '#cfe0ff', 22, 800, 'center');
+  }
+  button('menu', 60, 960, 220, 70, 'MENU', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+};
+
+// ---------- record mondial sur l'écran titre et sur l'écran de fin ----------
+drawTitle = (prev => function () {
+  prev();
+  if (WB.top) { c.font = '800 20px Inter'; const t = `🏆  N°1 mondial : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts`; txt(t, 960, 1050, '#9fd6ff', 20, 800, 'center'); }
+})(drawTitle);
+drawGameOver = (prev => function () {
+  prev();
+  if ((G.mode || 'career') !== 'career') return;
+  txt(playerName().length < 2 ? 'Choisis un pseudo dans CLASSEMENTS pour apparaître au classement mondial' : WB.rank ? `Classement mondial : ${WB.rank}e sur ${WB.total}` : '', 960, 880, '#9fd6ff', 24, 800, 'center');
+})(drawGameOver);
+
+act = (prev => function (id) {
+  if (id === 'tabWorld') { WB.tab = 'world'; WB.page = 0; sfx.click(); loadWorld(); return; }
+  if (id === 'tabDay') { WB.tab = 'day'; sfx.click(); ON.board = null; ON.msg = ''; loadBoard(); return; }
+  if (id === 'pgPrev') { WB.page--; sfx.click(); return; }
+  if (id === 'pgNext') { WB.page++; sfx.click(); return; }
+  if (id === 'board') { WB.tab = 'world'; WB.page = 0; WB.list = null; loadWorld(); }
+  return prev(id);
+})(act);
 
 </script>
 </body></html>
