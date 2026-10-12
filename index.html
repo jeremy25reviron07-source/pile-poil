@@ -1080,7 +1080,7 @@ function towerCrane2(o) {
   rr(cx0 + 4, jt + 36, 120, 110, 4); c.fillStyle = lg(cx0, 0, cx0 + 120, 0, [[0, '#b5bcc4'], [1, '#7d858f']]); c.fill(); for (let k = 1; k < 4; k++) fillR(cx0 + 4, jt + 36 + k * 27, 120, 2, 'rgba(0,0,0,.25)'); ell(cx0 + 64, jt + 44, 4, 4, '#4a5058');
   rr(cx1 - 120, jt - 4, 64, 26, 4); c.fillStyle = '#5b636e'; c.fill(); ell(cx1 - 104, jt + 9, 11, 11, '#3a3f46'); ell(cx1 - 104, jt + 9, 6, 6, '#8a929c'); for (let k = -8; k <= 8; k += 3) ln(cx1 - 104 + k, jt - 1, cx1 - 104 + k, jt + 19, 'rgba(200,205,210,.5)', 1);
   rr(cx1 - 48, jt - 8, 34, 30, 3); c.fillStyle = '#d9dee4'; c.fill(); fillR(cx1 - 44, jt - 2, 10, 4, '#e8483b');
-  rr(cx0 + 130, jt + 1, 110, 20, 2); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 1.5; c.stroke(); txt('PILE POIL', cx0 + 185, jt + 16, '#1a1300', 13, 900, 'center');
+  rr(cx0 + 130, jt + 1, 110, 20, 2); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 1.5; c.stroke(); { let fs = 13; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > 102 && fs > 8) { fs--; c.font = `900 ${fs}px Inter`; } txt(companyName(), cx0 + 185, jt + 16, '#1a1300', fs, 900, 'center'); }
   // câble de levage le long de la flèche
   ln(cx1 - 104, jt + 9, jibR - 10, jt + jh - 2, 'rgba(40,44,50,.55)', 1.5);
   // cabine (le grutier est ajouté en dynamique)
@@ -1099,7 +1099,7 @@ function trolley(x, jt, col = '#d93b2b') {
 
 // ---------- Grue sur chenilles (flèche treillis) ----------
 function crawler2(tipX, lvl) {
-  const bx = 300, gy = GY, col = '#f6b81a', dark = '#b9820a', lo = shade(col, -55), hi = shade(col, 35);
+  const sk = craneSkin(), bx = 300, gy = GY, col = sk.col, dark = sk.dark, lo = shade(col, -55), hi = shade(col, 35);
   ell(bx + 180, gy + 3, 270, 9, 'rgba(0,0,0,.35)');
   track(bx - 60, bx + 420, gy, 76);
   fillR(bx + 120, gy - 92, 120, 18, '#2b2f36'); ell(bx + 180, gy - 86, 40, 10, '#3a3f46');
@@ -1109,7 +1109,7 @@ function crawler2(tipX, lvl) {
   fillR(bx - 10, gy - 104, 380, 8, '#1d2026'); for (let k = 0; k < 9; k++) c.fillStyle = k % 2 ? '#1d2026' : '#ffc21a', c.fillRect(bx - 10 + k * 20, gy - 104, 20, 8);
   // contrepoids
   rr(bx - 90, gy - 190, 100, 96, 6); c.fillStyle = lg(bx - 90, 0, bx + 10, 0, [[0, '#9aa3ad'], [1, '#5f6873']]); c.fill(); for (let k = 1; k < 4; k++) fillR(bx - 90, gy - 190 + k * 24, 100, 2, 'rgba(0,0,0,.3)');
-  txt('PILE POIL', bx + 90, gy - 120, 'rgba(30,24,0,.75)', 22, 900, 'center');
+  txt(companyName(), bx + 90, gy - 120, 'rgba(30,24,0,.75)', companyName().length > 10 ? 17 : 22, 900, 'center');
   // cabine
   rr(bx + 260, gy - 290, 110, 96, 10); c.fillStyle = lg(0, gy - 290, 0, gy - 194, [[0, hi], [1, dark]]); c.fill();
   cabGlass(bx + 275, gy - 275, 70, 44, 1, clamp(lvl ? lvl.cr.v / 120 : 0, -1, 1));
@@ -1395,8 +1395,8 @@ function bakeTranche(t) {
   if (C.crane === 'tower') {
     e.crane = mk();
     onCanvas(e.crane, () => {
-      towerCrane2({ mx: TOWER.mx, gy: GY, jt: TOWER.jt, jibL: TOWER.jibL, jibR: TOWER.jibR, col: C.night ? '#b98612' : '#f6b81a', dark: C.night ? '#7a5608' : '#b9820a', light: C.night });
-      if (C.night) for (let x = 420; x < 1780; x += 200) withShadow('#ff4a3a', 16, 0, 0, () => ell(x, TOWER.jt + 2, 4, 4, '#ff6a5a'));
+      towerStatic(C.night);
+      if (C.night) for (let x = 420; x < towerJibEnd(); x += 200) withShadow('#ff4a3a', 16, 0, 0, () => ell(x, TOWER.jt + 2, 4, 4, '#ff6a5a'));
     }); force(e.crane);
   }
   if (t >= 2) {
@@ -1598,10 +1598,10 @@ function operator(wx, wy, ww, wh, lookDir, lever) {
   // le grutier vu à travers la vitre : épaules, tête casquée tournée vers la charge
   c.save(); rr(wx, wy, ww, wh, 6); c.clip();
   const cx = wx + ww / 2 + lookDir * 3, base = wy + wh;
-  c.fillStyle = '#1f3a5f'; c.beginPath(); c.ellipse(cx, base + 4, ww * .36, wh * .42, 0, Math.PI, 0); c.fill();
-  fillR(cx - ww * .3, base - wh * .2, ww * .6, 4, 'rgba(255,200,40,.9)');
+  const OL = opLook(); c.fillStyle = OL.jacket; c.beginPath(); c.ellipse(cx, base + 4, ww * .36, wh * .42, 0, Math.PI, 0); c.fill();
+  fillR(cx - ww * .3, base - wh * .2, ww * .6, 4, OL.stripe);
   ell(cx + lookDir * 2, base - wh * .55, wh * .2, wh * .24, '#e3ae86');
-  c.fillStyle = '#f3f5f7'; c.beginPath(); c.ellipse(cx + lookDir * 2, base - wh * .66, wh * .23, wh * .18, 0, Math.PI, 0); c.fill(); fillR(cx + lookDir * 2 - wh * .26 + (lookDir > 0 ? 4 : 0), base - wh * .67, wh * .5, 2.5, '#d5dbe1');
+  c.fillStyle = OL.helm; c.beginPath(); c.ellipse(cx + lookDir * 2, base - wh * .66, wh * .23, wh * .18, 0, Math.PI, 0); c.fill(); fillR(cx + lookDir * 2 - wh * .26 + (lookDir > 0 ? 4 : 0), base - wh * .67, wh * .5, 2.5, '#d5dbe1');
   ell(cx + lookDir * (wh * .12), base - wh * .52, 1.6, 1.6, '#2a1d14');
   ln(cx - ww * .22, base, cx - ww * .22 + lever * 4, base - wh * .22, '#15181d', 3); ell(cx - ww * .22 + lever * 4, base - wh * .24, 3, 3, '#e8483b');
   c.restore();
@@ -2202,11 +2202,11 @@ function drawLevel(lvl) {
   heras(lvl);
   c.drawImage(SITE, 0, 0);
   siteSign2(lvl);
-  if (lvl.craneLayer) { c.drawImage(lvl.craneLayer, 0, 0); operator(TOWER.mx + 66, TOWER.jt + 56, 64, 42, Math.sign(lvl.cr.x - 400) || 1, clamp(lvl.cr.v / 200, -1, 1)); }
+  if (lvl.craneLayer) { c.drawImage(lvl.craneLayer, 0, 0); craneOperator(lvl); }
   drawSiteLife(lvl);
   // balise d'aviation clignotante au sommet de la grue
   const blink = (Math.sin(G.t * 5) > .3) ? 1 : .15;
-  if (C.crane === 'tower') { c.globalAlpha = blink; withShadow('#ff3b2b', 26, 0, 0, () => ell(TOWER.mx + 35, TOWER.jt - 172, 7, 7, '#ff5a48')); c.globalAlpha = 1; }
+  if (C.crane === 'tower') { const [bx, by] = towerBeaconPos(); c.globalAlpha = blink; withShadow('#ff3b2b', 26, 0, 0, () => ell(bx, by, 7, 7, '#ff5a48')); c.globalAlpha = 1; }
   // ombre portée de la charge : plus elle est haute, plus l'ombre est petite et diffuse
   { let lx, ly; if (lvl.phase === 'hang') { const s = loadState(lvl); lx = s.x; ly = s.y; } else if (lvl.fly) { lx = lvl.fly.x; ly = lvl.fly.y; }
     if (lx !== undefined && !(lvl.fly && (lvl.fly.broken || lvl.fly.sunk)) && !(lvl.phase === 'done' && (lvl.result === 'in' || lvl.result === 'perfect'))) { const hgt = clamp((GY - ly) / 650, 0, 1), k = 1 - hgt * .6; ell(lx, GY + 6, lvl.loadW * .62 * k, 11 * k, `rgba(0,0,0,${(.42 * (1 - hgt * .75)).toFixed(3)})`); } }
@@ -2215,7 +2215,7 @@ function drawLevel(lvl) {
   c.save(); c.globalAlpha = .55 + .45 * pulse; target(t.x, t.w, GY, 150); c.restore();
   drawWorkers(lvl); window.__skin = window.__helm = null;
   banksman2(lvl); drawCrew(lvl, true);
-  if (C.crane === 'crawler') { crawler2(lvl.cr.x, lvl); } else trolley(lvl.cr.x, TOWER.jt);
+  if (C.crane === 'crawler') { mobileCrane(lvl.cr.x, lvl); } else trolley(lvl.cr.x, TOWER.jt, craneSkin().trolley);
   const [px, py] = pivotOf(lvl);
   if (lvl.phase === 'hang') {
     c.save(); c.translate(px, py); c.rotate(-lvl.th);
@@ -2238,8 +2238,8 @@ function drawLevel(lvl) {
   drawAccident(lvl);
   c.filter = 'none';
   // helpers: trajectory preview during apprenticeship
-  if (lvl.phase === 'hang' && C.t === 0) {
-    const pts = predict(lvl); c.save(); c.fillStyle = 'rgba(255,255,255,.9)'; pts.forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }); c.restore();
+  if (lvl.phase === 'hang' && (C.t === 0 || laserOn())) {
+    let pts = predict(lvl); if (C.t !== 0) pts = pts.slice(0, Math.ceil(pts.length * .4)); c.save(); c.fillStyle = 'rgba(255,255,255,.9)'; pts.forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }); c.restore();
   }
   // weather
   if (C.rain) { const n = C.rain === 'forte' ? 260 : C.rain === 'pluie' ? 170 : 90, ang = clamp(C.wind / 60, -.6, .6) + .15; c.strokeStyle = 'rgba(210,225,245,.42)'; c.lineWidth = 2; c.beginPath(); for (let i = 0; i < n; i++) { const r = lvl.rain[i]; r[1] += r[2] * 1.4; r[0] += r[2] * ang * 1.4; if (r[1] > H) { r[1] = -40; r[0] = Math.random() * W; } if (i % 9 === 0 && r[1] > GY + 20 && r[1] < GY + 40) { c.moveTo(r[0] - 6, r[1] - 2); c.lineTo(r[0] - 1, r[1] - 9); c.moveTo(r[0] + 6, r[1] - 2); c.lineTo(r[0] + 1, r[1] - 9); } if (r[0] > W) r[0] -= W; if (r[0] < 0) r[0] += W; c.moveTo(r[0], r[1]); c.lineTo(r[0] + r[2] * ang, r[1] + r[2]); } c.stroke(); }
@@ -2262,7 +2262,7 @@ function hud(lvl) {
   txt(TRANCHES[C.t].name.toUpperCase(), 210, 70, '#cfe0ff', 19, 800);
   const t0 = CHECKPOINTS[C.t]; for (let i = 0; i < 10; i++) { const l = t0 + i; if (l > 49) break; const x = 210 + i * 27; rr(x, 92, 21, 26, 5); c.fillStyle = l < n ? '#2bd67b' : l === n ? '#ffc21a' : 'rgba(255,255,255,.14)'; c.fill(); }
   txt(`Checkpoint : niv. ${G.checkpoint}`, 210, 144, 'rgba(255,255,255,.55)', 15, 700);
-  P(522, 30, 250, 122); txt('VIES', 552, 70, '#ffc21a', 22); for (let i = 0; i < 3; i++) helmet(582 + i * 70, 126, .85, i < G.lives);
+  P(522, 30, 250, 122); txt('VIES', 552, 70, '#ffc21a', 22); { const nh = Math.max(3, G.lives), sp = nh > 3 ? 54 : 70, k = nh > 3 ? .7 : .85; for (let i = 0; i < nh; i++) helmet(582 + i * sp - (nh > 3 ? 8 : 0), 126, k, i < G.lives); }
   if (G.combo >= 2) { const pz = 1 + .06 * Math.sin(G.t * 8); c.save(); c.translate(647, 198); c.scale(pz, pz); rr(-125, -32, 250, 64, 22); c.fillStyle = 'rgba(43,214,123,.92)'; c.fill(); txt(`COMBO ×${Math.min(3, 1 + (G.combo - 1) * .5).toLocaleString('fr-FR')}`, 0, 11, '#06210f', 28, 900, 'center'); c.restore(); }
   txt('PILE POIL', 960, 92, '#ffc21a', 58, 900, 'center'); txt('ADRESSE & PRÉCISION', 960, 124, 'rgba(255,255,255,.85)', 17, 800, 'center');
   P(1530, 30, 354, 122); txt('SCORE', 1560, 70, '#ffc21a', 22); txt(G.score.toLocaleString('fr-FR'), 1560, 126, '#fff', 52, 900);
@@ -2339,7 +2339,7 @@ function drawCheckpoint() {
     txt(st === 'done' ? '✓' : st === 'next' ? '▶' : '•', x, 341, st === 'lock' ? '#8d9abb' : '#0b1a10', 30, 900, 'center');
     txt(tr.name.toUpperCase(), x, 400, st === 'lock' ? '#8d9abb' : '#fff', 18, 900, 'center'); txt('Niv. ' + tr.range, x, 428, st === 'next' ? '#ffc21a' : '#8d9abb', 18, 800, 'center');
   });
-  rr(160, 480, 600, 260, 22); c.fillStyle = 'rgba(12,18,32,.74)'; c.fill(); txt('VIES RECHARGÉES', 200, 540, '#ffc21a', 28, 900); for (let i = 0; i < 3; i++) helmet(260 + i * 150, 680, 1.7, true); txt(`3 / 3 pour la tranche ${TRANCHES[t].range}`, 200, 722, '#cfe0ff', 22, 700);
+  rr(160, 480, 600, 260, 22); c.fillStyle = 'rgba(12,18,32,.74)'; c.fill(); txt('VIES RECHARGÉES', 200, 540, '#ffc21a', 28, 900); { const nh = Math.max(3, G.lives); for (let i = 0; i < nh; i++) helmet(240 + i * (nh > 3 ? 120 : 150), 680, nh > 3 ? 1.4 : 1.7, true); } txt(`${G.lives} / ${G.lives} pour la tranche ${TRANCHES[t].range}`, 200, 722, '#cfe0ff', 22, 700);
   rr(800, 480, 960, 260, 22); c.fillStyle = 'rgba(12,18,32,.74)'; c.fill();
   txt(`TRANCHE : ${TRANCHES[t].name.toUpperCase()}`, 840, 540, '#ffc21a', 28, 900);
   const hz = [[['sun', 'Commandes', 'jauge + balancement'], ['wind', 'Trou large', 'qui rétrécit'], ['cloud', 'Grue', 'vitesse constante']],
@@ -2481,7 +2481,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -2846,9 +2846,10 @@ function drawTitle() {
   button('live', 460, 512, 480, 96, 'DUEL EN DIRECT', '#ff6a55', '#c4281a', '#ffffff');
   button('duel', 980, 512, 480, 96, 'DUEL DIFFÉRÉ', '#5fa8ff', '#2a62c4', '#061a3a');
   button('board', 460, 624, 480, 84, 'CLASSEMENTS', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
-  if (cp > 1) button('restart', 980, 624, 480, 84, 'RECOMMENCER LA CARRIÈRE', 'rgba(255,255,255,.14)', 'rgba(255,255,255,.06)', '#fff');
-  txt('Défis et duels : 5 chantiers, 3 vies, le même tirage pour chaque joueur', 960, 770, '#9fb7cf', 22, 700, 'center');
-  if (DEMO) txt('Mode démo : scores et duels restent sur cet appareil (ajoute tes clés Supabase pour jouer en ligne)', 960, 806, '#ffb36b', 17, 700, 'center');
+  button('garage', 980, 624, 480, 84, 'GARAGE', '#ff9a3c', '#c45f0a', '#2a1200');
+  if (cp > 1) button('restart', 700, 724, 520, 56, 'RECOMMENCER LA CARRIÈRE', 'rgba(255,255,255,.14)', 'rgba(255,255,255,.06)', '#fff');
+  txt('Défis et duels : 5 chantiers, 3 vies, le même tirage pour chaque joueur', 960, 812, '#9fb7cf', 21, 700, 'center');
+  if (DEMO) txt('Mode démo : scores et duels restent sur cet appareil (ajoute tes clés Supabase pour jouer en ligne)', 960, 840, '#ffb36b', 16, 700, 'center');
   const rows = TOUCH ? [['◀ ▶', 'Déplacer'], ['▲ ▼', 'Câble'], ['MAINTENIR', 'Puissance puis lâcher']] : [['← →', 'Déplacer'], ['↑ ↓', 'Câble'], ['ESPACE', 'Maintenir puis relâcher'], ['ÉCHAP', 'Pause']];
   const ws = rows.map(([k, l]) => { c.font = '900 18px Inter'; const kw = c.measureText(k).width + 26; c.font = '700 19px Inter'; return [kw, c.measureText(l).width]; }), tot = ws.reduce((s, [a2, b2]) => s + a2 + b2 + 50, -50);
   let x = 960 - tot / 2; rows.forEach(([k, l], i) => { const [kw, lw] = ws[i]; rr(x, 860, kw, 34, 8); c.fillStyle = 'rgba(255,255,255,.92)'; c.fill(); txt(k, x + kw / 2, 884, '#121a2c', 18, 900, 'center'); txt(l, x + kw + 10, 884, '#e6eef8', 19, 700); x += kw + lw + 50; });
@@ -3206,7 +3207,7 @@ const WB = { list: null, msg: '', tab: 'world', page: 0, rank: null, total: null
 const CAREER_MAX = lvl => 225 * lvl * (lvl + 1);   // plafond théorique (tout parfait, combo ×3)
 
 if (SB) {
-  DB.career = async () => { const { data, error } = await SB.from('career').select('name,score,level').order('score', { ascending: false }).limit(100); err(error, 'Classement mondial indisponible'); return data; };
+  DB.career = async () => { const { data, error } = await SB.from('career').select('name,score,level').order('score', { ascending: false }).limit(100); if (error) throw new Error('Classement mondial indisponible : ' + (error.message || error.code || '').slice(0, 90)); return data; };
   DB.submitCareer = async b => { const { data, error } = await SB.rpc('submit_career', { p_name: b.name, p_score: b.score, p_level: b.level }); err(error); return data; };
 } else {
   DB.career = async () => (DB._r('career') || []).slice(0, 100);
@@ -3330,6 +3331,550 @@ act = (prev => function (id) {
   if (id === 'board') { WB.tab = 'world'; WB.page = 0; WB.list = null; loadWorld(); }
   return prev(id);
 })(act);
+
+// =====================================================================
+//  PILE POIL — GARAGE : pièces gagnées en jouant, peintures de grue, améliorations
+// =====================================================================
+function hexShade(hex, amt) { const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, v + amt)).toString(16).padStart(2, '0'); return '#' + f(n >> 16) + f((n >> 8) & 255) + f(n & 255); }
+const SKINS = [
+  { id: 'jaune', name: 'Jaune chantier', col: '#f6b81a', dark: '#b9820a', trolley: '#d93b2b', price: 0 },
+  { id: 'rouge', name: 'Rouge pompier', col: '#d9362b', dark: '#8e1d16', trolley: '#2b2f36', price: 120 },
+  { id: 'bleu', name: 'Bleu acier', col: '#2f6fd1', dark: '#1c437f', trolley: '#f6b81a', price: 220 },
+  { id: 'vert', name: 'Vert forêt', col: '#2e8b57', dark: '#1b5434', trolley: '#f2f2f2', price: 320 },
+  { id: 'blanc', name: 'Blanc perle', col: '#e9edf2', dark: '#9aa3ad', trolley: '#d93b2b', price: 450 },
+  { id: 'noir', name: 'Noir carbone', col: '#3a3f46', dark: '#1d2026', trolley: '#ffc21a', price: 650 },
+  { id: 'or', name: 'Or massif', col: '#ffd447', dark: '#b8860b', trolley: '#1d2026', price: 1500 },
+];
+const UPGRADES = [
+  { id: 'casque', name: 'Casque de réserve', desc: '4 vies par checkpoint au lieu de 3', price: 700, icon: 'worker' },
+  { id: 'laser', name: 'Viseur laser', desc: 'Trajectoire visible dès le niveau 11', price: 1000, icon: 'sun' },
+];
+save.coins = save.coins || 0; save.skins = save.skins || ['jaune']; save.upg = save.upg || []; save.skin = save.skin || 'jaune';
+function craneSkin() { return SKINS.find(s => s.id === save.skin) || SKINS[0]; }
+const isCareer = () => (G.mode || 'career') === 'career';
+const hasUpg = id => save.upg.includes(id);
+function laserOn() { return isCareer() && hasUpg('laser'); }
+
+// ---------- gains de pièces ----------
+finish = (prev => function (lvl, res) {
+  prev(lvl, res);
+  if (res !== 'in' && res !== 'perfect') return;
+  const t = lvl.C.t, gain = isCareer() ? (t === 5 ? 200 : 10 + 3 * t) + (res === 'perfect' ? 10 : 0) : 8 + (res === 'perfect' ? 6 : 0);
+  save.coins += gain; writeSave(save);
+  if (lvl.target) FX.pops.push({ text: `+${gain} pièces`, x: lvl.target.x + lvl.target.w / 2, y: GY - 120, t: -.25, col: '#ffd447' });
+  tone(1568, .08, 'square', .03, .35); tone(2093, .12, 'square', .03, .42);
+})(finish);
+gotoCheckpointScreen = (prev => function (n) { prev(n); if (isCareer() && hasUpg('casque')) G.lives = 4; })(gotoCheckpointScreen);
+
+// ---------- pièce dessinée ----------
+function coinIcon(x, y, r) {
+  ell(x, y + r * .12, r, r, '#a66f00'); ell(x, y, r, r, '#ffd447'); ell(x, y, r * .74, r * .74, '#f2b705');
+  c.strokeStyle = '#a66f00'; c.lineWidth = Math.max(1.5, r * .1); c.beginPath(); c.moveTo(x - r * .3, y + r * .35); c.lineTo(x - r * .3, y - r * .35); c.lineTo(x + r * .3, y - r * .35); c.moveTo(x + r * .15, y - r * .35); c.lineTo(x + r * .15, y + r * .05); c.stroke();
+}
+function coinPill(x, y) {
+  c.font = '900 30px Inter'; const label = save.coins.toLocaleString('fr-FR'), w = c.measureText(label).width + 86;
+  rr(x, y, w, 60, 30); c.fillStyle = 'rgba(12,18,32,.8)'; c.fill(); c.strokeStyle = 'rgba(255,212,71,.6)'; c.lineWidth = 2; c.stroke();
+  coinIcon(x + 32, y + 30, 18); txt(label, x + 62, y + 41, '#ffd447', 30, 900);
+  return w;
+}
+function price(x, y, n, ok, size = 19) { coinIcon(x + 11, y - 7, size * .58); txt(n.toLocaleString('fr-FR'), x + 28, y, ok ? '#ffd447' : 'rgba(255,212,71,.45)', size, 900); }
+function smallBtn(id, x, y, w, h, label, kind) {
+  const cols = { go: ['#3cf29b', '#17a764', '#06210f'], buy: ['#ffd447', '#c98d00', '#2a1a00'], off: ['rgba(255,255,255,.14)', 'rgba(255,255,255,.08)', 'rgba(255,255,255,.55)'], blue: ['#5fa8ff', '#2a62c4', '#061a3a'] }[kind];
+  rr(x, y, w, h, h / 2); c.fillStyle = lg(0, y, 0, y + h, [[0, cols[0]], [1, cols[1]]]); c.fill();
+  txt(label, x + w / 2, y + h / 2 + 9, cols[2], 24, 900, 'center'); if (kind !== 'off') G.buttons.push({ id, x, y, w, h });
+}
+function statBars(x, y, vals, w = 300, base) {
+  vals.forEach((v, i) => {
+    const yy = y + i * 46; txt(STAT_NAMES[i], x, yy, '#9fb7cf', 16, 900);
+    for (let k = 0; k < 13; k++) { const on = v >= (k + 1) * .5, was = base && base[i] >= (k + 1) * .5; rr(x + k * (w / 13), yy + 8, w / 13 - 4, 16, 3); c.fillStyle = on ? (was || !base ? (k < 6 ? '#ffd447' : '#3cf29b') : '#5fa8ff') : 'rgba(255,255,255,.1)'; c.fill(); }
+  });
+}
+
+// ---------- aperçus précalculés ----------
+const GA = { tab: 'tower', view: { tower: null, mobile: null }, prev: {}, msg: '', msgT: 0, ok: true };
+function previewKey(slot, id) { return `${slot}:${id}:${save.skin}:${save.company}:${save.outfit}`; }
+function cranePreview(slot, id) {
+  const key = previewKey(slot, id); if (GA.prev[key]) return GA.prev[key];
+  const k = document.createElement('canvas'); k.width = 1900; k.height = 880;
+  const keep = Object.assign({}, save.crane); save.crane[slot] = id;
+  onCanvas(k, () => {
+    c.translate(0, -30);
+    fillR(0, GY, 1900, 40, 'rgba(70,45,25,.0)');
+    if (slot === 'tower') {
+      towerStatic(false);
+      const fake = { cr: { x: 1180, v: 0 }, C: { t: 0 } }; craneOperator(fake);
+      const hy = trolley(1180, TOWER.jt, craneSkin().trolley); cables(1180, hy, 1180, hy + 230); const hb = hookBlock(1180, hy + 230); slings(1180, hb, 1180, hy + 314, 140); concreteBlock(1180, hy + 314, 140, 84);
+    } else {
+      const fake = { cr: { x: 1300, v: 0 }, time: 0 }; mobileCrane(1300, fake);
+      cables(1300, 222, 1300, 420); const hb = hookBlock(1300, 420); slings(1300, hb, 1300, 504, 150); pipe(1300, 504, 150, 56);
+    }
+  });
+  save.crane = keep;
+  return (GA.prev[key] = k);
+}
+function invalidateCrane() { for (const k in CACHE) delete CACHE[k]; GA.prev = {}; prebake([0, 1, 2, 3, 4]); }
+function equipSkin(id) { save.skin = id; writeSave(save); invalidateCrane(); }
+
+// ---------- écran GARAGE ----------
+const TABS = [['tower', 'GRUES À TOUR'], ['mobile', 'GRUES MOBILES'], ['style', 'PEINTURE & TENUE'], ['equip', 'ÉQUIPEMENT']];
+function drawGarage() {
+  screenBg();
+  txt('GARAGE', 960, 86, '#ffc21a', 60, 900, 'center');
+  coinPill(1380, 34);
+  button('menu', 40, 30, 220, 64, 'MENU', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  TABS.forEach(([id, label], i) => { const x = 280 + i * 345, on = GA.tab === id; rr(x, 118, 325, 58, 29); c.fillStyle = on ? '#ffc21a' : 'rgba(255,255,255,.1)'; c.fill(); txt(label, x + 162, 156, on ? '#1a1300' : '#fff', 21, 900, 'center'); G.buttons.push({ id: 'tab_' + id, x, y: 118, w: 325, h: 58 }); });
+  if (GA.tab === 'tower' || GA.tab === 'mobile') drawModels(GA.tab);
+  else if (GA.tab === 'style') drawStyle();
+  else drawEquip();
+  if (GA.msg && performance.now() - GA.msgT < 2600) { c.save(); c.globalAlpha = Math.min(1, (2600 - (performance.now() - GA.msgT)) / 400); c.font = '800 24px Inter'; const tw = c.measureText(GA.msg).width + 50; rr(960 - tw / 2, 1016, tw, 50, 25); c.fillStyle = GA.ok ? 'rgba(43,214,123,.94)' : 'rgba(232,72,59,.94)'; c.fill(); txt(GA.msg, 960, 1050, '#fff', 24, 800, 'center'); c.restore(); }
+}
+function drawModels(slot) {
+  const list = CRANES[slot], viewId = GA.view[slot] || save.crane[slot], m = modelOf(slot, viewId);
+  const own = save.owned.includes(m.id), eq = save.crane[slot] === m.id, locked = (save.maxLevel || 1) < m.req;
+  // liste
+  list.forEach((md, i) => {
+    const x = 60, y = 200 + i * 168, w = 500, h = 154, o = save.owned.includes(md.id), e = save.crane[slot] === md.id, lk = (save.maxLevel || 1) < md.req, sel = md.id === m.id;
+    rr(x, y, w, h, 18); c.fillStyle = e ? 'rgba(60,242,155,.16)' : 'rgba(12,18,32,.84)'; c.fill();
+    rr(x, y, w, h, 18); c.strokeStyle = sel ? '#ffc21a' : e ? '#3cf29b' : 'rgba(255,255,255,.12)'; c.lineWidth = sel ? 4 : 2; c.stroke();
+    const th = cranePreview(slot, md.id); c.save(); rr(x + 12, y + 12, 170, h - 24, 12); c.clip(); fillR(x + 12, y + 12, 170, h - 24, 'rgba(90,150,210,.25)'); c.globalAlpha = lk ? .35 : 1; c.drawImage(th, 0, 60, 1900, 820, x + 2, y + 30, 1900 * .1, 820 * .1); c.restore();
+    let nm = md.name, fs = 21; c.font = `900 ${fs}px Inter`; while (c.measureText(nm).width > 290 && fs > 15) { fs--; c.font = `900 ${fs}px Inter`; }
+    txt(nm, x + 196, y + 44, '#fff', fs, 900);
+    const lv = save.clvl[md.id] || 0; if (o) for (let k = 0; k < 3; k++) ell(x + 206 + k * 22, y + 70, 7, 7, k < lv ? '#3cf29b' : 'rgba(255,255,255,.18)');
+    if (e) txt('ÉQUIPÉE', x + 196, y + 120, '#3cf29b', 19, 900);
+    else if (o) txt('Disponible', x + 196, y + 120, '#9fd6ff', 19, 800);
+    else if (lk) txt(`🔒 Niveau ${md.req} requis`, x + 196, y + 120, '#ff9a8a', 19, 800);
+    else price(x + 196, y + 120, md.price, save.coins >= md.price);
+    G.buttons.push({ id: `mv_${slot}_${md.id}`, x, y, w, h });
+  });
+  // fiche détaillée
+  const X = 600, Y = 200, Wd = 1260;
+  rr(X, Y, Wd, 830, 24); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  c.save(); rr(X, Y, Wd, 480, 24); c.clip(); fillR(X, Y, Wd, 480, lg(0, Y, 0, Y + 480, [[0, 'rgba(90,150,210,.45)'], [1, 'rgba(160,200,235,.15)']])); fillR(X, Y + 430, Wd, 50, 'rgba(90,60,35,.6)');
+  c.globalAlpha = locked ? .4 : 1; c.drawImage(cranePreview(slot, m.id), 0, 0, 1900, 880, X + 110, Y + 12, 1900 * .55, 880 * .55); c.restore();
+  if (locked) { rr(X + Wd / 2 - 230, Y + 190, 460, 90, 20); c.fillStyle = 'rgba(12,18,32,.85)'; c.fill(); txt(`🔒 Atteins le niveau ${m.req} en Carrière`, X + Wd / 2, Y + 246, '#fff', 26, 900, 'center'); }
+  txt(m.name.toUpperCase(), X + 40, Y + 530, '#ffc21a', 30, 900);
+  wrapText(m.desc, X + 40, Y + 570, 640, 26, '#cfe0ff', 19);
+  const lv = save.clvl[m.id] || 0, st = statsOf(slot, m.id);
+  statBars(X + 760, Y + 520, st, 450, m.st);
+  txt(own ? `Amélioration : niveau ${lv}/3` : 'Améliorable 3 fois après achat (+0,5 partout)', X + 760, Y + 670, '#9fb7cf', 17, 800);
+  // actions
+  const by = Y + 720;
+  if (locked) smallBtn('', X + 40, by, 420, 70, `NIVEAU ${m.req} REQUIS`, 'off');
+  else if (!own) { const ok = save.coins >= m.price; smallBtn(`buy_${slot}_${m.id}`, X + 40, by, 420, 70, `ACHETER · ${m.price.toLocaleString('fr-FR')}`, ok ? 'buy' : 'off'); if (!ok) G.buttons.push({ id: `buy_${slot}_${m.id}`, x: X + 40, y: by, w: 420, h: 70 }); }
+  else if (!eq) smallBtn(`eq_${slot}_${m.id}`, X + 40, by, 420, 70, 'ÉQUIPER', 'go');
+  else smallBtn('', X + 40, by, 420, 70, '✓ ÉQUIPÉE', 'off');
+  if (own) { const cost = upgCost(slot, m.id); if (lv < 3) { const ok = save.coins >= cost; smallBtn(`up_${slot}_${m.id}`, X + 500, by, 460, 70, `AMÉLIORER · ${cost.toLocaleString('fr-FR')}`, ok ? 'blue' : 'off'); if (!ok) G.buttons.push({ id: `up_${slot}_${m.id}`, x: X + 500, y: by, w: 460, h: 70 }); } else smallBtn('', X + 500, by, 460, 70, '★ AMÉLIORATION MAX', 'off'); }
+  txt(slot === 'tower' ? 'Utilisée aux niveaux 1-20 et 31-49' : 'Utilisée aux niveaux 21-30 (conditions extrêmes)', X + 40, by - 22, 'rgba(255,255,255,.5)', 17, 700);
+}
+function wrapText(s, x, y, maxW, lh, col, size) { c.font = `700 ${size}px Inter`; let line = '', yy = y; s.split(' ').forEach(w => { const t = line ? line + ' ' + w : w; if (c.measureText(t).width > maxW) { txt(line, x, yy, col, size, 700); line = w; yy += lh; } else line = t; }); if (line) txt(line, x, yy, col, size, 700); }
+function drawStyle() {
+  txt('PEINTURE DES GRUES', 60, 234, '#ffc21a', 24, 900);
+  SKINS.forEach((sk, i) => {
+    const x = 60 + i * 258, y = 254, w = 240, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
+    rr(x, y, w, h, 18); c.fillStyle = eq ? 'rgba(60,242,155,.18)' : 'rgba(12,18,32,.84)'; c.fill();
+    rr(x, y, w, h, 18); c.strokeStyle = eq ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 4 : 2; c.stroke();
+    const sx = x + 22, sy = y + 22; fillR(sx, sy, w - 44, 9, sk.col); fillR(sx, sy + 32, w - 44, 9, sk.col);
+    c.strokeStyle = sk.dark; c.lineWidth = 3; c.beginPath(); for (let xx = sx; xx < sx + w - 54; xx += 24) { c.moveTo(xx, sy + 36); c.lineTo(xx + 12, sy + 5); c.lineTo(xx + 24, sy + 36); } c.stroke();
+    rr(x + w / 2 - 22, sy + 48, 44, 16, 4); c.fillStyle = sk.trolley; c.fill();
+    txt(sk.name, x + w / 2, y + 108, '#fff', 19, 800, 'center');
+    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 136, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 136, '#9fd6ff', 17, 900, 'center'); else price(x + w / 2 - 40, y + 138, sk.price, save.coins >= sk.price, 18);
+    G.buttons.push({ id: 'sk_' + sk.id, x, y, w, h });
+  });
+  // nom de l'entreprise
+  rr(60, 440, 860, 250, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  txt('TON ENTREPRISE', 100, 494, '#ffc21a', 24, 900); txt('Le nom affiché sur le panneau de la contre-flèche et sur les grues mobiles', 100, 528, '#cfe0ff', 18, 700);
+  companySignBig(100, 600, 520);
+  // tenue du grutier
+  rr(960, 440, 900, 580, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  txt('TENUE DU GRUTIER', 1000, 494, '#ffc21a', 24, 900);
+  const O = opLook(); c.save(); c.translate(1000, 530); c.scale(2.6, 2.6); rr(0, 0, 100, 70, 10); c.fillStyle = lg(0, 0, 0, 70, [[0, '#d9f2ff'], [1, '#3b6f96']]); c.fill(); operator(0, 0, 100, 70, 1, .3); c.restore();
+  person2(1430, 760, 1.6, 1, { vest: O.vest, helm: O.helm, skin: '#e3ae86', pants: '#2b3a55', shirt: O.jacket }, {});
+  OUTFITS.forEach((o, i) => {
+    const x = 1000 + (i % 3) * 280, y = 790 + Math.floor(i / 3) * 110, w = 260, h = 96, own = save.outfits.includes(o.id), eq = save.outfit === o.id;
+    rr(x, y, w, h, 16); c.fillStyle = eq ? 'rgba(60,242,155,.18)' : 'rgba(255,255,255,.06)'; c.fill(); rr(x, y, w, h, 16); c.strokeStyle = eq ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 3 : 1.5; c.stroke();
+    ell(x + 38, y + 40, 18, 12, o.helm); fillR(x + 22, y + 52, 32, 26, o.jacket); fillR(x + 22, y + 62, 32, 5, o.stripe);
+    txt(o.name, x + 72, y + 42, '#fff', 19, 800);
+    if (eq) txt('PORTÉE', x + 72, y + 74, '#3cf29b', 16, 900); else if (own) txt('PORTER', x + 72, y + 74, '#9fd6ff', 16, 900); else price(x + 72, y + 76, o.price, save.coins >= o.price, 17);
+    G.buttons.push({ id: 'of_' + o.id, x, y, w, h });
+  });
+  rr(60, 720, 860, 300, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  txt('COMMENT GAGNER DES PIÈCES', 100, 774, '#ffc21a', 22, 900);
+  [['Chantier réussi en Carrière', '10 à 22'], ['Lancer parfait', '+10'], ['Master Niveau réussi', '+200'], ['Défi du jour et duels (par chantier)', '8 · parfait +6']].forEach(([a, b], i) => { txt(a, 100, 822 + i * 48, '#e6eef8', 21, 700); coinIcon(720, 815 + i * 48, 11); txt(b, 880, 822 + i * 48, '#ffd447', 21, 900, 'right'); });
+}
+function companySignBig(x, y, w) { rr(x, y - 50, w, 70, 8); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 4; c.stroke(); let fs = 44; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 40 && fs > 18) { fs--; c.font = `900 ${fs}px Inter`; } txt(companyName(), x + w / 2, y + 2, '#1a1300', fs, 900, 'center'); }
+function drawEquip() {
+  txt('Équipements valables en Carrière (défis et duels restent à armes égales)', 960, 236, '#9fb7cf', 20, 700, 'center');
+  UPGRADES.forEach((u, i) => {
+    const x = 210 + i * 770, y = 280, w = 730, h = 420, own = hasUpg(u.id);
+    rr(x, y, w, h, 24); c.fillStyle = own ? 'rgba(60,242,155,.14)' : 'rgba(12,18,32,.84)'; c.fill(); rr(x, y, w, h, 24); c.strokeStyle = own ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = 2; c.stroke();
+    c.save(); c.translate(x + 110, y + 130); c.scale(4, 4); ICONS[u.icon](0, 0); c.restore();
+    txt(u.name, x + 230, y + 120, '#fff', 34, 900); wrapText(u.desc, x + 230, y + 166, 460, 28, '#cfe0ff', 22);
+    if (own) txt('✓ INSTALLÉ', x + 230, y + 330, '#3cf29b', 28, 900);
+    else { const ok = save.coins >= u.price; smallBtn('ug_' + u.id, x + 230, y + 290, 360, 70, `ACHETER · ${u.price.toLocaleString('fr-FR')}`, ok ? 'buy' : 'off'); if (!ok) G.buttons.push({ id: 'ug_' + u.id, x: x + 230, y: y + 290, w: 360, h: 70 }); }
+  });
+  rr(210, 740, 1500, 240, 24); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  txt('TA PROGRESSION', 250, 796, '#ffc21a', 24, 900);
+  const tot = CRANES.tower.length + CRANES.mobile.length, own = save.owned.length, ups = Object.values(save.clvl).reduce((a, b) => a + b, 0);
+  [[`Grues possédées`, `${own} / ${tot}`], ['Améliorations de grues', `${ups} / ${tot * 3}`], ['Peintures', `${save.skins.length} / ${SKINS.length}`], ['Tenues', `${save.outfits.length} / ${OUTFITS.length}`]].forEach(([a, b], i) => {
+    const x = 250 + (i % 2) * 740, y = 850 + Math.floor(i / 2) * 60; txt(a, x, y, '#e6eef8', 24, 700); txt(b, x + 640, y, '#fff', 26, 900, 'right'); });
+}
+function gaMsg(m, ok) { GA.msg = m; GA.ok = ok; GA.msgT = performance.now(); }
+drawOnline = (prev => function () { if (G.screen === 'garage') drawGarage(); else prev(); })(drawOnline);
+
+// ---------- champ HTML pour le nom d'entreprise ----------
+let GCO = null;
+function companyInput() {
+  if (GCO) return GCO;
+  GCO = document.createElement('div'); GCO.id = 'gco';
+  GCO.innerHTML = `<style>#gco[hidden]{display:none!important}#gco{position:fixed;z-index:5;display:flex;gap:8px}
+#gco input{font:800 18px Inter,sans-serif;padding:10px 14px;border-radius:12px;border:2px solid #ffc21a;background:#0c1220;color:#fff;width:230px;text-transform:uppercase}
+#gco button{font:900 16px Inter,sans-serif;padding:10px 16px;border-radius:12px;border:0;background:#3cf29b;color:#06210f;cursor:pointer}
+#gco input:focus-visible,#gco button:focus-visible{outline:3px solid #fff}</style>
+<input id="gcoName" maxlength="18" placeholder="Nom de ta boîte" aria-label="Nom de l'entreprise"><button id="gcoOk">Peindre</button>`;
+  document.body.appendChild(GCO);
+  const inp = GCO.querySelector('#gcoName'); inp.value = save.company || '';
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') GCO.querySelector('#gcoOk').click(); }); inp.addEventListener('keyup', e => e.stopPropagation());
+  GCO.querySelector('#gcoOk').onclick = () => { save.company = inp.value.replace(/[^\p{L}\p{N} &'\-.]/gu, '').trim().slice(0, 18); writeSave(save); invalidateCrane(); sfx.click(); gaMsg(save.company ? `« ${companyName()} » peint sur tes grues` : 'Nom remis à PILE POIL', true); };
+  return GCO;
+}
+setInterval(() => {
+  const show = G.screen === 'garage' && GA.tab === 'style';
+  if (!show) { if (GCO && !GCO.hidden) GCO.hidden = true; return; }
+  const o = companyInput(), r = cv.getBoundingClientRect(), k = r.width / W;
+  o.hidden = false; o.style.left = (r.left + 100 * k) + 'px'; o.style.top = (r.top + 640 * k) + 'px'; o.style.transform = `scale(${Math.max(.6, Math.min(1.2, k * 1.4))})`; o.style.transformOrigin = 'left top';
+}, 120);
+
+// ---------- pièces sur l'écran titre ----------
+drawTitle = (prev => function () { prev(); coinPill(40, 36); })(drawTitle);
+drawCheckpoint = (prev => function () { prev(); coinPill(40, 36); })(drawCheckpoint);
+
+act = (prev => function (id) {
+  if (id === 'garage') { sfx.click(); GA.view = { tower: null, mobile: null }; G.screen = 'garage'; return; }
+  if (id.startsWith('tab_')) { sfx.click(); GA.tab = id.slice(4); return; }
+  let mt;
+  if ((mt = id.match(/^mv_(\w+)_(\w+)$/))) { sfx.click(); GA.view[mt[1]] = mt[2]; return; }
+  if ((mt = id.match(/^buy_(\w+)_(\w+)$/))) {
+    const m = modelOf(mt[1], mt[2]); if (save.owned.includes(m.id) || (save.maxLevel || 1) < m.req) return;
+    if (save.coins < m.price) { sfx.click(); return gaMsg(`Il te manque ${(m.price - save.coins).toLocaleString('fr-FR')} pièces`, false); }
+    save.coins -= m.price; save.owned.push(m.id); save.crane[mt[1]] = m.id; writeSave(save); invalidateCrane(); sfx.perfect(); return gaMsg(`${m.name} achetée et équipée !`, true);
+  }
+  if ((mt = id.match(/^eq_(\w+)_(\w+)$/))) { save.crane[mt[1]] = mt[2]; writeSave(save); invalidateCrane(); sfx.win(); return gaMsg(`${modelOf(mt[1], mt[2]).name} équipée`, true); }
+  if ((mt = id.match(/^up_(\w+)_(\w+)$/))) {
+    const cost = upgCost(mt[1], mt[2]); if (!cost) return;
+    if (save.coins < cost) { sfx.click(); return gaMsg(`Il te manque ${(cost - save.coins).toLocaleString('fr-FR')} pièces`, false); }
+    save.coins -= cost; save.clvl[mt[2]] = (save.clvl[mt[2]] || 0) + 1; writeSave(save); sfx.perfect(); return gaMsg(`Amélioration niveau ${save.clvl[mt[2]]} installée !`, true);
+  }
+  if (id.startsWith('sk_')) {
+    const sk = SKINS.find(s => s.id === id.slice(3)); if (!sk) return;
+    if (save.skins.includes(sk.id)) { if (save.skin !== sk.id) { equipSkin(sk.id); sfx.click(); gaMsg(`${sk.name} équipée`, true); } return; }
+    if (save.coins < sk.price) { sfx.click(); return gaMsg(`Il te manque ${(sk.price - save.coins).toLocaleString('fr-FR')} pièces`, false); }
+    save.coins -= sk.price; save.skins.push(sk.id); equipSkin(sk.id); sfx.win(); return gaMsg(`${sk.name} achetée et équipée !`, true);
+  }
+  if (id.startsWith('of_')) {
+    const o = OUTFITS.find(s => s.id === id.slice(3)); if (!o) return;
+    if (save.outfits.includes(o.id)) { save.outfit = o.id; writeSave(save); GA.prev = {}; sfx.click(); return gaMsg(`Tenue ${o.name} portée`, true); }
+    if (save.coins < o.price) { sfx.click(); return gaMsg(`Il te manque ${(o.price - save.coins).toLocaleString('fr-FR')} pièces`, false); }
+    save.coins -= o.price; save.outfits.push(o.id); save.outfit = o.id; writeSave(save); GA.prev = {}; sfx.win(); return gaMsg(`Tenue ${o.name} achetée !`, true);
+  }
+  if (id.startsWith('ug_')) {
+    const u = UPGRADES.find(s => s.id === id.slice(3)); if (!u || hasUpg(u.id)) return;
+    if (save.coins < u.price) { sfx.click(); return gaMsg(`Il te manque ${(u.price - save.coins).toLocaleString('fr-FR')} pièces`, false); }
+    save.coins -= u.price; save.upg.push(u.id); writeSave(save); sfx.perfect(); return gaMsg(`${u.name} installé !`, true);
+  }
+  return prev(id);
+})(act);
+addEventListener('keydown', e => { if (G.screen === 'garage' && e.key === 'Escape') act('menu'); });
+
+// =====================================================================
+//  PILE POIL — MODÈLES DE GRUES (garage)
+//  Emplacement « tour » : niveaux 1-20 et 31-49 · emplacement « mobile » : niveaux 21-30
+// =====================================================================
+const CRANES = {
+  tower: [
+    { id: 'elements', name: 'Grue à montage par éléments', st: [3, 3, 3], req: 1, price: 0,
+      desc: 'La grue à tour classique à tête marteau : porte-flèche, tirants et contre-flèche lestée. Polyvalente sur tous les chantiers.' },
+    { id: 'automontante', name: 'Grue automontante', st: [5, 2, 2.5], req: 5, price: 350,
+      desc: 'Petite grue de lotissement qui se déplie seule. Lest au pied, pilotée à la radiocommande depuis le sol. Très vive, mais la charge balance.' },
+    { id: 'flattop', name: 'Grue flat-top', st: [4, 3.5, 2.5], req: 12, price: 700,
+      desc: 'Sans porte-flèche ni tirants : idéale en ville quand plusieurs grues se croisent. Chariot rapide, flèche plus sensible au vent.' },
+    { id: 'xxl', name: 'Grue XXL sur rails', st: [2.5, 5, 4.5], req: 31, price: 1400,
+      desc: 'Mât renforcé, châssis sur bogies et rails, double lest : la grue des grands ouvrages. Lourde à manœuvrer, mais d\'une stabilité redoutable.' },
+  ],
+  mobile: [
+    { id: 'treillis', name: 'Grue à chenilles treillis', st: [3, 3, 3], req: 1, price: 0,
+      desc: 'La grue sur chenilles à flèche treillis des chantiers industriels. Équilibrée et fiable.' },
+    { id: 'telescopique', name: 'Grue mobile télescopique', st: [4.5, 3.5, 2.5], req: 21, price: 600,
+      desc: 'Porteur routier à 5 essieux, stabilisateurs déployés, flèche télescopique à 4 éléments. Précise et rapide à mettre en place.' },
+    { id: 'superlift', name: 'Chenillée lourde à superlift', st: [2, 5, 5], req: 26, price: 1200,
+      desc: 'Le monstre des levages exceptionnels : mât arrière, plateau de contrepoids superlift. Lente, mais le vent ne la fait pas broncher.' },
+  ],
+};
+const STAT_NAMES = ['MANIABILITÉ', 'STABILITÉ', 'TENUE AU VENT'];
+const UPG_COST = [150, 300, 500];
+save.crane = save.crane || { tower: 'elements', mobile: 'treillis' };
+save.owned = save.owned || ['elements', 'treillis'];
+save.clvl = save.clvl || {};
+save.maxLevel = Math.max(save.maxLevel || 1, save.checkpoint || 1);
+save.company = save.company || '';
+save.outfit = save.outfit || 'classique';
+// anciens bonus remplacés par les caractéristiques des grues : on rembourse
+if (save.upg && save.upg.some(u => u === 'cable' || u === 'lest')) {
+  if (save.upg.includes('cable')) save.coins += 250; if (save.upg.includes('lest')) save.coins += 400;
+  save.upg = save.upg.filter(u => u !== 'cable' && u !== 'lest');
+}
+writeSave(save);
+
+const modelOf = (slot, id) => CRANES[slot].find(m => m.id === id) || CRANES[slot][0];
+const equipped = slot => modelOf(slot, save.crane[slot]);
+const tierOf = (slot, id) => CRANES[slot].findIndex(m => m.id === id);
+function statsOf(slot, id) { const m = modelOf(slot, id), lv = save.clvl[id] || 0; return m.st.map(v => v + lv * .5); }
+function upgCost(slot, id) { const lv = save.clvl[id] || 0; return lv >= 3 ? 0 : Math.round(UPG_COST[lv] * (1 + tierOf(slot, id) * .5)); }
+function companyName() { return (save.company || 'PILE POIL').toUpperCase(); }
+
+// ---------- effets en jeu (Carrière uniquement : défis et duels à armes égales) ----------
+function slotOfLevel(C) { return C.crane === 'crawler' ? 'mobile' : 'tower'; }
+function curStats(C) { return isCareer() && C.t !== 5 ? statsOf(slotOfLevel(C), save.crane[slotOfLevel(C)]) : [3, 3, 3]; }
+cfg = (prev => function (n) {
+  const C = prev(n), [, s, w] = curStats(C);
+  C.swing *= 1.3 - .1 * s; C.wind *= 1.3 - .1 * w;
+  return C;
+})(cfg);
+updateCrane = (prev => function (lvl, dt) {
+  const [m] = curStats(lvl.C), k = .75 + .085 * m, manual = keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown;
+  if (!manual || Math.abs(k - 1) < .01) return prev(lvl, dt);
+  prev(lvl, dt * k); lvl.cr.v *= k;
+})(updateCrane);
+// niveau max atteint (pour débloquer les modèles)
+setInterval(() => { if (isCareer() && G.level > (save.maxLevel || 1) && (G.screen === 'play' || G.screen === 'checkpoint')) { save.maxLevel = G.level; writeSave(save); } }, 1000);
+
+// ---------- tenue du grutier ----------
+const OUTFITS = [
+  { id: 'classique', name: 'Classique', helm: '#f3f5f7', jacket: '#1f3a5f', stripe: 'rgba(255,200,40,.9)', vest: '#1f3a5f', price: 0 },
+  { id: 'orange', name: 'Orange HV', helm: '#ffc21a', jacket: '#ff7a1a', stripe: '#e9edf2', vest: '#ff7a1a', price: 80 },
+  { id: 'fluo', name: 'Jaune fluo', helm: '#f3f5f7', jacket: '#d4f02a', stripe: '#9aa3ad', vest: '#d4f02a', price: 80 },
+  { id: 'chef', name: 'Chef de chantier', helm: '#2f6fd1', jacket: '#2b3a55', stripe: '#ffd21a', vest: '#ffd21a', price: 150 },
+  { id: 'pompier', name: 'Rouge', helm: '#d9362b', jacket: '#8e1d16', stripe: '#e9edf2', vest: '#d9362b', price: 150 },
+  { id: 'noir', name: 'Noir & or', helm: '#1d2026', jacket: '#1d2026', stripe: '#ffd447', vest: '#2b2f36', price: 300 },
+];
+save.outfits = save.outfits || ['classique'];
+function opLook() { return OUTFITS.find(o => o.id === save.outfit) || OUTFITS[0]; }
+
+// =====================================================================
+//  DESSIN DES GRUES À TOUR (partie fixe, précalculée)
+// =====================================================================
+function skc(night) { const sk = craneSkin(), col = night ? hexShade(sk.col, -60) : sk.col, dark = night ? hexShade(sk.dark, -50) : sk.dark; return { col, dark, hi: shade(col, 35), lo: shade(col, -55), night }; }
+function towerJibEnd() { const id = save.crane.tower; return id === 'automontante' ? 1640 : TOWER.jibR; }
+function towerBeaconPos() { const id = save.crane.tower, mx = TOWER.mx, jt = TOWER.jt; return id === 'flattop' ? [mx + 35, jt - 30] : id === 'automontante' ? [mx + 22, jt - 128] : id === 'xxl' ? [mx + 48, jt - 212] : [mx + 35, jt - 172]; }
+function towerStatic(night) {
+  const id = save.crane.tower, o = { mx: TOWER.mx, gy: GY, jt: TOWER.jt, jibL: TOWER.jibL, jibR: TOWER.jibR }, K = skc(night);
+  if (id === 'flattop') return flatTop(o, K);
+  if (id === 'automontante') return autoMontante(o, K);
+  if (id === 'xxl') return xxlRails(o, K);
+  towerCrane2(Object.assign(o, { col: K.col, dark: K.dark, light: night }));
+}
+function latticeMast(mx, base, top, mw, K, lw = 3.2) {
+  c.strokeStyle = K.lo; c.lineWidth = 5; c.beginPath(); c.moveTo(mx + 10, base); c.lineTo(mx + 10, top - 6); c.moveTo(mx + mw + 10, base); c.lineTo(mx + mw + 10, top - 6); c.stroke();
+  ln(mx + mw * .37, base, mx + mw * .37, top, '#5b636e', 2); ln(mx + mw * .57, base, mx + mw * .57, top, '#5b636e', 2); for (let yy = base; yy > top; yy -= 9) ln(mx + mw * .37, yy, mx + mw * .57, yy, '#5b636e', 1.5);
+  for (let yy = base; yy > top; yy -= mw) { const y2 = Math.max(top, yy - mw);
+    c.strokeStyle = K.dark; c.lineWidth = lw; c.beginPath(); c.moveTo(mx, yy); c.lineTo(mx + mw / 2, y2 + (yy - y2) / 2); c.lineTo(mx + mw, yy); c.moveTo(mx, y2); c.lineTo(mx + mw / 2, y2 + (yy - y2) / 2); c.lineTo(mx + mw, y2); c.stroke();
+    fillR(mx, yy - 3, mw, 5, K.col); fillR(mx - 3, yy - 6, 8, 10, K.lo); fillR(mx + mw - 5, yy - 6, 8, 10, K.lo); }
+  [mx, mx + mw - 7].forEach(xx => fillR(xx, top, 7, base - top, lg(xx, 0, xx + 7, 0, [[0, K.hi], [.5, K.col], [1, K.lo]])));
+}
+function jibTruss(x0, x1, jt, jh, K, tipCut = 20) {
+  ln(x0, jt + jh - 6, x1, jt + jh - 6, K.lo, 4);
+  c.strokeStyle = shade(K.dark, -10); c.lineWidth = 2; for (let x = x0; x < x1; x += jh) { c.beginPath(); c.moveTo(x + 6, jt + jh - 6); c.lineTo(x + jh / 2 + 6, jt + 4); c.stroke(); }
+  ln(x0, jt, x1 - tipCut, jt, K.col, 6); ln(x0, jt + jh, x1, jt + jh, K.col, 7); ln(x0, jt - 2, x1 - tipCut, jt - 2, K.hi, 1.5);
+  c.strokeStyle = K.dark; c.lineWidth = 3; c.beginPath(); for (let x = x0; x < x1 - tipCut; x += jh) { c.moveTo(x, jt + jh); c.lineTo(x + jh / 2, jt); c.lineTo(x + jh, jt + jh); } c.stroke();
+  for (let x = x0; x < x1; x += jh * 5) fillR(x - 3, jt - 4, 6, jh + 10, K.lo);
+  fillR(x0, jt + jh + 2, x1 - x0, 3, '#3a3f46');
+  c.fillStyle = K.col; c.beginPath(); c.moveTo(x1 - tipCut, jt); c.lineTo(x1 + 8, jt + jh); c.lineTo(x1 - tipCut, jt + jh); c.fill(); fillR(x1 + 2, jt + jh - 10, 10, 12, '#2b2f36');
+}
+function companySign(x, y, w) { rr(x, y, w, 20, 2); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 1.5; c.stroke(); let fs = 13; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 8 && fs > 8) { fs--; c.font = `900 ${fs}px Inter`; } txt(companyName(), x + w / 2, y + 15, '#1a1300', fs, 900, 'center'); }
+function ballastBase(mx, gy, mw) {
+  fillR(mx - 90, gy - 26, mw + 180, 14, '#4a5058'); fillR(mx - 90, gy - 12, mw + 180, 12, '#2b2f36');
+  for (let k = 0; k < 4; k++) { const bx = mx - 84 + k * ((mw + 168) / 4); rr(bx, gy - 58, (mw + 168) / 4 - 6, 32, 3); c.fillStyle = lg(0, gy - 58, 0, gy - 26, [[0, '#b9c0c7'], [1, '#868e97']]); c.fill(); ell(bx + 14, gy - 52, 3, 3, '#5b636e'); }
+}
+function towerCab(x, y, w, h, K) {
+  rr(x, y, w, h, 8); c.fillStyle = lg(0, y, 0, y + h, [[0, K.hi], [1, K.dark]]); c.fill(); fillR(x, y + h - 8, w, 8, K.lo);
+  fillR(x + 4, y + 6, w - 18, h - 14, '#22262c'); fillR(x + w - 10, y + 8, 6, h - 22, '#cfeaf8');
+  if (K.night) { c.save(); c.globalCompositeOperation = 'lighter'; fillR(x + 4, y + 6, w - 18, h - 14, 'rgba(255,214,140,.25)'); c.restore(); }
+}
+
+// --- flat-top : pas de porte-flèche, flèche profonde, contre-flèche lestée au même niveau
+function flatTop(o, K) {
+  const { mx, gy, jt, jibL, jibR } = o, mw = 70;
+  ballastBase(mx, gy, mw); latticeMast(mx, gy - 58, jt + 50, mw, K);
+  fillR(mx - 10, jt + 34, mw + 20, 18, '#3f4650'); fillR(mx - 6, jt + 30, mw + 12, 6, '#5b636e');
+  // pièce pivot (« tête » carrée) au-dessus du mât
+  rr(mx - 4, jt - 34, mw + 8, 36, 4); c.fillStyle = lg(0, jt - 34, 0, jt, [[0, K.hi], [1, K.dark]]); c.fill(); for (let k = 0; k < 3; k++) ln(mx + 8 + k * 22, jt - 30, mx + 8 + k * 22, jt - 4, K.lo, 2);
+  // flèche : membrure haute plate et plus haute que d'habitude
+  const jh = 46; jibTruss(mx + mw, jibR, jt, jh, K, 6);
+  ln(mx + mw, jt - 14, jibR - 40, jt - 14, K.col, 5); c.strokeStyle = K.dark; c.lineWidth = 2; c.beginPath(); for (let x = mx + mw; x < jibR - 50; x += jh) { c.moveTo(x, jt); c.lineTo(x + jh / 2, jt - 14); c.lineTo(x + jh, jt); } c.stroke();
+  // contre-flèche : plate-forme, garde-corps, blocs de lest suspendus, treuil
+  const cx0 = jibL + 60, cx1 = mx;
+  fillR(cx0, jt - 14, cx1 - cx0, 10, K.col); fillR(cx0, jt + 22, cx1 - cx0, 10, K.col); fillR(cx0, jt + 32, cx1 - cx0, 4, K.lo);
+  c.strokeStyle = K.dark; c.lineWidth = 2.5; c.beginPath(); for (let x = cx0; x < cx1 - 20; x += 36) { c.moveTo(x, jt + 22); c.lineTo(x + 18, jt - 4); c.lineTo(x + 36, jt + 22); } c.stroke();
+  for (let k = 0; k < 3; k++) { const bx = cx0 + 6 + k * 46; rr(bx, jt + 36, 42, 96, 3); c.fillStyle = lg(bx, 0, bx + 42, 0, [[0, '#b5bcc4'], [1, '#7d858f']]); c.fill(); fillR(bx, jt + 64, 42, 2, 'rgba(0,0,0,.25)'); fillR(bx, jt + 96, 42, 2, 'rgba(0,0,0,.25)'); }
+  rr(cx1 - 120, jt - 2, 64, 24, 4); c.fillStyle = '#5b636e'; c.fill(); ell(cx1 - 104, jt + 10, 10, 10, '#3a3f46'); ell(cx1 - 104, jt + 10, 5, 5, '#8a929c');
+  companySign(cx0 + 150, jt - 36, 120);
+  ln(cx1 - 104, jt + 10, jibR - 10, jt + jh - 2, 'rgba(40,44,50,.55)', 1.5);
+  towerCab(mx + 62, jt + 50, 82, 56, K);
+}
+
+// --- automontante : mât fin, poinçon et tirants, lest au pied, pas de cabine
+function autoMontante(o, K) {
+  const { mx, gy, jt } = o, mw = 44, jx1 = 1640, base = gy - 96;
+  // châssis à stabilisateurs
+  fillR(mx - 170, gy - 30, 380, 18, '#3a3f46'); [[mx - 230, -1], [mx + 250, 1]].forEach(([px]) => { ln(mx + 20, gy - 22, px, gy - 10, '#4a5058', 10); fillR(px - 24, gy - 10, 48, 10, '#2b2f36'); });
+  [mx - 120, mx + 150].forEach(wx => { ell(wx, gy - 14, 17, 17, '#16181c'); ell(wx, gy - 14, 7, 7, '#8a929c'); });
+  // plateforme tournante + lest béton à l'arrière
+  rr(mx - 190, base - 6, 300, 72, 6); c.fillStyle = lg(0, base - 6, 0, base + 66, [[0, K.hi], [1, K.dark]]); c.fill();
+  for (let k = 0; k < 4; k++) { rr(mx - 184 + k * 44, base - 74, 40, 70, 3); c.fillStyle = lg(0, base - 74, 0, base, [[0, '#b9c0c7'], [1, '#868e97']]); c.fill(); fillR(mx - 184 + k * 44, base - 44, 40, 2, 'rgba(0,0,0,.25)'); }
+  rr(mx + 30, base + 4, 70, 40, 4); c.fillStyle = '#5b636e'; c.fill(); ell(mx + 52, base + 24, 12, 12, '#3a3f46'); ell(mx + 52, base + 24, 5, 5, '#8a929c');
+  companySign(mx - 180, base + 24, 140);
+  // mât télescopique en treillis fin
+  latticeMast(mx, base - 6, jt + 6, mw, K, 2.4);
+  // poinçon au-dessus du mât et tirants
+  const px = mx + mw / 2, py = jt - 120;
+  ln(mx + 4, jt + 8, px, py, K.col, 6); ln(mx + mw - 4, jt + 8, px, py, K.col, 6); ell(px, py, 6, 6, '#2b2f36');
+  const tie = (x2, y2) => { ln(px, py, x2, y2, '#c9cfd6', 2.5); }; tie(mx + (jx1 - mx) * .5, jt); tie(mx + (jx1 - mx) * .86, jt);
+  ln(px, py, mx - 170, base - 74, '#c9cfd6', 2.5); ln(px + 2, py + 3, mx - 166, base - 72, 'rgba(120,128,136,.8)', 1.5);
+  // flèche triangulée légère
+  jibTruss(mx + mw, jx1, jt, 40, K, 16);
+  fillR(mx - 6, jt + 2, mw + 12, 44, K.lo); fillR(mx - 2, jt + 6, mw + 4, 36, K.col);
+}
+
+// --- XXL sur rails : rails, bogies, portique, mât large, gros porte-flèche
+function xxlRails(o, K) {
+  const { mx, gy, jt, jibL, jibR } = o, mw = 96, base = gy - 150;
+  // voie ferrée
+  for (let x = mx - 260; x < mx + 360; x += 34) fillR(x, gy - 8, 22, 8, '#5a4632');
+  fillR(mx - 270, gy - 14, 640, 5, '#9aa3ad'); fillR(mx - 270, gy - 10, 640, 2, '#5b636e');
+  // bogies + portique
+  [mx - 190, mx - 120, mx + 150, mx + 220].forEach(bx => { rr(bx - 34, gy - 46, 68, 30, 4); c.fillStyle = '#3a3f46'; c.fill(); ell(bx - 18, gy - 18, 12, 12, '#16181c'); ell(bx + 18, gy - 18, 12, 12, '#16181c'); ell(bx - 18, gy - 18, 5, 5, '#8a929c'); ell(bx + 18, gy - 18, 5, 5, '#8a929c'); });
+  fillR(mx - 240, gy - 58, 520, 14, K.lo); fillR(mx - 240, gy - 58, 520, 4, K.hi);
+  // jambes du portique en caissons + croisillons
+  [[mx - 155, mx + 4], [mx + 185, mx + mw - 4]].forEach(([fx, tx]) => { ln(fx, gy - 52, tx, base + 4, K.dark, 18); ln(fx, gy - 52, tx, base + 4, K.col, 12); });
+  ln(mx - 80, gy - 52, mx + mw + 20, base + 40, K.dark, 5); ln(mx + 110, gy - 52, mx - 20, base + 40, K.dark, 5); fillR(mx - 20, base - 10, mw + 40, 20, '#3f4650');
+  for (let k = 0; k < 3; k++) { rr(mx - 6 + k * 36, base - 52, 32, 42, 3); c.fillStyle = lg(0, base - 52, 0, base - 10, [[0, '#b9c0c7'], [1, '#868e97']]); c.fill(); }
+  // mât large à double treillis
+  latticeMast(mx, base - 52, jt + 54, mw, K, 4);
+  // couronne d'orientation
+  fillR(mx - 16, jt + 34, mw + 32, 22, '#3f4650'); fillR(mx - 10, jt + 28, mw + 20, 8, '#5b636e'); for (let k = 0; k < 10; k++) fillR(mx - 10 + k * (mw + 20) / 10, jt + 38, 3, 14, '#2b2f36');
+  // porte-flèche haut
+  const ax = mx + mw / 2, ay = jt - 200;
+  c.strokeStyle = K.col; c.lineWidth = 10; c.beginPath(); c.moveTo(mx + 6, jt); c.lineTo(ax - 6, ay); c.moveTo(mx + mw - 6, jt); c.lineTo(ax + 6, ay); c.stroke();
+  c.strokeStyle = K.dark; c.lineWidth = 3; for (let k = 1; k < 7; k++) { const t1 = k / 7, t2 = (k + .5) / 7; c.beginPath(); c.moveTo(lerp(mx + 6, ax - 6, t1), lerp(jt, ay, t1)); c.lineTo(lerp(mx + mw - 6, ax + 6, t2), lerp(jt, ay, t2)); c.stroke(); }
+  fillR(ax - 14, ay - 12, 28, 18, K.lo); ell(ax, ay - 3, 9, 9, '#2b2f36');
+  const tie = (x2, y2) => { ln(ax, ay, x2, y2, '#c9cfd6', 4); ln(ax + 3, ay + 4, x2, y2 + 4, 'rgba(120,128,136,.8)', 2.5); };
+  tie(mx + (jibR - mx) * .45, jt); tie(mx + (jibR - mx) * .75, jt); tie(mx + (jibR - mx) * .95, jt); tie(jibL + 30, jt + 8); tie(jibL + 160, jt + 8);
+  // flèche profonde (double membrure basse)
+  jibTruss(mx + mw, jibR, jt, 52, K, 22); ln(mx + mw, jt + 30, jibR - 40, jt + 30, 'rgba(60,66,74,.5)', 2);
+  // contre-flèche longue, double lest, local treuil
+  const cx0 = jibL, cx1 = mx;
+  fillR(cx0, jt + 22, cx1 - cx0, 12, K.col); fillR(cx0, jt + 34, cx1 - cx0, 5, K.lo);
+  for (let x = cx0; x < cx1; x += 24) ln(x, jt + 22, x, jt + 2, '#f2c94c', 2); ln(cx0, jt + 2, cx1, jt + 2, '#f2c94c', 2.5);
+  for (let k = 0; k < 2; k++) { const bx = cx0 + 4 + k * 66; rr(bx, jt + 39, 62, 128, 4); c.fillStyle = lg(bx, 0, bx + 62, 0, [[0, '#b5bcc4'], [1, '#7d858f']]); c.fill(); for (let r = 1; r < 4; r++) fillR(bx, jt + 39 + r * 32, 62, 2, 'rgba(0,0,0,.25)'); }
+  rr(cx1 - 150, jt - 26, 110, 48, 5); c.fillStyle = '#d9dee4'; c.fill(); fillR(cx1 - 146, jt - 18, 30, 12, '#5b636e'); fillR(cx1 - 110, jt - 18, 30, 12, '#5b636e'); fillR(cx1 - 150, jt + 14, 110, 8, K.lo);
+  companySign(cx0 + 150, jt + 1, 130);
+  ln(cx1 - 96, jt + 4, jibR - 10, jt + 50, 'rgba(40,44,50,.55)', 1.5);
+  // grande cabine avec passerelle
+  fillR(mx + mw, jt + 104, 110, 4, '#3a3f46'); ln(mx + mw, jt + 92, mx + mw + 110, jt + 92, '#f2c94c', 2);
+  towerCab(mx + mw + 4, jt + 50, 96, 56, K);
+}
+
+// grutier : en cabine, ou au sol avec la radiocommande (automontante)
+function craneOperator(lvl) {
+  const id = save.crane.tower, look = Math.sign(lvl.cr.x - 400) || 1, lever = clamp(lvl.cr.v / 200, -1, 1);
+  if (id === 'automontante') {
+    const O = opLook(), x = 520, y = GY + 4;
+    person2(x, y, S_FRONT, 1, { vest: O.vest, helm: O.helm, skin: '#e3ae86', pants: '#2b3a55', shirt: O.jacket }, { aL: [-.9, .55], aR: [-.7, .5] });
+    const hx = x + 14 * S_FRONT, hy = y - 52 * S_FRONT; rr(hx - 9, hy - 8, 20, 14, 3); c.fillStyle = '#ffc21a'; c.fill(); ln(hx + 6, hy - 8, hx + 8, hy - 20, '#2b2f36', 2); ell(hx + 1 + lever * 2, hy - 2, 2.5, 2.5, '#e8483b');
+    return;
+  }
+  if (id === 'xxl') return operator(TOWER.mx + 100, TOWER.jt + 56, 78, 42, look, lever);
+  operator(TOWER.mx + 66, TOWER.jt + 56, 64, 42, look, lever);
+}
+
+// =====================================================================
+//  GRUES MOBILES (dessinées à chaque image : la flèche suit la charge)
+// =====================================================================
+function mobileCrane(tipX, lvl) {
+  const id = save.crane.mobile;
+  if (id === 'telescopique') return teleCrane(tipX, lvl);
+  if (id === 'superlift') return superlift(tipX, lvl);
+  crawler2(tipX, lvl);
+}
+function boomBox(x0, y0, x1, y1, w0, w1, K, sections) {
+  const ang = Math.atan2(y1 - y0, x1 - x0), len = Math.hypot(x1 - x0, y1 - y0);
+  c.save(); c.translate(x0, y0); c.rotate(ang);
+  for (let i = 0; i < sections; i++) {
+    const a = len * i / sections * .92, b = i === sections - 1 ? len : len * (i + 1) / sections + 26, w = lerp(w0, w1, i / Math.max(1, sections - 1));
+    rr(a, -w / 2, b - a, w, 4); c.fillStyle = lg(0, -w / 2, 0, w / 2, [[0, K.hi], [.45, K.col], [1, K.dark]]); c.fill();
+    fillR(a, w / 2 - 4, b - a, 4, 'rgba(0,0,0,.25)'); if (i > 0) fillR(a - 2, -w / 2 - 2, 6, w + 4, K.lo);
+  }
+  c.restore();
+}
+function teleCrane(tipX, lvl) {
+  const K = skc(false), bx = 300, gy = GY, ty = 190;
+  ell(bx + 180, gy + 3, 330, 9, 'rgba(0,0,0,.35)');
+  // stabilisateurs déployés
+  [[bx - 150, bx - 60], [bx + 420, bx + 330]].forEach(([px, ox]) => { fillR(Math.min(px, ox), gy - 66, Math.abs(px - ox), 14, '#4a5058'); fillR(px - 8, gy - 66, 16, 54, '#3a3f46'); rr(px - 30, gy - 12, 60, 12, 3); c.fillStyle = '#2b2f36'; c.fill(); fillR(px - 40, gy - 2, 80, 4, '#7a5a3a'); });
+  // porteur 5 essieux
+  rr(bx - 80, gy - 96, 520, 46, 6); c.fillStyle = lg(0, gy - 96, 0, gy - 50, [[0, '#4a5058'], [1, '#2b2f36']]); c.fill();
+  for (let k = 0; k < 5; k++) { const wx = bx - 40 + k * 104 + (k > 1 ? 20 : 0); wheel(wx, gy - 30, 30, (lvl ? lvl.time : 0) * 0); ell(wx, gy - 30, 30, 30, 'rgba(0,0,0,0)'); }
+  // cabine du porteur (à gauche)
+  rr(bx - 150, gy - 170, 90, 110, 10); c.fillStyle = lg(0, gy - 170, 0, gy - 60, [[0, K.hi], [1, K.dark]]); c.fill(); rr(bx - 140, gy - 158, 46, 40, 5); c.fillStyle = lg(0, gy - 158, 0, gy - 118, [[0, '#d9f2ff'], [1, '#3b6f96']]); c.fill(); fillR(bx - 150, gy - 74, 90, 10, '#1d2026');
+  for (let k = 0; k < 12; k++) c.fillStyle = k % 2 ? '#1d2026' : '#ffc21a', c.fillRect(bx - 80 + k * 22, gy - 56, 22, 6);
+  // tourelle + contrepoids
+  rr(bx - 40, gy - 190, 330, 96, 8); c.fillStyle = lg(0, gy - 190, 0, gy - 94, [[0, K.hi], [1, K.dark]]); c.fill();
+  rr(bx - 70, gy - 178, 90, 74, 6); c.fillStyle = lg(bx - 70, 0, bx + 20, 0, [[0, '#9aa3ad'], [1, '#5f6873']]); c.fill(); for (let k = 1; k < 3; k++) fillR(bx - 70, gy - 178 + k * 24, 90, 2, 'rgba(0,0,0,.3)');
+  txt(companyName(), bx + 110, gy - 128, 'rgba(30,24,0,.75)', companyName().length > 10 ? 16 : 21, 900, 'center');
+  // cabine du grutier
+  rr(bx + 220, gy - 262, 92, 80, 8); c.fillStyle = lg(0, gy - 262, 0, gy - 182, [[0, K.hi], [1, K.dark]]); c.fill();
+  cabGlass(bx + 232, gy - 250, 64, 44, 1, clamp(lvl ? lvl.cr.v / 120 : 0, -1, 1)); beacon(bx + 266, gy - 268);
+  // flèche télescopique 4 éléments + vérin de relevage
+  const px = bx + 170, py = gy - 200, ang = Math.atan2(ty - py, tipX - px), len = Math.hypot(tipX - px, ty - py);
+  const cx = px + Math.cos(ang) * len * .32, cy = py + Math.sin(ang) * len * .32;
+  ln(bx + 230, gy - 120, cx, cy + 12, '#8a929c', 14); ln(bx + 230, gy - 120, lerp(bx + 230, cx, .55), lerp(gy - 120, cy + 12, .55), '#3a3f46', 18);
+  boomBox(px, py, tipX, ty + 4, 44, 22, K, 4);
+  ell(px, py, 14, 14, '#2b2f36'); ell(px, py, 6, 6, '#8a929c');
+  rr(tipX - 18, ty - 14, 36, 36, 6); c.fillStyle = K.lo; c.fill(); ell(tipX, ty + 10, 16, 16, '#3a3f46'); ell(tipX, ty + 10, 7, 7, '#8a929c');
+}
+function superlift(tipX, lvl) {
+  const K = skc(false), bx = 330, gy = GY, ty = 190;
+  ell(bx + 160, gy + 3, 360, 10, 'rgba(0,0,0,.4)');
+  // plateau superlift derrière, posé au sol
+  rr(bx - 300, gy - 40, 170, 30, 4); c.fillStyle = '#3a3f46'; c.fill(); wheel(bx - 270, gy - 10, 12, 0); wheel(bx - 160, gy - 10, 12, 0);
+  for (let r = 0; r < 4; r++) { rr(bx - 296, gy - 74 - r * 32, 162, 30, 3); c.fillStyle = lg(0, gy - 74 - r * 32, 0, gy - 44 - r * 32, [[0, '#b9c0c7'], [1, '#868e97']]); c.fill(); }
+  // chenilles larges
+  track(bx - 110, bx + 470, gy, 92); track(bx - 80, bx + 440, gy - 4, 24);
+  fillR(bx + 100, gy - 112, 160, 22, '#2b2f36');
+  // tourelle massive + contrepoids
+  rr(bx - 40, gy - 240, 420, 132, 10); c.fillStyle = lg(0, gy - 240, 0, gy - 108, [[0, K.hi], [1, K.dark]]); c.fill();
+  for (let k = 0; k < 8; k++) fillR(bx + 150 + k * 18, gy - 224, 10, 60, 'rgba(0,0,0,.25)');
+  rr(bx - 130, gy - 234, 100, 120, 6); c.fillStyle = lg(bx - 130, 0, bx - 30, 0, [[0, '#9aa3ad'], [1, '#5f6873']]); c.fill(); for (let k = 1; k < 5; k++) fillR(bx - 130, gy - 234 + k * 24, 100, 2, 'rgba(0,0,0,.3)');
+  fillR(bx - 40, gy - 124, 420, 10, '#1d2026'); for (let k = 0; k < 21; k++) c.fillStyle = k % 2 ? '#1d2026' : '#ffc21a', c.fillRect(bx - 40 + k * 20, gy - 124, 20, 10);
+  txt(companyName(), bx + 80, gy - 150, 'rgba(30,24,0,.75)', companyName().length > 10 ? 19 : 26, 900, 'center');
+  // mât arrière (treillis) + suspentes vers le plateau et la pointe
+  const fx = bx + 230, fy = gy - 230, mxT = bx - 90, myT = gy - 560;
+  const latt = (x0, y0, x1, y1, hw, step, col, dark) => {
+    const ang = Math.atan2(y1 - y0, x1 - x0), len = Math.hypot(x1 - x0, y1 - y0);
+    c.save(); c.translate(x0, y0); c.rotate(ang);
+    ln(0, -hw, len, -hw * .45, col, 7); ln(0, hw, len, hw * .45, col, 7);
+    c.strokeStyle = dark; c.lineWidth = 3; c.beginPath(); for (let x = 0; x < len - step; x += step) { const w1 = hw - hw * .55 * x / len, w2 = hw - hw * .55 * (x + step) / len; c.moveTo(x, -w1); c.lineTo(x + step / 2, w2); c.lineTo(x + step, -w2); } c.stroke();
+    for (let x = len * .2; x < len; x += len * .2) fillR(x - 3, -hw, 6, hw * 2, shade(col, -55));
+    c.restore();
+  };
+  latt(bx + 120, gy - 236, mxT, myT, 20, 36, K.col, K.dark);
+  ln(mxT, myT, bx - 215, gy - 202, '#c9cfd6', 4); ln(mxT, myT, tipX, ty, '#c9cfd6', 3.5); ln(mxT + 3, myT + 4, tipX, ty + 4, 'rgba(120,128,136,.8)', 2);
+  // flèche principale treillis, plus large
+  latt(fx, fy, tipX, ty, 34, 46, K.col, K.dark);
+  fillR(fx - 18, fy - 38, 36, 76, '#3a3f46'); ell(fx, fy, 10, 10, '#2b2f36'); ell(mxT, myT, 9, 9, '#2b2f36');
+  ell(tipX, ty + 10, 24, 24, '#3a3f46'); ell(tipX, ty + 10, 11, 11, '#8a929c'); ell(tipX, ty + 10, 4, 4, '#2b2f36');
+  rr(bx + 300, gy - 330, 110, 96, 10); c.fillStyle = lg(0, gy - 330, 0, gy - 234, [[0, K.hi], [1, K.dark]]); c.fill();
+  cabGlass(bx + 315, gy - 316, 72, 46, 1, clamp(lvl ? lvl.cr.v / 120 : 0, -1, 1)); beacon(bx + 352, gy - 336);
+}
 
 </script>
 </body></html>
