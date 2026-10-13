@@ -4705,7 +4705,7 @@ const PAL = {
   red: '#ff6b5b', orange: '#ffa14a', blue: '#6fb1ff', violet: '#b58bff', yellow: '#ffc21a', green: '#3cf29b',
 };
 const TRANCHE_COL = ['#3cf29b', '#6fb1ff', '#ffa14a', '#c38bff', '#ff6b5b', '#ffc21a'];
-const CARD = { green: ['#4ef0a8', '#16a463', '#0a6b3d'], violet: ['#b58bff', '#7a4ee0', '#4b2a9a'], orange: ['#ffb35a', '#f07a1a', '#a54a00'], red: ['#ff7a6b', '#e0392b', '#911c12'], blue: ['#7cbcff', '#2e7be0', '#164b94'], gold: ['#ffd84f', '#f2a900', '#9a6a00'], slate: ['#5a6d8e', '#3a4b68', '#1f2a3e'] };
+const CARD = { green: ['#3ff0b0', '#0e9f7a', '#06604a'], violet: ['#a98bff', '#5b3fe0', '#3a239a'], orange: ['#ffb057', '#ff5f3a', '#a8321a'], red: ['#ff7f6e', '#e02f4a', '#8e1426'], blue: ['#5cc4ff', '#2c63f0', '#16399a'], gold: ['#ffe066', '#ffa41a', '#9a5a00'], slate: ['#4d5f82', '#283651', '#161f33'] };
 const TF = "'Lilita One', Inter, sans-serif";          // police des titres
 const RAD = 36;                                         // arrondis « très ronds »
 try { document.fonts && document.fonts.load("40px 'Lilita One'"); } catch (e) {}
@@ -4757,7 +4757,7 @@ function icon(name, x, y, size, col) {
 function relief(x, y, w, h, colA, colB, r = Math.min(RAD, h / 2), lift = Math.min(10, Math.round(h * .09))) {
   const hv = hov(x, y, w, h + lift), d = hv ? -2 : 0;
   withShadow('rgba(0,0,0,.35)', 30, 0, 14, () => { rr(x, y + lift, w, h, r); c.fillStyle = shade(colB, -.42); c.fill(); });
-  rr(x, y + d, w, h, r); c.fillStyle = lg(0, y, 0, y + h, [[0, colA], [1, colB]]); c.fill();
+  rr(x, y + d, w, h, r); c.fillStyle = lg(x, y, x + Math.min(w, h) * .9, y + h, [[0, colA], [1, colB]]); c.fill();
   c.save(); rr(x, y + d, w, h, r); c.clip();
   fillR(x, y + d, w, h * .46, hv ? 'rgba(255,255,255,.17)' : 'rgba(255,255,255,.11)');
   c.restore();
@@ -4798,15 +4798,17 @@ const ICN = {
 };
 
 // ---------- logo : crochet suspendu + O de POIL en cible ----------
-drawLogo = function (cx, cy, s = 1) {
+let LOGO_HALF = 300;
+drawLogo = function (cx, cy, s = 1, hook = true) {
   c.save(); c.translate(cx, cy); c.scale(s, s);
   c.font = `400 160px ${TF}`; c.textBaseline = 'alphabetic';
   const wP = c.measureText('PILE').width, wP2 = c.measureText('P').width, wIL = c.measureText('IL').width, R = 60, gap = 34;
   const total = wP + gap + wP2 + 8 + R * 2 + 8 + wIL, x0 = -total / 2, by = 58;
   // câble et crochet au-dessus de l'espace entre les deux mots
-  const hx = x0 + wP + gap / 2;
+  const hx = x0 + wP + gap / 2; LOGO_HALF = total / 2 * s;
+  if (hook) {
   ln(hx, -260, hx, -96, 'rgba(220,230,240,.85)', 4);
-  c.strokeStyle = '#ffc21a'; c.lineWidth = 10; c.lineCap = 'round'; c.beginPath(); c.moveTo(hx - 14, -96); c.lineTo(hx + 14, -96); c.moveTo(hx, -96); c.lineTo(hx, -70); c.arc(hx - 12, -70, 12, 0, Math.PI * .95); c.stroke(); c.lineCap = 'butt';
+  c.strokeStyle = '#ffc21a'; c.lineWidth = 10; c.lineCap = 'round'; c.beginPath(); c.moveTo(hx - 14, -96); c.lineTo(hx + 14, -96); c.moveTo(hx, -96); c.lineTo(hx, -70); c.arc(hx - 12, -70, 12, 0, Math.PI * .95); c.stroke(); c.lineCap = 'butt'; }
   const word = (t, x, face, depth) => { c.textAlign = 'left';
     c.fillStyle = 'rgba(0,0,0,.35)'; c.fillText(t, x, by + 22);
     c.fillStyle = depth; c.fillText(t, x, by + 9);
@@ -4867,31 +4869,84 @@ function pastille(n, x, y, r, onCard) {  // une pastille du chemin : terminé / 
 }
 
 // ---------- ACCUEIL : carte Carrière + colonne ----------
+// ---------- grue de l'accueil : flèche, mât, contre-flèche ----------
+const TI = { t0: null };
+const easeOutBack = k => 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+function truss(x0, x1, y, h, col, dk) {   // poutre treillis horizontale
+  fillR(x0, y, x1 - x0, 6, col); fillR(x0, y + h - 7, x1 - x0, 7, col); fillR(x0, y + 6, x1 - x0, 2, 'rgba(255,255,255,.35)');
+  c.strokeStyle = dk; c.lineWidth = 3.5; c.beginPath(); for (let x = x0; x < x1; x += h) { c.moveTo(x, y + h - 4); c.lineTo(x + h / 2, y + 4); c.lineTo(x + h, y + h - 4); } c.stroke();
+}
+function beacon(x, y, t, ph = 0) { const on = Math.sin(t * 3.2 + ph) > .2; if (on) ell(x, y, 22, 22, 'rgba(255,60,60,.18)'); ell(x, y, 6, 6, on ? '#ff4a4a' : '#5a1a1a'); }
+function titleCrane(t, trolleyX) {
+  const Y = 122, JH = 34, MX = 1050, MW = 44, col = '#ffc21a', dk = '#b98200';
+  // mât (visible entre la carte et la colonne) et tête de mât
+  c.save(); c.globalAlpha = .95;
+  fillR(MX - MW / 2, Y + JH, 6, H, col); fillR(MX + MW / 2 - 6, Y + JH, 6, H, col);
+  c.strokeStyle = dk; c.lineWidth = 3; c.beginPath(); for (let y = Y + JH; y < H; y += MW) { c.moveTo(MX - MW / 2 + 3, y); c.lineTo(MX + MW / 2 - 3, y + MW / 2); c.lineTo(MX - MW / 2 + 3, y + MW); } c.stroke();
+  c.fillStyle = col; c.beginPath(); c.moveTo(MX - MW / 2, Y); c.lineTo(MX - 4, Y - 70); c.lineTo(MX + 4, Y - 70); c.lineTo(MX + MW / 2, Y); c.fill();
+  c.fillStyle = 'rgba(11,16,32,.9)'; c.beginPath(); c.moveTo(MX - MW / 2 + 8, Y); c.lineTo(MX, Y - 52); c.lineTo(MX + MW / 2 - 8, Y); c.fill();
+  // tirants
+  c.strokeStyle = 'rgba(220,230,240,.55)'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(MX, Y - 70); c.lineTo(160, Y); c.moveTo(MX, Y - 70); c.lineTo(560, Y); c.moveTo(MX, Y - 70); c.lineTo(1880, Y); c.stroke();
+  // flèche (vers la gauche) et contre-flèche (vers la droite)
+  truss(-40, MX - MW / 2, Y, JH, col, dk); truss(MX + MW / 2, 1900, Y, JH, col, dk);
+  // lest de contre-flèche
+  for (let k = 0; k < 3; k++) { rr(1800 + k * 34 - 34, Y + JH + 2, 30, 66, 4); c.fillStyle = lg(0, Y + JH, 0, Y + JH + 66, [[0, '#9aa4b2'], [1, '#5d6676']]); c.fill(); }
+  // cabine
+  rr(MX - MW / 2 - 70, Y + JH + 2, 66, 52, 10); c.fillStyle = col; c.fill(); rr(MX - MW / 2 - 62, Y + JH + 10, 50, 28, 6); c.fillStyle = lg(0, Y + JH + 10, 0, Y + JH + 38, [[0, '#bfe6ff'], [1, '#4b86b8']]); c.fill();
+  // chariot
+  rr(trolleyX - 34, Y + JH - 2, 68, 22, 6); c.fillStyle = '#e8edf3'; c.fill(); ell(trolleyX - 20, Y + JH - 2, 7, 7, '#2b3445'); ell(trolleyX + 20, Y + JH - 2, 7, 7, '#2b3445');
+  c.restore();
+  beacon(MX, Y - 74, t); beacon(8, Y + 4, t, 1.3); beacon(1896, Y + 4, t, 2.1);
+  return Y + JH + 20;   // point d'accroche des câbles
+}
 let titleBoardAsked = false;
 drawTitle = function () {
-  screenBg(); fillR(0, 0, W, H, rg(560, 640, 200, 1300, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.45)']]));
-  if (!titleBoardAsked && !DEMO && !WB.top) { titleBoardAsked = true; try { loadWorld(); } catch (e) {} }
+  const t = G.t; if (TI.t0 === null) TI.t0 = t; const e = t - TI.t0;
+  screenBg();
+  // ambiance : nuit bleu profond, lueur chaude du projecteur sur le logo, halo violet à droite
+  fillR(0, 0, W, H, lg(0, 0, 0, H, [[0, 'rgba(5,8,22,.62)'], [.45, 'rgba(10,14,38,.30)'], [1, 'rgba(4,6,16,.72)']]));
+  fillR(0, 0, W, H, rg(570, 330, 0, 640, [[0, 'rgba(255,176,80,.24)'], [.5, 'rgba(255,140,60,.08)'], [1, 'rgba(255,140,60,0)']]));
+  fillR(0, 0, W, H, rg(1500, 760, 0, 900, [[0, 'rgba(120,90,255,.14)'], [1, 'rgba(120,90,255,0)']]));
+  if (!titleBoardAsked && !DEMO && !WB.top) { titleBoardAsked = true; try { loadWorld(); } catch (er) {} }
+  // le logo descend accroché à la grue (à l'arrivée), puis se balance doucement
+  const k = clamp(e / 1.5, 0, 1), tx = -420 + 990 * (1 - Math.pow(1 - k, 3));   // le chariot amène le logo depuis la gauche
+  const hookY = titleCrane(t, tx), Lc = 8;
+  const ang = Math.sin(t * .9) * .012 + (k < 1 ? .05 * (1 - k) : Math.sin((e - 1.5) * 2.6) * .05 * Math.exp(-(e - 1.5) * 1.1));
+  // faisceau du projecteur sous la flèche
+  c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = lg(0, hookY, 0, 420, [[0, 'rgba(255,214,140,.10)'], [1, 'rgba(255,214,140,0)']]); c.beginPath(); c.moveTo(tx - 40, hookY - 18); c.lineTo(tx + 40, hookY - 18); c.lineTo(tx + 360, 440); c.lineTo(tx - 360, 440); c.fill(); c.restore();
+  c.save(); c.translate(tx, hookY); c.rotate(ang);
+  ln(-5, -18, -5, Lc, '#dfe7f0', 3); ln(5, -18, 5, Lc, '#dfe7f0', 3);
+  // moufle + crochet
+  rr(-22, Lc, 44, 34, 8); c.fillStyle = lg(-22, 0, 22, 0, [[0, '#ff6a5a'], [1, '#c82536']]); c.fill(); fillR(-16, Lc + 24, 32, 5, '#ffd34d');
+  c.strokeStyle = '#c9d2dc'; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, Lc + 34); c.lineTo(0, Lc + 46); c.arc(-9, Lc + 50, 9, 0, Math.PI * .95); c.stroke(); c.lineCap = 'butt';
+  // élingues jusqu'aux deux extrémités du logo
+  const ly = Lc + 192, s = .8, half = LOGO_HALF || 280, ax = half - 40, ay = ly - 58;
+  ln(0, Lc + 50, -ax, ay, 'rgba(230,236,244,.9)', 3); ln(0, Lc + 50, ax, ay, 'rgba(230,236,244,.9)', 3);
+  [-ax, ax].forEach(x => { c.strokeStyle = '#ffc21a'; c.lineWidth = 4; c.beginPath(); c.arc(x, ay + 6, 8, Math.PI, 0); c.stroke(); });
+  drawLogo(0, ly, s, false);
+  c.restore();
   topBarUI();
-  drawLogo(570, 300, .82);
   // carte CARRIÈRE (CONTINUER est poussé en premier : il gagne le clic)
-  const cur = careerLevel(), t = trancheOf(cur), cp = save.checkpoint || 1, x = 120, y = 410, w = 900, h = 610;
-  const cy = y + h - 158;
+  const cur = careerLevel(), tr0 = trancheOf(cur), cp = save.checkpoint || 1, x = 120, y = 452, w = 900, h = 576;
+  const cy = y + h - 150;
   relief(x, y, w, h, CARD.green[0], CARD.green[1], RAD + 4, 12);
-  iconBtn('play', x + 44, cy, w - 88, 116, 'play', cp > 1 ? `CONTINUER · NIV. ${cp}` : 'JOUER', PAL.gold[0], PAL.gold[1], '#2a1a00', 50);
+  c.save(); rr(x, y, w, h, RAD + 4); c.clip(); c.globalAlpha = .1; icon('build', x + w - 140, y + 210, 300, '#fff'); c.restore();
+  iconBtn('play', x + 44, cy, w - 88, 112, 'play', cp > 1 ? `CONTINUER · NIV. ${cp}` : 'JOUER', PAL.gold[0], PAL.gold[1], '#2a1a00', 48);
+  // reflet qui balaie le bouton CONTINUER toutes les 4 s
+  { const ph = (t % 4) / 1.1; if (ph < 1) { c.save(); rr(x + 44, cy, w - 88, 112, 56); c.clip(); const sx = x + 44 - 200 + ph * (w - 88 + 400); c.fillStyle = lg(sx, 0, sx + 160, 0, [[0, 'rgba(255,255,255,0)'], [.5, 'rgba(255,255,255,.45)'], [1, 'rgba(255,255,255,0)']]); c.beginPath(); c.moveTo(sx + 60, cy); c.lineTo(sx + 160, cy); c.lineTo(sx + 100, cy + 112); c.lineTo(sx, cy + 112); c.fill(); c.restore(); } }
   G.buttons.push({ id: 'career', x, y, w, h });
-  icon('build', x + 84, y + 92, 76, '#fff');
-  T('CARRIÈRE', x + 140, y + 116, 'rgba(0,0,0,.2)', 78); T('CARRIÈRE', x + 140, y + 112, '#fff', 78);
-  txt(`${tr('Niveau')} ${cur} / 50 · ${tr(trancheName(t))}`, x + 142, y + 160, 'rgba(255,255,255,.92)', 30, 800);
-  icon('chev', x + w - 60, y + 104, 48, 'rgba(255,255,255,.85)');
-  // chemin de 6 pastilles autour du niveau en cours
-  const n0 = clamp(cur - 3, 1, 45), py = y + 286, step = (w - 176) / 5;
-  for (let i = 0; i < 5; i++) { const xa = x + 88 + i * step, done = lvState(n0 + i + 1) !== 'l'; fillR(xa, py - 6, step, 12, done ? '#fff' : 'rgba(0,0,0,.2)'); }
-  for (let i = 0; i < 6; i++) pastille(n0 + i, x + 88 + i * step, py, 46, true);
-  txt(`★ ${totalStars()}`, x + w - 44, y + 160, '#fff', 30, 900, 'right');
+  rr(x + 40, y + 40, 84, 84, 26); c.fillStyle = 'rgba(255,255,255,.2)'; c.fill(); icon('build', x + 82, y + 82, 50, '#fff');
+  T('CARRIÈRE', x + 148, y + 100, 'rgba(0,0,0,.18)', 70); T('CARRIÈRE', x + 148, y + 96, '#fff', 70);
+  txt(`${tr('Niveau')} ${cur} / 50 · ${tr(trancheName(tr0))}`, x + 150, y + 134, 'rgba(255,255,255,.92)', 28, 800);
+  c.font = '900 28px Inter'; const sw = c.measureText(String(totalStars())).width + 74; rr(x + w - 44 - sw, y + 44, sw, 50, 25); c.fillStyle = 'rgba(0,0,0,.18)'; c.fill(); icon('star', x + w - 44 - sw + 30, y + 69, 28, PAL.yellow); txt(String(totalStars()), x + w - 44 - sw + 54, y + 79, '#fff', 28, 900);
+  // chemin de 6 pastilles autour du niveau en cours (la pastille en cours pulse)
+  const n0 = clamp(cur - 3, 1, 45), py = y + 236, step = (w - 176) / 5;
+  for (let i = 0; i < 5; i++) { const xa = x + 88 + i * step, dn = lvState(n0 + i + 1) !== 'l'; fillR(xa, py - 6, step, 12, dn ? '#fff' : 'rgba(0,0,0,.2)'); }
+  for (let i = 0; i < 6; i++) { if (n0 + i === cur) { const pr = (t % 1.6) / 1.6; c.strokeStyle = `rgba(255,214,77,${.7 * (1 - pr)})`; c.lineWidth = 4; c.beginPath(); c.arc(x + 88 + i * step, py, 50 + pr * 26, 0, 7); c.stroke(); } pastille(n0 + i, x + 88 + i * step, py, 44, true); }
   // barre des 5 étapes + prochain checkpoint
-  for (let k = 0; k < 5; k++) { const bx = x + 44 + k * ((w - 88 + 12) / 5), bw = (w - 88 + 12) / 5 - 12, f = clamp((cur - 1 - k * 10) / 10, 0, 1); rr(bx, y + 376, bw, 12, 6); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); if (f > 0) { rr(bx, y + 376, Math.max(12, bw * f), 12, 6); c.fillStyle = '#fff'; c.fill(); } }
-  const nextCp = CHECKPOINTS.find(k => k > cur) || 50;
-  txt(cur >= 50 ? 'Dernier niveau : le Master' : `Prochain checkpoint : niveau ${nextCp}`, x + 44, y + 424, 'rgba(255,255,255,.9)', 24, 800);
+  for (let q = 0; q < 5; q++) { const bx = x + 44 + q * ((w - 88 + 12) / 5), bw = (w - 88 + 12) / 5 - 12, f = clamp((cur - 1 - q * 10) / 10, 0, 1); rr(bx, y + 326, bw, 10, 5); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); if (f > 0) { rr(bx, y + 326, Math.max(10, bw * f), 10, 5); c.fillStyle = '#fff'; c.fill(); } }
+  const nextCp = CHECKPOINTS.find(q => q > cur) || 50;
+  txt(cur >= 50 ? 'Dernier niveau : le Master' : `Prochain checkpoint : niveau ${nextCp}`, x + 44, y + 376, 'rgba(255,255,255,.9)', 24, 800);
   // colonne de droite
   const done = save.dailyBonus === todayKey();
   const rows = [
@@ -4902,12 +4957,13 @@ drawTitle = function () {
     ['board', 'slate', 'trophy', 'CLASSEMENTS', WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour', null],
   ];
   rows.forEach(([id, col, ic, title, sub, badge], i) => {
-    const rx = 1080, ry = 172 + i * 172, rw = 720, rh = 146, d = relief(rx, ry, rw, rh, CARD[col][0], CARD[col][1], RAD, 10), tc = col === 'gold' ? '#2a1a00' : '#fff';
-    ell(rx + 82, ry + rh / 2 + d, 46, 46, 'rgba(255,255,255,.2)'); icon(ic, rx + 82, ry + rh / 2 + d, 50, tc);
+    const rx = 1080, ry = 184 + i * 170, rw = 720, rh = 144, d = relief(rx, ry, rw, rh, CARD[col][0], CARD[col][1], RAD, 10), tc = col === 'gold' ? '#2a1a00' : '#fff';
+    c.save(); rr(rx, ry + d, rw, rh, RAD); c.clip(); c.globalAlpha = .12; icon(ic, rx + rw - 170, ry + rh / 2 + d + 10, 190, tc); c.restore();
+    rr(rx + 36, ry + rh / 2 + d - 44, 88, 88, 28); c.fillStyle = col === 'gold' ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.2)'; c.fill(); icon(ic, rx + 80, ry + rh / 2 + d, 48, tc);
     if (tc === '#fff') T(title, rx + 152, ry + 72 + d + 3, 'rgba(0,0,0,.2)', 50); T(title, rx + 152, ry + 72 + d, tc, 50);
     txt(sub, rx + 154, ry + 112 + d, col === 'gold' ? 'rgba(42,26,0,.8)' : 'rgba(255,255,255,.88)', 26, 800);
     icon('chev', rx + rw - 50, ry + rh / 2 + d, 40, col === 'gold' ? 'rgba(42,26,0,.7)' : 'rgba(255,255,255,.8)');
-    if (badge) { c.font = '900 20px Inter'; const bw = c.measureText(tr(badge)).width + 30; rr(rx + rw - 96 - bw, ry + 20 + d, bw, 36, 18); c.fillStyle = col === 'gold' ? '#e0392b' : '#fff'; c.fill(); txt(badge, rx + rw - 96 - bw / 2, ry + 45 + d, col === 'gold' ? '#fff' : CARD[col][2], 20, 900, 'center'); }
+    if (badge) { const pu = 1 + Math.max(0, Math.sin(G.t * 4)) * .06; c.save(); c.translate(rx + rw - 96, ry + 38 + d); c.scale(pu, pu); c.translate(-(rx + rw - 96), -(ry + 38 + d)); c.font = '900 20px Inter'; const bw = c.measureText(tr(badge)).width + 30; rr(rx + rw - 96 - bw, ry + 20 + d, bw, 36, 18); c.fillStyle = col === 'gold' ? '#e0392b' : '#fff'; c.fill(); txt(badge, rx + rw - 96 - bw / 2, ry + 45 + d, col === 'gold' ? '#fff' : CARD[col][2], 20, 900, 'center'); c.restore(); }
     G.buttons.push({ id, x: rx, y: ry, w: rw, h: rh + 10 });
   });
   if (DEMO) txt('Mode démo : scores et duels restent sur cet appareil', 1440, 1064, '#ffb36b', 18, 700, 'center');
