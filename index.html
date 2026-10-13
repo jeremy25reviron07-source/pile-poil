@@ -8757,6 +8757,139 @@ Object.assign(EN, {
 EN_RX.push([/^(\d)\/3 du jour$/, '$1/3 today'], [/^Nouvelles missions dans (.*)$/, 'New missions in $1'], [/^✔ Mission accomplie : (.*)$/, '✔ Mission complete: $1'], [/^\+(\d+) pièces · mission du jour$/, '+$1 coins · daily mission'], [/^\+(\d+) pièces · bonus des 3 missions$/, '+$1 coins · all-missions bonus']);
 
 // =====================================================================
+//  PILE POIL — DONNER ENVIE DE JOUER ET DE REVENIR (sans encombrer le jeu)
+//  1. premier lancement guidé : directement sur un chantier, une seule fois
+//  2. défi du jour partageable : résultat en carrés de couleur, façon Wordle
+//  3. pose parfaite partageable : une pastille 4 s après un « PILE POIL ! », image prête pour les réseaux
+//  Tout se règle dans TUNE ; save.stats compte ce qui se passe (pour optimiser plus tard)
+// =====================================================================
+const TUNE = {
+  tuto: true,            // premier lancement guidé
+  tutoSlow: .35,         // vitesse de la grue quand la charge est au bon endroit (aide au premier lâcher)
+  tutoSafeLives: true,   // pas de vie perdue pendant le tutoriel
+  poseShare: true,       // pastille « Partager » après une pose parfaite
+  poseShareSec: 4,       // durée d'affichage de la pastille
+  dailyShare: true,      // bouton « Partager » à la fin du défi du jour
+  dayZero: Date.UTC(2026, 9, 1),   // numéro du défi : #1 le 1er octobre 2026
+};
+function ppTrack(ev) { save.stats = save.stats || {}; save.stats[ev] = (save.stats[ev] || 0) + 1; writeSave(save); try { if (window.PP_TRACK) window.PP_TRACK(ev); } catch (e) {} }
+const ppUrl = () => location.origin + location.pathname;
+async function ppShare({ text, file, title = 'PILE POIL' }) {
+  try {
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: `${text}\n${ppUrl()}`, title }); return 'shared'; }
+    if (navigator.share) { await navigator.share({ text, url: ppUrl(), title }); return 'shared'; }
+  } catch (e) { if (e && e.name === 'AbortError') return 'abort'; }
+  if (file) { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click(); a.remove(); }
+  try { await navigator.clipboard.writeText(`${text}\n${ppUrl()}`); toast(file ? 'Image enregistrée et texte copié : colle-le où tu veux 📋' : 'Copié ! Colle-le dans ton groupe 📋', '#3cf29b'); return 'copied'; } catch (e) {}
+  if (file) { toast('Image enregistrée 📸', '#3cf29b'); return 'saved'; }
+  toast('Partage indisponible sur ce navigateur', '#ff9a6a'); return 'none';
+}
+
+// ---------- 1. PREMIER LANCEMENT GUIDÉ ----------
+const isNewPlayer = () => !save.tuto && (save.maxLevel || 1) <= 1 && !Object.keys(save.lvl || {}).length && !(save.score > 0) && !/[?&](duel|salle|tour|day)=/.test(location.search);
+if (!isNewPlayer()) { if (!save.tuto) { save.tuto = 1; writeSave(save); } }
+else if (TUNE.tuto) setTimeout(() => {
+  if (!isNewPlayer() || G.screen !== 'title') return;
+  G.mode = 'career'; G.runSeed = 0; G.replay = false; G.lives = 3; G.score = 0; G.perfects = 0; G.livesLost = 0; G.workersHit = 0; G.startTime = Date.now(); G.checkpoint = 1; save.checkpoint = 1;
+  G.tuto = { step: 'wait', t0: G.t }; save.keysSeen = 1; startLevel(1); ppTrack('tuto_start');
+}, 600);
+function tutoLand(l) { // où tomberait la charge si on la lâchait maintenant (lâcher bref)
+  const s = loadState(l), dir = Math.abs(s.vx) > 30 ? Math.sign(s.vx) : (l.cr.dir || 1), p = .08, dt = 1 / 60; let x = s.x, y = s.y, vx = s.vx + dir * p * 620, vy = s.vy - p * 260;
+  for (let i = 0; i < 300 && y + l.loadH / 2 < GY; i++) { vx += (l.C.wind || 0) * PX_PER_KMH * dt; vy += GRAV * dt; x += vx * dt; y += vy * dt; } return x;
+}
+function tutoUpdate() {
+  const T = G.tuto; if (!T || G.screen !== 'play' || !L) return;
+  if (L.cr.speedK0 === undefined) L.cr.speedK0 = L.cr.speedK; L.gaugeK = .3;
+  if (L.phase === 'hang') { const t = L.target, err = Math.abs(tutoLand(L) - (t.x + t.w / 2)), ok = err < Math.max(14, t.w * .26);
+    T.step = L.charging ? 'release' : ok ? 'now' : 'wait'; L.cr.speedK = L.cr.speedK0 * (T.step === 'wait' ? 1 : TUNE.tutoSlow); }
+  else { L.cr.speedK = L.cr.speedK0; if (L.phase === 'fly') T.step = 'fly'; }
+}
+finish = (prev => function (lvl, res) {
+  const T = G.tuto, lives = G.lives, lost = G.livesLost; prev(lvl, res);
+  if (T && G.mode === 'career') {
+    if (res === 'in' || res === 'perfect') { T.step = 'bravo'; T.doneT = G.t; save.tuto = 1; writeSave(save); ppTrack('tuto_done'); }
+    else if (TUNE.tutoSafeLives) { G.lives = lives; G.livesLost = lost; T.step = 'retry'; T.retryT = G.t; if (G.msg) G.msg.sub = 'Pas grave, réessaie : vise juste au-dessus de la fouille'; }
+  }
+  // 3. pose parfaite : on prépare la pastille de partage
+  if (TUNE.poseShare && res === 'perfect' && G.mode !== 'live' && !T) G.pose = { t: G.t, n: lvl.C.n, x: lvl.fly ? lvl.fly.x : lvl.target.x + lvl.target.w / 2, region: window.REGION, zone: lvl.zone, shot: null };
+  // 2. défi du jour : on garde chaque essai
+  if (G.mode === 'daily' && G.run) (G.run.hist = G.run.hist || []).push(res === 'perfect' ? 'P' : res === 'in' ? 'I' : 'M');
+})(finish);
+// fin du tutoriel : quelques secondes de bravo, puis le jeu normal
+startLevel = (prev => function (n) { const T = G.tuto; prev(n); if (T && T.step === 'bravo') { G.tuto = null; G.tip = { t: G.t }; } else if (T) T.step = 'wait'; })(startLevel);
+function bubble(x, y, w, title, sub, arrow) { // bulle blanche avec petite flèche
+  const h = sub ? 96 : 66; c.save(); withShadow('rgba(0,0,0,.45)', 24, 0, 8, () => { rr(x, y, w, h, 22); c.fillStyle = '#fff'; c.fill(); });
+  if (arrow) { c.fillStyle = '#fff'; c.beginPath(); const [ax, ay] = arrow; c.moveTo(ax - 16, ay < y ? y : y + h); c.lineTo(ax + 16, ay < y ? y : y + h); c.lineTo(ax, ay); c.fill(); }
+  txt(title, x + w / 2, y + 42, '#14233f', 30, 900, 'center'); if (sub) txt(sub, x + w / 2, y + 78, '#5a6478', 21, 800, 'center'); c.restore();
+}
+function hand(x, y, press) { c.save(); c.translate(x, y + (press ? 10 : 0)); c.font = '84px sans-serif'; c.textAlign = 'center'; withShadow('rgba(0,0,0,.5)', 14, 0, 6, () => c.fillText('👆', 0, 0)); c.textAlign = 'left'; c.restore(); }
+function drawTuto() {
+  const T = G.tuto; if (!T || G.screen !== 'play' || !L) return; const t = L.target, tc = t.x + t.w / 2, pulse = .5 + .5 * Math.sin(G.t * 6);
+  // la fouille visée clignote doucement
+  if (T.step === 'wait' || T.step === 'now') { c.save(); c.globalAlpha = .35 + .4 * pulse; c.strokeStyle = '#3cf29b'; c.lineWidth = 6; rr(t.x - 18, GY - 18, t.w + 36, 182, 16); c.stroke(); c.restore(); }
+  const pw = TOUCH ? TBTN.power : null, px = pw ? pw[0] + pw[2] / 2 : 960, py = pw ? pw[1] + pw[3] / 2 : 1000;
+  const retry = T.retryT && G.t - T.retryT < 2.5;
+  if (retry) bubble(660, 300, 600, 'Presque !', 'Aucune vie perdue, on recommence');
+  else if (T.step === 'wait') bubble(clamp(tc - 300, 40, 1280), GY - 330, 600, 'La grue avance toute seule', 'Attends que la charge arrive au-dessus de la fouille', [clamp(tc, 80, 1840), GY - 30]);
+  if (T.step === 'now') { bubble(TOUCH ? px - 560 : 660, TOUCH ? py - 260 : 820, 600, 'MAINTENANT !', TOUCH ? 'Touche ce bouton puis relâche-le' : 'Appuie sur ESPACE puis relâche', TOUCH ? [px - 120, py - 120] : null); if (TOUCH) hand(px + 30, py + 70, pulse > .5); else { rr(860, 960, 200, 64, 14); c.fillStyle = pulse > .5 ? '#ffc21a' : '#fff'; c.fill(); txt('ESPACE', 960, 1003, '#14233f', 28, 900, 'center'); } }
+  if (T.step === 'release') bubble(TOUCH ? px - 560 : 660, TOUCH ? py - 260 : 820, 600, 'Relâche !', 'Plus tu maintiens, plus la charge part loin', TOUCH ? [px - 120, py - 120] : null);
+  if (T.step === 'bravo') { const k = Math.min(1, (G.t - T.doneT) * 3); c.save(); c.globalAlpha = k; bubble(560, 280, 800, 'Bravo, tu as compris ! 🎉', 'Les 49 chantiers suivants t\'attendent'); c.restore(); }
+}
+function drawTip() { // une seule astuce, au 2e chantier, puis plus rien
+  const P = G.tip; if (!P || G.screen !== 'play') return; const a = G.t - P.t; if (a > 5) { G.tip = null; return; }
+  c.save(); c.globalAlpha = Math.min(1, a * 3, (5 - a) * 2); bubble(560, 250, 800, TOUCH ? 'Astuce : ◀ ▶ ajuste la grue, ▲ ▼ le câble' : 'Astuce : ← → ajuste la grue, ↑ ↓ le câble', 'Lâche quand le balancement est au plus bas'); c.restore();
+}
+
+// ---------- 3. POSE PARFAITE PARTAGEABLE ----------
+function poseChip() {
+  const P = G.pose; if (!P || G.screen !== 'play' || G.paused) return; const a = G.t - P.t;
+  if (a > TUNE.poseShareSec + .4 || !P.shot) return;
+  const k = Math.min(1, (a - .45) * 4, (TUNE.poseShareSec + .4 - a) * 3), w = 420, h = 74, x = 960 - w / 2, y = TOUCH ? 952 : 902, pop = 1 + .04 * Math.sin(G.t * 7);
+  c.save(); c.globalAlpha = Math.max(0, k); c.translate(960, y + h / 2); c.scale(pop, pop); c.translate(-960, -y - h / 2);
+  withShadow('rgba(0,0,0,.45)', 20, 0, 6, () => { rr(x, y, w, h, h / 2); c.fillStyle = lg(0, y, 0, y + h, [[0, '#ffd36a'], [1, '#f2a20f']]); c.fill(); });
+  txt('📸  Partager ce PILE POIL', 960, y + 48, '#2a1a00', 27, 900, 'center'); c.restore();
+  G.buttons.push({ id: 'poseShare', x, y, w, h });
+}
+function poseImage(P) { // image 1080 × 1350, le format des réseaux
+  const o = document.createElement('canvas'); o.width = 1080; o.height = 1350; const x = o.getContext('2d');
+  x.fillStyle = '#0b1020'; x.fillRect(0, 0, 1080, 1350);
+  const cw = 864, sx = clamp(P.x - cw / 2, 0, W - cw); x.drawImage(P.shot, sx, 0, cw, 1080, 0, 0, 1080, 1350);
+  const g = x.createLinearGradient(0, 0, 0, 1350); g.addColorStop(0, 'rgba(11,16,32,.9)'); g.addColorStop(.18, 'rgba(11,16,32,0)'); g.addColorStop(.8, 'rgba(11,16,32,0)'); g.addColorStop(1, 'rgba(11,16,32,.97)'); x.fillStyle = g; x.fillRect(0, 0, 1080, 1350);
+  x.textAlign = 'center'; x.font = `400 120px ${TF}`; x.lineWidth = 14; x.strokeStyle = '#4a2c00'; x.strokeText('PILE POIL !', 540, 150); x.fillStyle = '#ffc21a'; x.fillText('PILE POIL !', 540, 150);
+  const where = P.zone && P.zone.name ? P.zone.name : '', reg = P.region === 'jp' ? 'Japon' : P.region === 'eg' ? 'Égypte' : 'France';
+  x.font = '800 38px Inter, sans-serif'; x.fillStyle = '#fff'; x.fillText(`Niveau ${P.n} · ${reg}${where ? ' · ' + where : ''}`.slice(0, 52), 540, 1220);
+  x.font = '700 30px Inter, sans-serif'; x.fillStyle = '#ffd36a'; x.fillText(`Et toi, tu poses pile poil ? ${location.host}`, 540, 1280);
+  return new Promise(res => o.toBlob(b => res(new File([b], 'pile-poil.png', { type: 'image/png' })), 'image/png'));
+}
+
+// ---------- 2. DÉFI DU JOUR PARTAGEABLE ----------
+const dayNum = () => Math.max(1, Math.floor((Date.now() - TUNE.dayZero) / 864e5) + 1);
+const HIST_COL = { P: '#2bd67b', I: '#ffc21a', M: '#ff5a48' }, HIST_EMO = { P: '🟩', I: '🟨', M: '🟥' };
+function dailyText() { const r = G.run || {}, h = r.hist || [];
+  return `PILE POIL · Défi #${dayNum()} 🏗️\n${h.map(k => HIST_EMO[k]).join('')}\n${r.passed ?? 0}/5 chantiers · ${G.score.toLocaleString('fr-FR')} pts${G.perfects ? ` · ${G.perfects} 🎯` : ''}`; }
+drawRunEnd = (prev => function () {
+  prev(); if (G.mode !== 'daily' || !TUNE.dailyShare) return; const h = (G.run && G.run.hist) || [];
+  h.slice(0, 14).forEach((k, i) => { rr(200 + i * 38, 500, 30, 30, 7); c.fillStyle = HIST_COL[k]; c.fill(); });
+  const x = 160, y = 556, w = 600, h2 = 78; withShadow('rgba(0,0,0,.4)', 18, 0, 6, () => { rr(x, y, w, h2, h2 / 2); c.fillStyle = lg(0, y, 0, y + h2, [[0, '#3cf29b'], [1, '#17a764']]); c.fill(); });
+  txt('📤  PARTAGER MON RÉSULTAT', x + w / 2, y + 50, '#06210f', 28, 900, 'center'); G.buttons.push({ id: 'dailyShare', x, y, w, h: h2 });
+})(drawRunEnd);
+
+// ---------- branchements ----------
+// la photo est prise juste avant que le HUD et les boutons soient dessinés : on ne garde que le chantier
+hud = (prev => function (lvl) { const P = G.pose; if (P && !P.shot && G.t - P.t > .45 && G.screen === 'play') { const s = document.createElement('canvas'); s.width = W; s.height = H; s.getContext('2d').drawImage(cv, 0, 0); P.shot = s; } prev(lvl); })(hud);
+drawTouch = (prev => function (lvl) { tutoUpdate(); prev(lvl); drawTuto(); drawTip(); poseChip(); })(drawTouch);
+act = (prev => function (id) {
+  if (id === 'poseShare' && G.pose && G.pose.shot) { sfx.click(); const P = G.pose; G.pose = null; ppTrack('share_pose'); poseImage(P).then(f => ppShare({ file: f, text: `J'ai posé PILE POIL au niveau ${P.n} 🎯 Tu fais mieux ?` })); return; }
+  if (id === 'dailyShare') { sfx.click(); ppTrack('share_daily'); ppShare({ text: dailyText() }); return; }
+  return prev(id);
+})(act);
+Object.assign(EN, {
+  'La grue avance toute seule': 'The crane moves on its own', 'Attends que la charge arrive au-dessus de la fouille': 'Wait until the load is above the pit', 'MAINTENANT !': 'NOW!', 'Touche ce bouton puis relâche-le': 'Tap this button and let go', 'Appuie sur ESPACE puis relâche': 'Press SPACE and let go',
+  'Relâche !': 'Let go!', 'Plus tu maintiens, plus la charge part loin': 'The longer you hold, the further it flies', 'Presque !': 'Almost!', 'Aucune vie perdue, on recommence': 'No life lost, try again', "Les 49 chantiers suivants t'attendent": '49 more sites are waiting for you',
+  '📸  Partager ce PILE POIL': '📸  Share this PILE POIL', '📤  PARTAGER MON RÉSULTAT': '📤  SHARE MY RESULT', 'Copié ! Colle-le dans ton groupe 📋': 'Copied! Paste it in your group chat 📋',
+});
+
+// =====================================================================
 //  PILE POIL — TÉLÉPHONE (iPhone en priorité) : survol tactile, installation sur l'écran d'accueil
 // =====================================================================
 // au doigt, le « survol » ne doit pas rester collé après un appui
