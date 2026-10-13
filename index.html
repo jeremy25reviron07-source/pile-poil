@@ -4879,24 +4879,28 @@ function truss(x0, x1, y, h, col, dk) {   // poutre treillis horizontale
 }
 function beacon(x, y, t, ph = 0) { const on = Math.sin(t * 3.2 + ph) > .2; if (on) ell(x, y, 22, 22, 'rgba(255,60,60,.18)'); ell(x, y, 6, 6, on ? '#ff4a4a' : '#5a1a1a'); }
 function titleCrane(t, trolleyX) {
-  const Y = 122, JH = 34, MX = 1050, MW = 44, col = '#ffc21a', dk = '#b98200';
-  // tête de mât
-  c.save(); c.globalAlpha = .95;
-  // (pas de mât sous la flèche : seulement le haut de la grue)
-  c.fillStyle = col; c.beginPath(); c.moveTo(MX - MW / 2, Y); c.lineTo(MX - 4, Y - 70); c.lineTo(MX + 4, Y - 70); c.lineTo(MX + MW / 2, Y); c.fill();
-  c.fillStyle = 'rgba(11,16,32,.9)'; c.beginPath(); c.moveTo(MX - MW / 2 + 8, Y); c.lineTo(MX, Y - 52); c.lineTo(MX + MW / 2 - 8, Y); c.fill();
-  // tirants
-  c.strokeStyle = 'rgba(220,230,240,.55)'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(MX, Y - 70); c.lineTo(160, Y); c.moveTo(MX, Y - 70); c.lineTo(560, Y); c.moveTo(MX, Y - 70); c.lineTo(1880, Y); c.stroke();
-  // flèche (vers la gauche) et contre-flèche (vers la droite)
-  truss(-40, 1900, Y, JH, col, dk); rr(MX - MW / 2 - 6, Y - 4, MW + 12, JH + 12, 6); c.fillStyle = dk; c.fill();
-  // lest de contre-flèche
-  for (let k = 0; k < 3; k++) { rr(1800 + k * 34 - 34, Y + JH + 2, 30, 66, 4); c.fillStyle = lg(0, Y + JH, 0, Y + JH + 66, [[0, '#9aa4b2'], [1, '#5d6676']]); c.fill(); }
-  // cabine
-  rr(MX - MW / 2 - 70, Y + JH + 2, 66, 52, 10); c.fillStyle = col; c.fill(); rr(MX - MW / 2 - 62, Y + JH + 10, 50, 28, 6); c.fillStyle = lg(0, Y + JH + 10, 0, Y + JH + 38, [[0, '#bfe6ff'], [1, '#4b86b8']]); c.fill();
+  // flèche de grue « flat-top » stylisée : une seule poutre en treillis d'un bord à l'autre de l'écran
+  const Y = 120, JH = 40;
+  c.save();
+  fillR(0, Y + JH, W, 34, lg(0, Y + JH, 0, Y + JH + 34, [[0, 'rgba(0,0,0,.32)'], [1, 'rgba(0,0,0,0)']]));   // ombre portée
+  fillR(0, Y + 8, W, JH - 18, 'rgba(10,14,30,.35)');                                                       // âme sombre (profondeur)
+  // diagonales du treillis, avec un liseré clair
+  c.lineCap = 'round';
+  c.strokeStyle = '#c48f00'; c.lineWidth = 5; c.beginPath(); for (let x = -JH; x < W + JH; x += JH) { c.moveTo(x, Y + JH - 8); c.lineTo(x + JH / 2, Y + 8); c.lineTo(x + JH, Y + JH - 8); } c.stroke();
+  c.strokeStyle = 'rgba(255,236,160,.45)'; c.lineWidth = 1.5; c.beginPath(); for (let x = -JH; x < W + JH; x += JH) { c.moveTo(x + 2, Y + JH - 9); c.lineTo(x + JH / 2 + 1, Y + 9); } c.stroke();
+  c.lineCap = 'butt';
+  // membrures haute et basse en dégradé
+  rr(-20, Y, W + 40, 10, 5); c.fillStyle = lg(0, Y, 0, Y + 10, [[0, '#ffe27a'], [1, '#f2b100']]); c.fill();
+  rr(-20, Y + JH - 10, W + 40, 12, 5); c.fillStyle = lg(0, Y + JH - 10, 0, Y + JH + 2, [[0, '#ffd23f'], [1, '#d99a00']]); c.fill();
+  fillR(0, Y + 1, W, 2, 'rgba(255,255,255,.55)');
+  // rail du chariot sous la flèche
+  fillR(0, Y + JH + 2, W, 4, 'rgba(60,44,0,.55)');
   // chariot
-  rr(trolleyX - 34, Y + JH - 2, 68, 22, 6); c.fillStyle = '#e8edf3'; c.fill(); ell(trolleyX - 20, Y + JH - 2, 7, 7, '#2b3445'); ell(trolleyX + 20, Y + JH - 2, 7, 7, '#2b3445');
+  rr(trolleyX - 40, Y + JH - 4, 80, 26, 9); c.fillStyle = lg(0, Y + JH - 4, 0, Y + JH + 22, [[0, '#f4f7fb'], [1, '#b9c3cf']]); c.fill();
+  ell(trolleyX - 24, Y + JH - 4, 8, 8, '#2b3445'); ell(trolleyX + 24, Y + JH - 4, 8, 8, '#2b3445'); ell(trolleyX - 24, Y + JH - 4, 3, 3, '#9aa6b5'); ell(trolleyX + 24, Y + JH - 4, 3, 3, '#9aa6b5');
+  fillR(trolleyX - 30, Y + JH + 12, 60, 4, 'rgba(255,194,26,.9)');
   c.restore();
-  beacon(MX, Y - 74, t); beacon(8, Y + 4, t, 1.3); beacon(1896, Y + 4, t, 2.1);
+  beacon(60, Y - 6, t); beacon(W - 60, Y - 6, t, 1.6);
   return Y + JH + 20;   // point d'accroche des câbles
 }
 let titleBoardAsked = false;
@@ -5276,40 +5280,68 @@ function tdStatus(s) {
   if (!s.oname) return ['CODE À ENVOYER', PAL.sub];
   return ['SON TOUR', PAL.sub];
 }
-// écran DUELS (remplace l'ancien Défis et duels : le défi du jour reste sur l'accueil)
+// écran DUELS : deux grands duels en haut, récapitulatif « Mes duels » en dessous
+function tdAvatar(x, y, r, name, col) { ell(x, y + 4, r, r, 'rgba(0,0,0,.25)'); ell(x, y, r, r, lg(0, y - r, 0, y + r, [[0, col[0]], [1, col[1]]])); txt((name || '?')[0].toUpperCase(), x, y + r * .36, '#fff', r, 900, 'center'); }
+function tdDots(x, y, st, col) { for (let k = 0; k < 5; k++) { const dn = k < st.i, cu = k === st.i && !st.done; rr(x + k * 34, y, 28, 10, 5); c.fillStyle = dn ? col : cu ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.1)'; c.fill(); } }
 drawDefis = function () {
-  screenBg(); navBar('defBack', 'DUELS');
+  screenBg(); fillR(0, 0, W, H, lg(0, 0, 0, H, [[0, 'rgba(5,8,22,.5)'], [1, 'rgba(4,6,16,.7)']]));
+  navBar('defBack', 'DUELS');
+  const pend = tdPendingCount();
   const cards = [
-    ['live', 'red', 'bolt', 'DUEL EN DIRECT', 'Vous jouez en même temps', 'Salon avec un code'],
-    ['tdNew', 'blue', 'swords', 'CHACUN SON TOUR', 'Un lancer chacun, à ton rythme', 'Salon avec un code'],
+    ['live', 'red', 'bolt', 'DUEL EN DIRECT', 'Vous jouez en même temps', ['Tu vois sa grue en direct', 'Salon avec un code ou un lien'], null],
+    ['tdNew', 'blue', 'swords', 'CHACUN SON TOUR', 'Un lancer chacun, quand tu veux', ['Le duel t\'attend, même jeu fermé', 'Notification quand c\'est ton tour'], pend ? `${pend} À TOI` : null],
   ];
-  cards.forEach(([id, col, ic, title, sub, pill], i) => {
-    const x = 110 + i * 500, y = 170, w = 460, h = 680, d = relief(x, y, w, h, CARD[col][0], CARD[col][1], RAD + 4, 12);
-    iconBtn(id, x + 36, y + h - 146, w - 72, 106, 'play', 'JOUER', '#ffffff', '#e8eef6', CARD[col][2], 46);
+  cards.forEach(([id, col, ic, title, sub, feats, badge], i) => {
+    const x = 100 + i * 870, y = 150, w = 850, h = 400, d = relief(x, y, w, h, CARD[col][0], CARD[col][1], RAD + 4, 12);
+    iconBtn(id, x + w - 330, y + h - 136, 290, 100, 'play', 'JOUER', '#ffffff', '#e8eef6', CARD[col][2], 44);
     G.buttons.push({ id, x, y, w, h });
-    c.save(); rr(x, y, w, h, RAD + 4); c.clip(); c.globalAlpha = .1; icon(ic, x + w - 90, y + 120, 260, '#fff'); c.restore();
-    rr(x + w / 2 - 80, y + 70 + d, 160, 160, 48); c.fillStyle = 'rgba(255,255,255,.2)'; c.fill(); icon(ic, x + w / 2, y + 150 + d, 96, '#fff');
-    T(title, x + w / 2, y + 330 + d + 4, 'rgba(0,0,0,.2)', 48, 'center'); T(title, x + w / 2, y + 330 + d, '#fff', 48, 'center');
-    txt(sub, x + w / 2, y + 382 + d, 'rgba(255,255,255,.95)', 26, 800, 'center');
-    c.font = '900 24px Inter'; const pw = c.measureText(tr(pill)).width + 44; rr(x + w / 2 - pw / 2, y + 410 + d, pw, 46, 23); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); txt(pill, x + w / 2, y + 441 + d, '#fff', 24, 900, 'center');
+    c.save(); rr(x, y, w, h, RAD + 4); c.clip(); c.globalAlpha = .1; icon(ic, x + w - 130, y + 120, 300, '#fff'); c.restore();
+    rr(x + 44, y + 48 + d, 136, 136, 42); c.fillStyle = 'rgba(255,255,255,.2)'; c.fill(); icon(ic, x + 112, y + 116 + d, 80, '#fff');
+    T(title, x + 210, y + 116 + d + 4, 'rgba(0,0,0,.2)', 62); T(title, x + 210, y + 116 + d, '#fff', 62);
+    txt(sub, x + 212, y + 164 + d, 'rgba(255,255,255,.95)', 28, 800);
+    feats.forEach((f, k) => { const fy = y + 238 + k * 46 + d; ell(x + 62, fy - 9, 15, 15, 'rgba(255,255,255,.22)'); ICN.check(x + 62, fy - 9, '#fff', .7); txt(f, x + 92, fy, '#fff', 24, 800); });
+    c.font = '900 22px Inter'; const pill = '5 chantiers · 3 vies · même tirage', pw = c.measureText(tr(pill)).width + 40; rr(x + 44, y + h - 92 + d, pw, 44, 22); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); txt(pill, x + 44 + pw / 2, y + h - 62 + d, '#fff', 22, 900, 'center');
+    if (badge) { const pu = 1 + Math.max(0, Math.sin(G.t * 4)) * .06; c.save(); c.translate(x + w - 90, y + 2); c.scale(pu, pu); c.font = '900 24px Inter'; const bw = c.measureText(tr(badge)).width + 36; rr(-bw / 2, -22, bw, 44, 22); c.fillStyle = '#fff'; c.fill(); txt(badge, 0, 9, CARD[col][2], 24, 900, 'center'); c.restore(); }
   });
-  // mes duels chacun son tour
-  const px = 1100, py = 170, pw = 710, ph = 680; uiPanel(px, py, pw, ph);
-  T('MES DUELS', px + 40, py + 70, PAL.text, 44);
-  const n = tdPendingCount(); if (n) { c.font = '900 22px Inter'; const t = `${n} à toi de jouer`, bw = c.measureText(tr(t)).width + 36; rr(px + pw - 40 - bw, py + 36, bw, 44, 22); c.fillStyle = '#2c63f0'; c.fill(); txt(t, px + pw - 40 - bw / 2, py + 66, '#fff', 22, 900, 'center'); }
-  const list = tdMine().slice().reverse().filter(e => TD.list[e.code]).sort((a, b) => (tdState(b.code).myTurn - tdState(a.code).myTurn) || (tdState(a.code).over - tdState(b.code).over)).slice(0, 5);
-  if (!list.length) { txt(tdMine().length ? 'Chargement…' : 'Aucun duel pour l\'instant.', px + 40, py + 140, PAL.sub, 24, 800); txt('Crée un duel « chacun son tour » et envoie le code à un ami.', px + 40, py + 180, PAL.sub, 22, 700); }
-  list.forEach((e, k) => {
-    const s = tdState(e.code), y = py + 108 + k * 104, [st, sc] = tdStatus(s), hv = hov(px + 24, y, pw - 48, 92);
-    rr(px + 24, y, pw - 48, 92, 26); c.fillStyle = hv ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.06)'; c.fill();
-    if (s.myTurn) { rr(px + 24, y, pw - 48, 92, 26); c.strokeStyle = '#6fb1ff'; c.lineWidth = 2.5; c.stroke(); }
-    txt(s.oname ? `contre ${s.oname}` : 'En attente d\'un adversaire', px + 52, y + 40, PAL.text, 25, 900);
-    txt(`${s.mine.score.toLocaleString('fr-FR')}  –  ${s.his.score.toLocaleString('fr-FR')}  ·  code ${e.code}`, px + 52, y + 74, PAL.sub, 20, 800);
-    c.font = '900 20px Inter'; const bw = c.measureText(tr(st)).width + 32; rr(px + pw - 96 - bw, y + 26, bw, 40, 20); c.fillStyle = s.myTurn ? '#2c63f0' : 'rgba(255,255,255,.1)'; c.fill(); txt(st, px + pw - 96 - bw / 2, y + 53, s.myTurn ? '#fff' : sc, 20, 900, 'center');
-    icon('chev', px + pw - 58, y + 46, 30, PAL.sub);
-    G.buttons.push({ id: 'tdOpen:' + e.code, x: px + 24, y, w: pw - 48, h: 92 });
+  // ---------- récapitulatif ----------
+  const all = tdMine().map(e => tdState(e.code)).filter(Boolean);
+  const won = all.filter(s => s.over && s.mine.score > s.his.score).length, lost = all.filter(s => s.over && s.mine.score < s.his.score).length, live = all.filter(s => !s.over).length;
+  T('MES DUELS', 100, 650, PAL.text, 50);
+  c.font = `400 50px ${TF}`; let bx = 100 + c.measureText(tr('MES DUELS')).width + 30;
+  [[`${won} victoire${won > 1 ? 's' : ''}`, '#3cf29b'], [`${lost} défaite${lost > 1 ? 's' : ''}`, '#ff6b5b'], [`${live} en cours`, '#6fb1ff']].forEach(([t2, col]) => {
+    c.font = '900 22px Inter'; const w2 = c.measureText(tr(t2)).width + 46; rr(bx, 614, w2, 44, 22); c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(); ell(bx + 20, 636, 6, 6, col); txt(t2, bx + 32, 644, PAL.text, 22, 900); bx += w2 + 12; });
+  iconBtn('tdNew', 1500, 604, 320, 70, null, 'Rejoindre avec un code', CARD.slate[0], CARD.slate[1], '#fff', 26);
+  const rank = s => s.myTurn ? 0 : !s.over ? 1 : 2;
+  const list = all.sort((a2, b2) => rank(a2) - rank(b2) || String(b2.r.updated || '').localeCompare(String(a2.r.updated || ''))).slice(0, 4);
+  const cw = (1720 - 3 * 28) / 4, cy = 700, ch = 340;
+  list.forEach((s, k) => {
+    const x = 100 + k * (cw + 28), [st, sc] = tdStatus(s), hv = hov(x, cy, cw, ch);
+    uiPanel(x, cy - (hv ? 4 : 0), cw, ch); const y = cy - (hv ? 4 : 0);
+    if (s.myTurn) { rr(x, y, cw, ch, RAD); c.strokeStyle = '#6fb1ff'; c.lineWidth = 3; c.stroke(); }
+    // bandeau d'état
+    c.font = '900 20px Inter'; const sw = c.measureText(tr(st)).width + 34; rr(x + cw / 2 - sw / 2, y + 20, sw, 38, 19); c.fillStyle = s.myTurn ? '#2c63f0' : s.over ? sc + '33' : 'rgba(255,255,255,.08)'; c.fill(); txt(st, x + cw / 2, y + 46, s.myTurn ? '#fff' : sc, 20, 900, 'center');
+    // avatars
+    const myName = s.r['p' + s.me] || 'Toi';
+    tdAvatar(x + cw / 2 - 100, y + 120, 40, myName, ['#4ef0a8', '#0e9f7a']); tdAvatar(x + cw / 2 + 100, y + 120, 40, s.oname || '?', s.oname ? ['#ffb057', '#ff5f3a'] : ['#5a6d8e', '#3a4b68']);
+    T('VS', x + cw / 2, y + 134, PAL.sub, 34, 'center');
+    txt('Toi', x + cw / 2 - 100, y + 190, PAL.sub, 20, 800, 'center'); txt(s.oname || 'En attente…', x + cw / 2 + 100, y + 190, PAL.sub, 20, 800, 'center');
+    const ms = s.mine.score, hs = s.his.score;
+    T(ms.toLocaleString('fr-FR'), x + cw / 2 - 24, y + 252, ms >= hs ? '#fff' : PAL.sub, 46, 'right'); T('–', x + cw / 2, y + 250, PAL.sub, 40, 'center'); T(hs.toLocaleString('fr-FR'), x + cw / 2 + 24, y + 252, hs > ms ? '#fff' : PAL.sub, 46, 'left');
+    tdDots(x + cw / 2 - 190, y + 278, s.mine, '#3cf29b'); tdDots(x + cw / 2 + 22, y + 278, s.his, '#ff9a6b');
+    txt(s.myTurn ? 'Touche pour jouer ton lancer' : s.over ? `code ${s.r.code}` : s.oname ? `Au tour de ${s.oname}` : `Envoie le code ${s.r.code}`, x + cw / 2, y + 322, s.myTurn ? '#9fd0ff' : PAL.sub, 19, 800, 'center');
+    G.buttons.push({ id: 'tdOpen:' + s.r.code, x, y: cy, w: cw, h: ch });
   });
-  chip(660, 924, 600, 84); txt('5 chantiers  ·  3 vies  ·  même tirage', 960, 976, PAL.sub, 28, 800, 'center');
+  // case « nouveau duel » pour remplir la rangée
+  if (list.length < 4) {
+    const k = list.length, x = 100 + k * (cw + 28), w2 = list.length ? cw : 1720, hv = hov(x, cy, w2, ch);
+    c.save(); c.setLineDash([14, 12]); rr(x, cy, w2, ch, RAD); c.strokeStyle = hv ? 'rgba(111,177,255,.9)' : 'rgba(255,255,255,.22)'; c.lineWidth = 3; c.stroke(); c.restore();
+    if (hv) { rr(x, cy, w2, ch, RAD); c.fillStyle = 'rgba(111,177,255,.06)'; c.fill(); }
+    ell(x + w2 / 2, cy + 120, 50, 50, 'rgba(111,177,255,.18)'); ln(x + w2 / 2 - 20, cy + 120, x + w2 / 2 + 20, cy + 120, '#6fb1ff', 6); ln(x + w2 / 2, cy + 100, x + w2 / 2, cy + 140, '#6fb1ff', 6);
+    T(list.length ? 'Nouveau duel' : 'Défie un ami !', x + w2 / 2, cy + 230, PAL.text, list.length ? 36 : 48, 'center');
+    txt(list.length ? 'Chacun son tour' : 'Crée un duel « chacun son tour » et envoie-lui le code : il jouera quand il veut.', x + w2 / 2, cy + 276, PAL.sub, 22, 800, 'center');
+    G.buttons.push({ id: 'tdNew', x, y: cy, w: w2, h: ch });
+  }
+  if (all.length > 4) txt(`+ ${all.length - 4} autre${all.length > 5 ? 's' : ''} duel${all.length > 5 ? 's' : ''}`, 1820, 1066, PAL.sub, 20, 800, 'right');
 };
 function drawTdForm() {
   screenBg(); navBar('tdFormBack', 'CHACUN SON TOUR');
@@ -5382,12 +5414,12 @@ addEventListener('keydown', ev => { if (ev.key !== 'Escape' || MO) return; if (G
 })();
 
 Object.assign(EN, {
-  'DUELS': 'DUELS', 'DUEL EN DIRECT': 'LIVE DUEL', 'Vous jouez en même temps': 'You play at the same time', 'CHACUN SON TOUR': 'TURN BY TURN', 'Un lancer chacun, à ton rythme': 'One drop each, at your own pace', 'MES DUELS': 'MY DUELS', 'Aucun duel pour l\'instant.': 'No duels yet.', 'Crée un duel « chacun son tour » et envoie le code à un ami.': 'Create a turn-by-turn duel and send the code to a friend.',
+  'DUELS': 'DUELS', 'DUEL EN DIRECT': 'LIVE DUEL', 'Vous jouez en même temps': 'You play at the same time', 'CHACUN SON TOUR': 'TURN BY TURN', 'Un lancer chacun, à ton rythme': 'One drop each, at your own pace', 'MES DUELS': 'MY DUELS', 'Créer ou rejoindre': 'Create or join', 'Aucun duel en cours': 'No duel in progress', 'Chargement de tes duels…': 'Loading your duels…', 'Vous jouez en même temps, chacun sur sa grue': 'You play at the same time, each on your crane', 'Tu vois la grue de ton adversaire en direct': "You see your opponent's crane live", 'Un lancer chacun, quand tu veux': 'One drop each, whenever you like', "Le duel t'attend : joue entre deux pauses": 'The duel waits for you: play between breaks', '5 chantiers · 3 vies · même tirage': '5 sites · 3 lives · same draw', 'Lance un duel « chacun son tour » et envoie le code à un ami : il apparaîtra ici.': 'Start a turn-by-turn duel and send the code to a friend: it will show up here.', 'Aucun duel pour l\'instant.': 'No duels yet.', 'Crée un duel « chacun son tour » et envoie le code à un ami.': 'Create a turn-by-turn duel and send the code to a friend.',
   'Comment ça marche': 'How it works', 'Crée le duel et envoie le code (ou le lien) à un ami.': 'Create the duel and send the code (or link) to a friend.', 'Chacun joue UN lancer à son tour, quand il veut.': 'Each player makes ONE drop per turn, whenever they like.', 'Raté = une vie en moins. Réussi = chantier suivant.': 'Miss = one life lost. Success = next site.', 'Après 5 chantiers ou 3 vies perdues, le meilleur score gagne.': 'After 5 sites or 3 lives lost, the best score wins.',
-  'Toi': 'You', 'points': 'points', 'chantiers': 'sites', 'VICTOIRE': 'VICTORY', 'DÉFAITE': 'DEFEAT', 'ÉGALITÉ': 'DRAW', 'À TOI': 'YOUR TURN', 'SON TOUR': 'THEIR TURN', 'CODE À ENVOYER': 'SEND THE CODE', 'NOUVEAU DUEL': 'NEW DUEL', 'Copier le lien': 'Copy link', 'Tu peux fermer le jeu : le duel t\'attend dans DUELS.': 'You can close the game: the duel waits for you in DUELS.', 'En attente…': 'Waiting…', 'En direct ou chacun son tour': 'Live or turn by turn',
+  'Toi': 'You', 'Tu vois sa grue en direct': "You see their crane live", 'Salon avec un code ou un lien': 'Room with a code or link', 'Un lancer chacun, quand tu veux': 'One drop each, whenever you like', "Le duel t'attend, même jeu fermé": 'The duel waits, even with the game closed', "Notification quand c'est ton tour": "Notified when it's your turn", 'Rejoindre avec un code': 'Join with a code', 'Touche pour jouer ton lancer': 'Tap to play your drop', 'Nouveau duel': 'New duel', 'Défie un ami !': 'Challenge a friend!', 'Chacun son tour': 'Turn by turn', 'Crée un duel « chacun son tour » et envoie-lui le code : il jouera quand il veut.': 'Create a turn-by-turn duel and send them the code: they play whenever they like.', '5 chantiers · 3 vies · même tirage': '5 sites · 3 lives · same draw', 'points': 'points', 'chantiers': 'sites', 'VICTOIRE': 'VICTORY', 'DÉFAITE': 'DEFEAT', 'ÉGALITÉ': 'DRAW', 'À TOI': 'YOUR TURN', 'SON TOUR': 'THEIR TURN', 'CODE À ENVOYER': 'SEND THE CODE', 'NOUVEAU DUEL': 'NEW DUEL', 'Copier le lien': 'Copy link', 'Tu peux fermer le jeu : le duel t\'attend dans DUELS.': 'You can close the game: the duel waits for you in DUELS.', 'En attente…': 'Waiting…', 'En direct ou chacun son tour': 'Live or turn by turn',
   'QUITTER TON LANCER ?': 'QUIT YOUR DROP?', 'Ce lancer comptera comme raté (une vie en moins).': 'This drop will count as a miss (one life lost).',
 });
-EN_RX.push([/^(\d+) à toi de jouer$/, '$1 your turn'], [/^(\d+) À TOI$/, '$1 YOUR TURN'], [/^contre (.*)$/, 'vs $1'], [/^JOUER MON LANCER · CHANTIER (\d)\/5$/, 'PLAY MY DROP · SITE $1/5'], [/^Au tour de (.*)$/, "$1's turn"], [/^DUEL · (.*)$/, 'DUEL · $1'], [/^(.*) a joué : à toi !$/, '$1 played: your turn!']);
+EN_RX.push([/^(\d+) victoires?$/, '$1 wins'], [/^(\d+) défaites?$/, '$1 losses'], [/^(\d+) en cours$/, '$1 ongoing'], [/^Envoie le code (.*)$/, 'Send code $1'], [/^code (.*)$/, 'code $1'], [/^(\d+) à toi de jouer$/, '$1 your turn'], [/^(\d+) À TOI$/, '$1 YOUR TURN'], [/^contre (.*)$/, 'vs $1'], [/^Chantier (\d)\/5 · code (.*)$/, 'Site $1/5 · code $2'], [/^\+ (\d+) autres?$/, '+ $1 more'], [/^JOUER MON LANCER · CHANTIER (\d)\/5$/, 'PLAY MY DROP · SITE $1/5'], [/^Au tour de (.*)$/, "$1's turn"], [/^DUEL · (.*)$/, 'DUEL · $1'], [/^(.*) a joué : à toi !$/, '$1 played: your turn!']);
 
 // =====================================================================
 //  PILE POIL — REMISE À ZÉRO DE SAISON (une seule fois par appareil)
