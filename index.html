@@ -2789,7 +2789,7 @@ function afterResult() {
     return startLevel(G.level);
   }
   if (ok) {
-    if (G.level === 50) { G.endTime = Date.now(); G.screen = 'victory'; save.best = Math.max(save.best || 0, G.score); save.checkpoint = 1; save.score = 0; writeSave(save); return; }
+    if (G.level === 50) { G.endTime = Date.now(); G.screen = 'victory'; save.best = Math.max(save.best || 0, G.score); save.checkpoint = 1; save.score = 0; save.restarted = true; writeSave(save); return; }
     const next = G.level + 1;
     if (CHECKPOINTS.includes(next)) { save.score = G.score; gotoCheckpointScreen(next); } else startLevel(next);
   } else { if (G.lives <= 0) G.screen = 'gameover'; else startLevel(G.level); }
@@ -2922,7 +2922,7 @@ window.drawLiveHud = drawLiveHud;
 function act(id) {
   sfx.click();
   if (id === 'play') { G.mode = 'career'; G.runSeed = 0; newGame(save.checkpoint || 1); }
-  if (id === 'restart') { G.mode = 'career'; G.runSeed = 0; save.checkpoint = 1; save.score = 0; writeSave(save); newGame(1); }
+  if (id === 'restart') { G.mode = 'career'; G.runSeed = 0; save.checkpoint = 1; save.score = 0; save.restarted = true; writeSave(save); newGame(1); }
   if (id === 'daily') startRun('daily', hashStr('pilepoil-' + todayKey()));
   if (id === 'duel') startRun('duel', (Math.random() * 1e9) | 0);
   if (id === 'acceptDuel' && ON.duel) startRun('duel', ON.duel.seed, ON.duel);
@@ -2934,7 +2934,7 @@ function act(id) {
   if (id === 'retry') { G.score = save.score || G.score; gotoCheckpointScreen(G.checkpoint); }
   if (id === 'menu') { G.paused = false; if (G.mode === 'live') liveLeave(); G.mode = 'career'; G.runSeed = 0; hideOverlay(); hideLiveOverlay(); G.screen = 'title'; history.replaceState(null, '', location.pathname); }
   if (id === 'resume') G.paused = false;
-  if (id === 'replay') { save.checkpoint = 1; save.score = 0; writeSave(save); newGame(1); }
+  if (id === 'replay') { save.checkpoint = 1; save.score = 0; save.restarted = true; writeSave(save); newGame(1); }
 }
 // lien de salon reçu : ?salle=CODE
 (function () {
@@ -4664,7 +4664,7 @@ act = (prev => function (id) {
   if (id === 'accLog') { sfx.click(); return accForm('login'); }
   if (id === 'accSync') { sfx.click(); accPull().then(() => accPush()); return toast(save.lang === 'en' ? 'Syncing…' : 'Synchronisation…', '#9fd6ff'); }
   if (id === 'accLogout') return modal({ title: 'SE DÉCONNECTER ?', lines: ['Ta progression reste sauvegardée sur ton compte.', 'Cet appareil repartira en mode invité.'], yes: 'SE DÉCONNECTER', no: 'ANNULER', onYes: () => accLogout(false) });
-  if (id === 'resetCareer') return modal({ title: 'RECOMMENCER LA CARRIÈRE ?', lines: ['Tu repartiras du niveau 1.', 'Tes pièces, tes grues et tes achats sont conservés.'], yes: 'RECOMMENCER', no: 'ANNULER', onYes: () => { save.checkpoint = 1; save.score = 0; writeSave(save); toast(save.lang === 'en' ? 'Career restarted at level 1' : 'Carrière remise au niveau 1', '#3cf29b'); } });
+  if (id === 'resetCareer') return modal({ title: 'RECOMMENCER LA CARRIÈRE ?', lines: ['Tu repartiras du niveau 1.', 'Tes pièces, tes grues et tes achats sont conservés.'], yes: 'RECOMMENCER', no: 'ANNULER', onYes: () => { save.checkpoint = 1; save.score = 0; save.restarted = true; writeSave(save); toast(save.lang === 'en' ? 'Career restarted at level 1' : 'Carrière remise au niveau 1', '#3cf29b'); } });
   if ((mt = id.match(/^(quality|lang):(\w+)$/))) { sfx.click(); save[mt[1]] = mt[2]; writeSave(save); if (mt[1] === 'lang') applyHtmlLang(); return; }
   if (id === 'vibrate') { save.vibrate = !save.vibrate; writeSave(save); sfx.click(); buzz(60); return; }
   return prev(id);
@@ -4853,6 +4853,19 @@ function navBar(backId, label) {   // écrans secondaires : ‹ TITRE à gauche,
 // ---------- progression de carrière ----------
 save.lvl = save.lvl || {};   // { niveau: { s: étoiles, p: meilleur score } }
 const careerLevel = () => Math.max(1, Math.min(50, save.maxLevel || save.checkpoint || 1));
+// ---------- reprise de carrière fiable ----------
+// Le checkpoint sauvegardé ne peut plus redescendre tout seul (synchro entre appareils, partie lancée
+// avant la fin du chargement du compte…). Il ne redescend que si le joueur recommence volontairement.
+const cpFor = lv => CHECKPOINTS.filter(k => k <= lv).pop() || 1;
+function resumeLevel() {
+  const cp = save.checkpoint || 1, best = cpFor(save.maxLevel || 1);
+  if (save.restarted) { if (cp >= best) { save.restarted = false; } else return cp; }
+  return Math.max(cp, best);
+}
+gotoCheckpointScreen = (prev => function (n) {
+  const keep = save.checkpoint || 1, keepScore = save.score || 0; prev(n);
+  if (isCareer() && !save.restarted && n < keep) { save.checkpoint = keep; save.score = keepScore; writeSave(save); }
+})(gotoCheckpointScreen);
 function trancheName(t) { return ['Apprentissage', 'Mouvement', 'Conditions extrêmes', 'Travail de nuit', 'Chantier vivant', 'Master'][t]; }
 function totalStars() { return Object.values(save.lvl || {}).reduce((a, v) => a + (v.s || 0), 0); }
 function lvState(n) { const cur = careerLevel(); return n < cur || ((save.lvl || (save.lvl = {}))[n] && (save.lvl || (save.lvl = {}))[n].s) ? 'd' : n === cur ? 'c' : 'l'; }
@@ -4931,7 +4944,7 @@ drawTitle = function () {
   c.restore();
   topBarUI();
   // carte CARRIÈRE (CONTINUER est poussé en premier : il gagne le clic)
-  const cur = careerLevel(), tr0 = trancheOf(cur), cp = save.checkpoint || 1, x = 120, y = 452, w = 900, h = 576;
+  const cur = careerLevel(), tr0 = trancheOf(cur), cp = resumeLevel(), x = 120, y = 452, w = 900, h = 576;
   const cy = y + h - 150;
   relief(x, y, w, h, CARD.green[0], CARD.green[1], RAD + 4, 12);
   c.save(); rr(x, y, w, h, RAD + 4); c.clip(); c.globalAlpha = .1; icon('build', x + w - 140, y + 210, 300, '#fff'); c.restore();
@@ -4977,7 +4990,7 @@ drawTitle = function () {
 const CV = { start: null };
 function drawCareer() {
   screenBg(); navBar('carBack', 'CARRIÈRE');
-  const cur = careerLevel(), cp = save.checkpoint || 1, t = trancheOf(cur);
+  const cur = careerLevel(), cp = resumeLevel(), t = trancheOf(cur);
   if (CV.start === null) CV.start = clamp(cur - 4, 1, 42);
   txt('PROGRESSION', 960, 208, PAL.sub, 26, 900, 'center');
   c.font = `400 76px ${TF}`; const head = `${tr('NIVEAU')} ${cur} / 50`, hw = c.measureText(head).width; c.font = `400 76px ${TF}`; const sw = c.measureText(`  ·  ${totalStars()}`).width;
@@ -5116,6 +5129,7 @@ afterResult = (prev => function () {
 act = (prev => function (id) {
   let mt;
   if (id === 'levels') { sfx.click(); LVS.t = null; G.screen = 'levels'; return; }
+  if (id === 'play' && (G.screen === 'title' || G.screen === 'career')) { const r = resumeLevel(); if (r !== (save.checkpoint || 1)) { save.checkpoint = r; writeSave(save); } }
   if (id === 'coinInfo') { sfx.click(); GA.info = !GA.info; return; }
   if (id === 'coinInfoShop') { GA.info = false; return act('shop'); }
   if (id === 'career') { sfx.click(); CV.start = null; G.screen = 'career'; return; }
