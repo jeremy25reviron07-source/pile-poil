@@ -4692,5 +4692,17 @@ Object.assign(EN, {
 });
 EN_RX.push([/^Tu reprendras au checkpoint du niveau (\d+)\.$/, 'You will resume at the level $1 checkpoint.']);
 
+// =====================================================================
+//  PILE POIL — REMISE À ZÉRO DE SAISON (une seule fois par appareil)
+//  Incrémenter RESET_SEASON pour repartir de zéro chez tous les joueurs
+// =====================================================================
+const RESET_SEASON = 2;
+if ((save.season || 1) < RESET_SEASON) {
+  try { Object.keys(localStorage).filter(k => k.startsWith('ppdemo_')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+  Object.assign(ACC, { name: '', token: '', v: 0, base: 0, dirty: false, state: 'off' }); accStore();
+  importSave({}); save.name = ''; save.season = RESET_SEASON; save.cbest = null; writeSave(save);
+  setTimeout(() => { if (typeof toast === 'function') toast(save.lang === 'en' ? 'New season: everyone starts from zero!' : 'Nouvelle saison : tout le monde repart de zéro !', '#ffd447'); }, 2500);
+}
+
 </script>
 </body></html>
