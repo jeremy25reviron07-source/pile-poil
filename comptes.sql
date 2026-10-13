@@ -1,0 +1,4 @@
+-- PILE POIL — comptes joueurs (déjà appliqué sur la base via le connecteur ; gardé pour référence)
+-- Table accounts (pseudo unique, mot de passe haché bcrypt, sauvegarde JSON versionnée)
+-- Fonctions : account_register, account_login, account_pull, account_push,
+--             submit_career2 / submit_score2 (un pseudo de compte est réservé à son propriétaire)

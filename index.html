@@ -2481,7 +2481,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -2838,10 +2838,10 @@ function hideLiveOverlay() { if (LVO) LVO.hidden = true; }
 // ---------- écrans ----------
 function drawTitle() {
   screenBg();
-  withShadow('rgba(255,194,26,.45)', 40, 0, 0, () => txt('PILE POIL', 960, 280, '#ffc21a', 160, 900, 'center'));
-  txt('Le jeu de grue d\'adresse et de précision', 960, 345, '#e6eef8', 30, 700, 'center');
+  drawLogo(960, 192, 1);
+  txt('Le jeu de grue d\'adresse et de précision', 960, 368, '#e6eef8', 28, 700, 'center');
   const cp = save.checkpoint || 1;
-  button('play', 460, 400, 480, 96, cp > 1 ? `CARRIÈRE · NIV. ${cp}` : 'CARRIÈRE', '#3cf29b', '#17a764', '#06210f');
+  button('play', 460, 400, 480, 96, cp > 1 ? `JOUER · NIV. ${cp}` : 'JOUER', '#3cf29b', '#17a764', '#06210f');
   button('daily', 980, 400, 480, 96, 'DÉFI DU JOUR', '#ffd447', '#c98d00', '#2a1a00');
   button('live', 460, 512, 480, 96, 'DUEL EN DIRECT', '#ff6a55', '#c4281a', '#ffffff');
   button('duel', 980, 512, 480, 96, 'DUEL DIFFÉRÉ', '#5fa8ff', '#2a62c4', '#061a3a');
@@ -2974,7 +2974,7 @@ function auInit() {
   const a = AU.ctx; AC = a;
   const comp = a.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .25; comp.connect(a.destination);
   AU.master = auGain(TOUCH ? 1.4 : 1, comp);
-  AU.sfx = auGain(AU.sound ? 1 : 0, AU.master);
+  AU.sfx = auGain(AU.sound ? (save.volSfx ?? 1) : 0, AU.master);
   AU.mus = auGain(0, AU.master);
   AU.white = auNoise(2, false); AU.brown = auNoise(4, true);
   // --- moteur de la grue : diesel grave (chenilles) + sifflement électrique du chariot
@@ -3118,7 +3118,7 @@ function auFrame() {
   auSet(AU.rainG.gain, rain * k, .5); auSet(AU.cityG.gain, city * k, .6);
   // musique : forte dans les menus, discrète en jeu, coupée pendant la pause
   const menu = G.screen !== 'play', target = !AU.music ? 0 : menu ? .5 : G.paused ? .12 : .2;
-  auSet(AU.mus.gain, target, .5);
+  auSet(AU.mus.gain, target * (save.volMus ?? 1), .5);
 }
 
 // ---------- musique générative (groove « chantier », 96 BPM) ----------
@@ -3166,7 +3166,7 @@ function auMusicTick() {
 }
 
 // ---------- réglages son / musique ----------
-function setSound(on) { AU.sound = on; MUTED = !on; save.sound = on; writeSave(save); if (AU.ctx) auSet(AU.sfx.gain, on ? 1 : 0, .05); }
+function setSound(on) { AU.sound = on; MUTED = !on; save.sound = on; writeSave(save); if (AU.ctx) auSet(AU.sfx.gain, on ? (save.volSfx ?? 1) : 0, .05); }
 function setMusic(on) { AU.music = on; save.music = on; writeSave(save); }
 setMuted = m => setSound(!m);
 addEventListener('keydown', e => {
@@ -3310,7 +3310,6 @@ drawBoard = function () {
       : WB.rank ? `Ton record : ${b.score.toLocaleString('fr-FR')} pts · ${WB.rank === 1 ? '1er' : WB.rank + 'e'} sur ${WB.total} grutier${WB.total > 1 ? 's' : ''}` : `Ton record : ${b.score.toLocaleString('fr-FR')} pts (niveau ${b.level})`;
     txt(WB.msg && !WB.msg.startsWith('Record') ? WB.msg : info, 960, 945, WB.msg && !WB.msg.startsWith('Record') ? '#ffd447' : '#cfe0ff', 22, 800, 'center');
   }
-  button('menu', 60, 960, 220, 70, 'MENU', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
 };
 
 // ---------- record mondial sur l'écran titre et sur l'écran de fin ----------
@@ -3423,7 +3422,7 @@ function drawGarage() {
   screenBg();
   txt('GARAGE', 960, 86, '#ffc21a', 60, 900, 'center');
   coinPill(1380, 34);
-  button('menu', 40, 30, 220, 64, 'MENU', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  button('menu', 40, 30, 220, 64, '◀ RETOUR', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
   TABS.forEach(([id, label], i) => { const x = 280 + i * 345, on = GA.tab === id; rr(x, 118, 325, 58, 29); c.fillStyle = on ? '#ffc21a' : 'rgba(255,255,255,.1)'; c.fill(); txt(label, x + 162, 156, on ? '#1a1300' : '#fff', 21, 900, 'center'); G.buttons.push({ id: 'tab_' + id, x, y: 118, w: 325, h: 58 }); });
   if (GA.tab === 'tower' || GA.tab === 'mobile') drawModels(GA.tab);
   else if (GA.tab === 'style') drawStyle();
@@ -3548,7 +3547,7 @@ setInterval(() => {
 
 // ---------- pièces sur l'écran titre ----------
 drawTitle = (prev => function () { prev(); coinPill(40, 36); })(drawTitle);
-drawCheckpoint = (prev => function () { prev(); coinPill(40, 36); })(drawCheckpoint);
+
 
 act = (prev => function (id) {
   if (id === 'garage') { sfx.click(); GA.view = { tower: null, mobile: null }; G.screen = 'garage'; return; }
@@ -4254,6 +4253,444 @@ function overlayLoop() {
 }
 // démarre après la boucle principale pour dessiner par-dessus
 (function waitFrame() { if (G.t > 0) requestAnimationFrame(overlayLoop); else setTimeout(waitFrame, 200); })();
+
+// =====================================================================
+//  PILE POIL — LANGUES (français / anglais)
+//  Le jeu est écrit en français ; en anglais, chaque texte affiché passe par tr()
+// =====================================================================
+const EN = {
+  // menus
+  'JOUER': 'PLAY', 'DÉFI DU JOUR': 'DAILY CHALLENGE', 'DUEL EN DIRECT': 'LIVE DUEL', 'DUEL DIFFÉRÉ': 'ASYNC DUEL', 'CLASSEMENTS': 'LEADERBOARDS', 'CLASSEMENT': 'LEADERBOARD',
+  'GARAGE': 'GARAGE', 'BOUTIQUE': 'SHOP', 'PARAMÈTRES': 'SETTINGS', 'MENU': 'MENU', '◀ RETOUR': '◀ BACK', 'RETOUR': 'BACK', 'PAUSE': 'PAUSE', '⏸ PAUSE': '⏸ PAUSE',
+  'REPRENDRE': 'RESUME', 'QUITTER': 'QUIT', 'QUITTER AU MENU': 'QUIT TO MENU', 'REJOUER': 'PLAY AGAIN', 'REVANCHE': 'REMATCH', 'RELEVER LE DÉFI': 'ACCEPT CHALLENGE',
+  'RECOMMENCER LA CARRIÈRE': 'RESTART CAREER', 'RECOMMENCER AU NIVEAU 1': 'RESTART AT LEVEL 1', 'ANNULER': 'CANCEL', 'PLUS TARD': 'LATER', 'OK': 'OK', 'ACHETER': 'BUY', 'AU GARAGE': 'TO THE GARAGE',
+  "Le jeu de grue d'adresse et de précision": 'The crane game of skill and precision', 'ADRESSE & PRÉCISION': 'SKILL & PRECISION',
+  'Défis et duels : 5 chantiers, 3 vies, le même tirage pour chaque joueur': 'Challenges and duels: 5 sites, 3 lives, the same draw for every player',
+  'Mode démo : scores et duels restent sur cet appareil (ajoute tes clés Supabase pour jouer en ligne)': 'Demo mode: scores and duels stay on this device',
+  'Déplacer': 'Move', 'Câble': 'Cable', 'Maintenir puis relâcher': 'Hold then release', 'Pause': 'Pause', 'Puissance': 'Power', 'Lâcher': 'Release', 'Sons': 'Sound', 'Sons coupés': 'Sound off', 'Musique': 'Music', 'Musique coupée': 'Music off',
+  'Puissance puis lâcher': 'Power then release', 'ESPACE maintenu': 'SPACE held', 'ESPACE relâché': 'SPACE released', 'ESPACE': 'SPACE', 'ÉCHAP': 'ESC', 'MAINTENIR': 'HOLD', 'LÂCHER': 'RELEASE',
+  // HUD
+  'NIVEAU': 'LEVEL', 'VIES': 'LIVES', 'SCORE': 'SCORE', 'CONDITIONS': 'CONDITIONS', 'PUISSANCE': 'POWER', 'VITESSE GRUE': 'CRANE SPEED', 'Constante': 'Constant', 'CHARGE': 'LOAD',
+  'Ensoleillé': 'Sunny', 'Couvert': 'Overcast', 'Pluie': 'Rain', 'Pluie forte': 'Heavy rain', 'Bruine': 'Drizzle', 'Nuit': 'Night', 'Vent': 'Wind', 'Vent →': 'Wind →', 'Vent ←': 'Wind ←', 'Brouillard': 'Fog', 'Visibilité': 'Visibility', 'Ouvriers': 'Workers',
+  'APPRENTISSAGE': 'APPRENTICESHIP', 'MAÎTRISE DU MOUVEMENT': 'MOTION MASTERY', 'CONDITIONS EXTRÊMES': 'EXTREME CONDITIONS', 'TRAVAIL DE NUIT': 'NIGHT SHIFT', 'LE CHANTIER VIVANT': 'LIVE SITE', 'MASTER NIVEAU': 'MASTER LEVEL',
+  'PILE POIL !': 'BULLSEYE!', 'DANS LE TROU !': 'IN THE HOLE!', 'RATÉ': 'MISSED', 'HORS ZONE': 'OUT OF BOUNDS', 'OUVRIER TOUCHÉ !': 'WORKER HIT!', 'FIN DE COURSE BASSE': 'LOWER LIMIT REACHED',
+  'La charge a manqué la cible · vie perdue': 'The load missed the target · life lost', 'La charge est tombée hors du chantier · vie perdue': 'The load fell off the site · life lost', 'Observe leurs trajets avant de lancer · vie perdue': 'Watch their paths before dropping · life lost',
+  'Vue cabine': 'Cabin view', 'ANÉMOMÈTRE': 'ANEMOMETER', "⚠ ARRÊT D'URGENCE · SECOURS EN ROUTE": '⚠ EMERGENCY STOP · HELP ON THE WAY',
+  'Bloc béton': 'Concrete block', 'Palette de parpaings': 'Pallet of blocks', 'Benne à béton pleine': 'Full concrete bucket', 'Prédalle préfabriquée': 'Precast slab', 'Poutre IPN': 'Steel I-beam', 'Banche métallique': 'Steel formwork panel', "Cage d'armatures": 'Rebar cage', 'Tube acier': 'Steel pipe',
+  // écrans de progression
+  'CHANTIER OUVERT': 'SITE OPEN', 'CHECKPOINT ATTEINT': 'CHECKPOINT REACHED', 'Ta première tranche commence · 3 vies': 'Your first stage begins · 3 lives', 'VIES RECHARGÉES': 'LIVES REFILLED',
+  'ESPACE ou ENTRÉE pour continuer': 'SPACE or ENTER to continue', 'Touchez le bouton pour continuer': 'Tap the button to continue', 'PLUS DE VIES': 'OUT OF LIVES', 'MASTER NIVEAU RÉUSSI !': 'MASTER LEVEL COMPLETE!',
+  'Les 50 niveaux sont validés · tu es officiellement Maître Grutier': 'All 50 levels done · you are officially a Master Crane Operator', 'SCORE FINAL': 'FINAL SCORE', 'RÉCOMPENSES': 'REWARDS',
+  'Lancers parfaits': 'Perfect drops', 'Vies perdues': 'Lives lost', 'Ouvriers touchés': 'Workers hit', 'Temps total': 'Total time',
+  'Commandes': 'Controls', 'jauge + balancement': 'gauge + swing', 'Trou large': 'Wide hole', 'qui rétrécit': 'that shrinks', 'Grue': 'Crane', 'vitesse constante': 'constant speed', 'Vitesse': 'Speed', 'variable': 'variable', 'Balancier': 'Swing', 'plus ample': 'wider',
+  'Trous': 'Holes', 'plus petits': 'smaller', 'dévie la trajectoire': 'bends the path', 'conditions difficiles': 'tough conditions', 'visibilité réduite': 'reduced visibility', 'éclairage essentiel': 'lighting is key', 'Ombres': 'Shadows', 'distances trompeuses': 'tricky distances',
+  'toujours présent': 'always there', 'à ne pas toucher': 'do not hit them', 'et vent': 'and wind', 'Cibles': 'Targets', 'très petites': 'very small', 'Cabine': 'Cabin', 'vue à la 1re personne': 'first-person view', 'Trou': 'Hole', '1 mètre': '1 meter',
+  // en ligne
+  'TU AS ÉTÉ DÉFIÉ !': 'YOU HAVE BEEN CHALLENGED!', 'Chargement du duel…': 'Loading duel…', 'Chargement…': 'Loading…', 'DUEL ENTRE AMIS': 'DUEL WITH FRIENDS', 'DÉFIE UN AMI': 'CHALLENGE A FRIEND', 'RÉSULTAT DU DUEL': 'DUEL RESULT',
+  'Les 5 chantiers sont réussis !': 'All 5 sites completed!', 'Même tirage de chantiers, même météo : le meilleur score gagne.': 'Same sites, same weather: best score wins.', 'Envoie ton score : ton ami jouera exactement les mêmes 5 chantiers.': 'Send your score: your friend will play the exact same 5 sites.',
+  'Deux grutiers, les mêmes 5 chantiers, en même temps. Le meilleur score gagne.': 'Two operators, the same 5 sites, at the same time. Best score wins.', 'CODE DU SALON': 'ROOM CODE', "Crée un salon et envoie le lien, ou entre le code reçu d'un ami.": "Create a room and send the link, or enter a friend's code.",
+  'Mêmes chantiers, même météo : à toi de jouer pile poil': 'Same sites, same weather: your turn to nail it', 'ADVERSAIRE': 'OPPONENT', 'Terminé': 'Finished', 'Synchronisation…': 'Syncing…', 'VICTOIRE !': 'VICTORY!', 'DÉFAITE': 'DEFEAT', 'ÉGALITÉ': 'DRAW', 'VICTOIRE PAR FORFAIT': 'WIN BY FORFEIT', "EN ATTENTE DE L'ADVERSAIRE…": 'WAITING FOR OPPONENT…', 'Déconnecté': 'Disconnected',
+  '🌍  MONDIAL': '🌍  WORLD', '📅  DÉFI DU JOUR': '📅  DAILY', 'MEILLEUR SCORE EN CARRIÈRE': 'BEST CAREER SCORE', 'MASTER ✓': 'MASTER ✓',
+  "Aucun record pour l'instant : sois le premier grutier classé !": 'No records yet: be the first ranked operator!', "Aucun score aujourd'hui : sois le premier !": 'No scores today: be the first!',
+  'Joue en Carrière : ton meilleur score y sera publié automatiquement': 'Play Career: your best score will be posted automatically', 'Choisis un pseudo dans CLASSEMENTS pour apparaître au classement mondial': 'Pick a nickname in LEADERBOARDS to appear in the world ranking',
+  // garage
+  'GRUES À TOUR': 'TOWER CRANES', 'GRUES MOBILES': 'MOBILE CRANES', 'PEINTURE & TENUE': 'PAINT & OUTFIT', 'ÉQUIPEMENT': 'EQUIPMENT', 'MANIABILITÉ': 'HANDLING', 'STABILITÉ': 'STABILITY', 'TENUE AU VENT': 'WIND RESISTANCE',
+  'ÉQUIPÉE': 'EQUIPPED', 'ÉQUIPER': 'EQUIP', '✓ ÉQUIPÉE': '✓ EQUIPPED', 'Disponible': 'Available', '★ AMÉLIORATION MAX': '★ MAX UPGRADE', 'Améliorable 3 fois après achat (+0,5 partout)': 'Can be upgraded 3 times after purchase (+0.5 each)',
+  'Utilisée aux niveaux 1-20 et 31-49': 'Used on levels 1-20 and 31-49', 'Utilisée aux niveaux 21-30 (conditions extrêmes)': 'Used on levels 21-30 (extreme conditions)',
+  'PEINTURE DES GRUES': 'CRANE PAINT', 'TON ENTREPRISE': 'YOUR COMPANY', 'Le nom affiché sur le panneau de la contre-flèche et sur les grues mobiles': 'The name shown on the counter-jib sign and mobile cranes', 'TENUE DU GRUTIER': "OPERATOR'S OUTFIT",
+  'PORTÉE': 'WORN', 'PORTER': 'WEAR', '★ BOUTIQUE': '★ SHOP', 'COMMENT GAGNER DES PIÈCES': 'HOW TO EARN COINS', 'Chantier réussi en Carrière': 'Site cleared in Career', 'Lancer parfait': 'Perfect drop', "1er passage d'un checkpoint": 'First time at a checkpoint', 'Défi du jour terminé (1 fois/jour)': 'Daily challenge done (once a day)',
+  'Équipements valables en Carrière (défis et duels restent à armes égales)': 'Equipment works in Career (challenges and duels stay fair)', '✓ INSTALLÉ': '✓ INSTALLED', 'TA PROGRESSION': 'YOUR PROGRESS', 'Grues possédées': 'Cranes owned', 'Améliorations de grues': 'Crane upgrades', 'Peintures': 'Paints', 'Tenues': 'Outfits',
+  'Casque de réserve': 'Spare helmet', '4 vies par checkpoint au lieu de 3': '4 lives per checkpoint instead of 3', 'Viseur laser': 'Laser sight', 'Trajectoire visible dès le niveau 11': 'Trajectory shown from level 11',
+  'Grue à montage par éléments': 'Sectional tower crane', 'Grue automontante': 'Self-erecting crane', 'Grue flat-top': 'Flat-top crane', 'Grue XXL sur rails': 'XXL rail-mounted crane', 'Grue à chenilles treillis': 'Lattice crawler crane', 'Grue mobile télescopique': 'Telescopic mobile crane', 'Chenillée lourde à superlift': 'Heavy superlift crawler',
+  'Jaune chantier': 'Site yellow', 'Rouge pompier': 'Fire red', 'Bleu acier': 'Steel blue', 'Vert forêt': 'Forest green', 'Blanc perle': 'Pearl white', 'Noir carbone': 'Carbon black', 'Or massif': 'Solid gold', 'Chrome': 'Chrome',
+  'Classique': 'Classic', 'Orange HV': 'Hi-vis orange', 'Jaune fluo': 'Neon yellow', 'Chef de chantier': 'Site manager', 'Rouge': 'Red', 'Noir & or': 'Black & gold',
+  // boutique et achats
+  'Fais avancer ton parc de grues plus vite · les pièces achetées sont créditées sur cet appareil': 'Grow your crane fleet faster · purchased coins are added to your account', 'UNE SEULE FOIS': 'ONE TIME ONLY', 'Pack Démarrage': 'Starter Pack',
+  '2 500 pièces + peinture Chrome exclusive': '2,500 coins + exclusive Chrome paint', 'La peinture Chrome ne se gagne pas en jeu.': 'Chrome paint cannot be earned in game.', 'Poignée de pièces': 'Handful of coins', 'Sac de pièces': 'Bag of coins', 'Coffre de chantier': 'Site chest', 'Benne de pièces': 'Skip of coins',
+  'POPULAIRE': 'POPULAR', 'MEILLEURE OFFRE': 'BEST VALUE', '✓ ACHETÉ': '✓ PURCHASED', 'RESTAURER MES ACHATS': 'RESTORE PURCHASES', 'Paiement sécurisé par Stripe · aucune donnée bancaire ne passe par le jeu · achat définitif': 'Secure payment by Stripe · no card data goes through the game · final sale',
+  "CONFIRMER L'ACHAT": 'CONFIRM PURCHASE', 'PIÈCES INSUFFISANTES': 'NOT ENOUGH COINS', 'Continue à jouer, ou passe par la boutique.': 'Keep playing, or visit the shop.', 'VOIR LA BOUTIQUE': 'SEE THE SHOP', 'EXCLUSIVITÉ BOUTIQUE': 'SHOP EXCLUSIVE',
+  'DÉJÀ ACHETÉ': 'ALREADY PURCHASED', "Le Pack Démarrage ne s'achète qu'une fois.": 'The Starter Pack can only be bought once.', 'BOUTIQUE EN PRÉPARATION': 'SHOP COMING SOON', 'Les paiements ne sont pas encore activés.': 'Payments are not enabled yet.', 'Reviens bientôt !': 'Come back soon!',
+  'Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay).': 'Secure payment by Stripe (card, Apple Pay, Google Pay).', 'Contenu numérique livré tout de suite : tu renonces au délai': 'Digital content delivered immediately: you waive the', "de rétractation de 14 jours. Mineur ? Demande l'accord d'un parent.": '14-day withdrawal period. Under 18? Ask a parent first.',
+  'MERCI POUR TON ACHAT ! 🎉': 'THANK YOU FOR YOUR PURCHASE! 🎉', "Direction le garage pour t'équiper !": 'Head to the garage to gear up!', 'AUCUN ACHAT EN ATTENTE': 'NO PENDING PURCHASES', 'Tous tes achats sont déjà crédités sur cet appareil.': 'All your purchases have already been credited.',
+  'Un paiement peut mettre quelques secondes à arriver :': 'A payment can take a few seconds to arrive:', 'réessaie dans un instant si besoin.': 'try again in a moment if needed.', 'Boutique indisponible en mode démo': 'Shop unavailable in demo mode', 'Serveur indisponible, réessaie plus tard': 'Server unavailable, try again later',
+};
+const EN_RX = [
+  [/^JOUER · NIV\. (\d+)$/, 'PLAY · LVL $1'], [/^NIVEAU (\d+) · (.*)$/, 'LEVEL $1 · $2'], [/^COMMENCER NIVEAU (\d+)(.*)$/, 'START LEVEL $1$2'], [/^REPRENDRE NIVEAU (\d+)$/, 'RESUME LEVEL $1'], [/^Checkpoint : niv\. (\d+)$/, 'Checkpoint: lvl $1'],
+  [/^Niv\. (.*)$/, 'Lvl $1'], [/^TRANCHE : (.*)$/, 'STAGE: $1'], [/^(\d+) \/ (\d+) pour la tranche (.*)$/, '$1 / $2 for stage $3'], [/^Niveaux 1 à (\d+) validés · ta progression est sauvegardée$/, 'Levels 1 to $1 cleared · your progress is saved'],
+  [/^Retour au checkpoint du niveau (\d+)\. Les niveaux validés avant restent acquis\.$/, 'Back to the level $1 checkpoint. Cleared levels stay cleared.'], [/^Lancers parfaits : (.*)$/, 'Perfect drops: $1'], [/^Vies perdues : (.*)$/, 'Lives lost: $1'],
+  [/^Meilleur score carrière : (.*)$/, 'Best career score: $1'], [/^Meilleur score : (.*)$/, 'Best score: $1'], [/^🏆  N°1 mondial : (.*) · (.*) pts$/, '🏆  World #1: $1 · $2 pts'], [/^\+(.*) points$/, '+$1 points'], [/^Combo ×(.*) · \+(.*) points$/, 'Combo ×$1 · +$2 points'], [/^COMBO ×(.*)$/, 'COMBO ×$1'],
+  [/^\+(.*) pièces$/, '+$1 coins'], [/^\+(.*) pièces · (.*)$/, '+$1 coins · $2'], [/^(.*) pièces$/, '$1 coins'], [/^Il te manque (.*) pièces\.?$/, 'You need $1 more coins'], [/^ACHETER · (.*)$/, 'BUY · $1'], [/^AMÉLIORER · (.*)$/, 'UPGRADE · $1'], [/^PAYER (.*)$/, 'PAY $1'],
+  [/^Solde après achat : (.*)$/, 'Balance after purchase: $1'], [/^Nouveau solde : (.*) pièces$/, 'New balance: $1 coins'], [/^\+(.*) pièces ajoutées(.*)$/, '+$1 coins added$2'], [/^Amélioration : niveau (.*)$/, 'Upgrade: level $1'], [/^NIVEAU (\d+) REQUIS$/, 'LEVEL $1 REQUIRED'],
+  [/^🔒 Niveau (\d+) requis$/, '🔒 Level $1 required'], [/^🔒 Atteins le niveau (\d+) en Carrière$/, '🔒 Reach level $1 in Career'], [/^Ton record : (.*) pts · (.*) sur (.*) grutiers?$/, 'Your record: $1 pts · #$2 of $3'], [/^Ton record : (.*) pts \(niveau (.*)\)$/, 'Your record: $1 pts (level $2)'],
+  [/^Classement mondial : (.*)e sur (.*)$/, 'World ranking: #$1 of $2'], [/^Page (.*) \/ (.*)$/, 'Page $1 / $2'], [/^CLASSEMENT DU (.*)$/, 'LEADERBOARD FOR $1'], [/^Chantier (.*)\/5$/, 'Site $1/5'], [/^(.*) chantiers? réussis? sur 5$/, '$1 of 5 sites cleared'],
+  [/^(.*)  contre  (.*)$/, '$1  vs  $2'], [/^(.*) attend un adversaire(.*)$/, '$1 is waiting for an opponent$2'], [/^(.*) a fait (.*) points sur 5 chantiers$/, '$1 scored $2 points on 5 sites'], [/^fouille (.*)$/, 'pit $1'], [/^(.*) · fouille (.*)$/, '$1 · pit $2'],
+  [/^Vent (.) $/, 'Wind $1'], [/^Connecté : (.*)$/, 'Signed in: $1'],
+];
+function tr(s) {
+  if (typeof s !== 'string' || (save.lang || 'fr') !== 'en') return s;
+  if (EN[s] !== undefined) return EN[s];
+  for (const [rx, out] of EN_RX) if (rx.test(s)) return s.replace(rx, out);
+  return s;
+}
+txt = (prev => function (s, ...a) { return prev(tr(s), ...a); })(txt);
+
+// =====================================================================
+//  PILE POIL — COMPTES JOUEURS : la progression suit le joueur (téléphone, ordinateur…)
+//  Pseudo unique + mot de passe ; sauvegarde complète stockée sur Supabase
+// =====================================================================
+const ACC_KEY = 'pilepoil_compte';
+const DEVICE_KEYS = ['sound', 'music', 'volMus', 'volSfx', 'quality', 'vibrate', 'lang', 'notif'];   // réglages propres à chaque appareil
+const ACC = Object.assign({ name: '', token: '', v: 0, base: 0, dirty: false }, (() => { try { return JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch (e) { return {}; } })());
+ACC.state = ACC.token ? 'idle' : 'off'; ACC.lastSync = 0; ACC.err = '';
+function accStore() { try { localStorage.setItem(ACC_KEY, JSON.stringify({ name: ACC.name, token: ACC.token, v: ACC.v, base: ACC.base, dirty: ACC.dirty })); } catch (e) {} }
+function exportSave() { const o = JSON.parse(JSON.stringify(save)); DEVICE_KEYS.forEach(k => delete o[k]); return o; }
+let accImporting = false;
+function importSave(remote) {
+  const keep = {}; DEVICE_KEYS.forEach(k => { if (k in save) keep[k] = save[k]; });
+  Object.keys(save).forEach(k => delete save[k]); Object.assign(save, remote || {}, keep);
+  ['skins', 'owned', 'outfits', 'upg', 'cpDone'].forEach(k => { if (!Array.isArray(save[k])) save[k] = k === 'skins' ? ['jaune'] : k === 'owned' ? ['elements', 'treillis'] : k === 'outfits' ? ['classique'] : []; });
+  save.coins = save.coins || 0; save.crane = save.crane || { tower: 'elements', mobile: 'treillis' }; save.clvl = save.clvl || {};
+  if (!save.pid) save.pid = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+  accImporting = true; writeSave(save); accImporting = false;
+  if (typeof invalidateCrane === 'function') invalidateCrane();
+  if (ACC.name) save.name = ACC.name;
+}
+// fusion quand deux appareils ont joué en même temps : on ne perd ni objet ni progression
+function mergeSaves(local, remote, baseCoins) {
+  const m = JSON.parse(JSON.stringify(remote || {}));
+  ['skins', 'owned', 'outfits', 'upg', 'cpDone'].forEach(k => { m[k] = [...new Set([...(remote[k] || []), ...(local[k] || [])])]; });
+  ['maxLevel', 'best', 'checkpoint'].forEach(k => { m[k] = Math.max(remote[k] || 0, local[k] || 0) || undefined; });
+  m.clvl = Object.assign({}, remote.clvl || {}); Object.entries(local.clvl || {}).forEach(([k, v]) => { m.clvl[k] = Math.max(m.clvl[k] || 0, v); });
+  m.coins = Math.max(0, (remote.coins || 0) + ((local.coins || 0) - (baseCoins || 0)));
+  if ((local.cbest && local.cbest.score || 0) > (remote.cbest && remote.cbest.score || 0)) m.cbest = local.cbest;
+  m.masterDone = remote.masterDone || local.masterDone; m.starterBought = remote.starterBought || local.starterBought;
+  return m;
+}
+
+// ---------- échanges avec le serveur ----------
+async function accRpc(fn, args) { const { data, error } = await SB.rpc(fn, args); if (error) throw new Error(error.message || 'Serveur indisponible'); return data; }
+let pushTimer = null;
+function schedulePush(delay = 3000) { if (!ACC.token || !SB) return; clearTimeout(pushTimer); pushTimer = setTimeout(accPush, delay); }
+async function accPush() {
+  if (!ACC.token || !SB || ACC.state === 'busy') return;
+  ACC.state = 'busy';
+  try {
+    const r = await accRpc('account_push', { p_token: ACC.token, p_save: exportSave(), p_version: ACC.v });
+    if (r.conflict) { const merged = mergeSaves(save, r.save || {}, ACC.base); ACC.v = r.version; importSave(merged); ACC.state = 'idle'; ACC.dirty = true; accStore(); return accPush(); }
+    ACC.v = r.version; ACC.base = save.coins; ACC.dirty = false; ACC.lastSync = Date.now(); ACC.err = ''; ACC.state = 'idle'; accStore();
+  } catch (e) { ACC.state = 'idle'; ACC.err = e.message; if (/Session/.test(e.message)) accLogout(true); }
+}
+async function accPull() {
+  if (!ACC.token || !SB) return;
+  try {
+    const r = await accRpc('account_pull', { p_token: ACC.token });
+    ACC.name = r.name; save.name = r.name;
+    if (r.version > ACC.v) { importSave(ACC.dirty ? mergeSaves(save, r.save, ACC.base) : r.save); ACC.v = r.version; ACC.base = save.coins; accStore(); if (ACC.dirty) schedulePush(500); }
+    else if (ACC.dirty) schedulePush(500);
+    ACC.lastSync = Date.now(); ACC.err = '';
+  } catch (e) { ACC.err = e.message; if (/Session/.test(e.message)) accLogout(true); }
+}
+async function accRegister(name, pass) {
+  if (!SB) throw new Error('Comptes indisponibles en mode démo');
+  name = name.trim(); const data = exportSave(); data.name = name;
+  const r = await accRpc('account_register', { p_name: name, p_pass: pass, p_save: data });
+  Object.assign(ACC, { name: r.name, token: r.token, v: r.version, base: save.coins, dirty: false, state: 'idle', lastSync: Date.now() }); save.name = r.name; accStore(); writeSave(save);
+}
+async function accLogin(name, pass) {
+  if (!SB) throw new Error('Comptes indisponibles en mode démo');
+  if (typeof claimPurchases === 'function') await claimPurchases(false);     // achats faits en invité sur cet appareil
+  const r = await accRpc('account_login', { p_name: name.trim(), p_pass: pass });
+  const local = exportSave(), fresh = !(local.coins > 0 || (local.maxLevel || 1) > 1 || (local.skins || []).length > 1);
+  Object.assign(ACC, { name: r.name, token: r.token, v: r.version, state: 'idle' });
+  const remote = r.save || {};
+  importSave(fresh ? remote : mergeSaves(local, remote, 0));
+  ACC.base = remote.coins || 0; ACC.dirty = !fresh; accStore();
+  if (!fresh) accPush(); else { ACC.base = save.coins; accStore(); }
+  ACC.lastSync = Date.now();
+}
+function accLogout(expired) {
+  Object.assign(ACC, { name: '', token: '', v: 0, base: 0, dirty: false, state: 'off' }); accStore();
+  // l'appareil repart d'une progression vierge : tout reste sur le compte
+  importSave({}); save.name = '';
+  if (typeof toast === 'function') toast(expired ? 'Session expirée : reconnecte-toi' : 'Déconnecté · ta progression reste sur ton compte', '#9fd6ff');
+}
+// chaque sauvegarde locale part aussi sur le compte (regroupée toutes les 3 s)
+writeSave = (prev => function (o) { prev(o); if (ACC.token && !accImporting) { ACC.dirty = true; accStore(); schedulePush(); } })(writeSave);
+addEventListener('visibilitychange', () => { if (document.hidden && ACC.dirty) accPush(); else if (!document.hidden) accPull(); });
+if (ACC.token) setTimeout(accPull, 600);
+setInterval(() => { if (ACC.token && document.visibilityState === 'visible') accPull(); }, 60000);
+
+// classements : un pseudo de compte ne peut être utilisé que par son propriétaire
+if (SB) {
+  DB.submit = async b => { const { data, error } = await SB.rpc('submit_score2', { p_day: b.day, p_name: b.name, p_score: b.score, p_passed: b.passed, p_perfects: Math.min(5, b.perfects), p_token: ACC.token || null }); if (error) throw new Error(error.message); return data; };
+  DB.submitCareer = async b => { const { data, error } = await SB.rpc('submit_career2', { p_name: b.name, p_score: b.score, p_level: b.level, p_token: ACC.token || null }); if (error) throw new Error(error.message); return data; };
+}
+// les champs « pseudo » des écrans en ligne reprennent le nom du compte
+setInterval(() => { if (!ACC.name) return; ['ovName', 'lvName', 'bdName'].forEach(id => { const el = document.getElementById(id); if (el && el.value !== ACC.name) { el.value = ACC.name; el.readOnly = true; } }); }, 400);
+
+// ---------- fenêtre HTML : créer un compte / se connecter ----------
+let ACCO = null;
+function accForm(mode) {
+  if (!ACCO) {
+    ACCO = document.createElement('div'); ACCO.id = 'acco';
+    ACCO.innerHTML = `<style>
+#acco[hidden],#acco [hidden]{display:none!important}
+#acco{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.72);z-index:20;font-family:Inter,system-ui,sans-serif}
+#acco .box{background:#121a2c;border:3px solid #ffc21a;border-radius:22px;padding:22px 24px;width:min(420px,92vw);color:#e6eef8;box-sizing:border-box}
+#acco h2{margin:0 0 6px;color:#ffc21a;font:900 24px Inter,sans-serif}
+#acco p{margin:0 0 14px;font:700 14px Inter,sans-serif;color:#9fb7cf}
+#acco .tabs{display:flex;gap:8px;margin-bottom:14px}
+#acco .tabs button{flex:1;padding:10px;border-radius:12px;border:0;font:900 14px Inter,sans-serif;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
+#acco .tabs button.on{background:#ffc21a;color:#1a1300}
+#acco input{display:block;width:100%;box-sizing:border-box;margin:0 0 10px;font:800 17px Inter,sans-serif;padding:12px 14px;border-radius:12px;border:2px solid #2f3d58;background:#0c1220;color:#fff}
+#acco input:focus{border-color:#ffc21a;outline:none}
+#acco .row{display:flex;gap:10px;margin-top:6px}
+#acco .row button{flex:1;padding:12px;border-radius:14px;border:0;font:900 16px Inter,sans-serif;cursor:pointer}
+#acco .go{background:#3cf29b;color:#06210f}#acco .no{background:rgba(255,255,255,.14);color:#fff}
+#acco .err{color:#ff7a6a;font:800 14px Inter,sans-serif;min-height:18px;margin:2px 0 6px}
+#acco button:focus-visible,#acco input:focus-visible{outline:3px solid #fff}</style>
+<div class="box" role="dialog" aria-label="Compte joueur"><h2 id="acTitle">Compte joueur</h2><p id="acSub">Retrouve tes pièces, tes grues et ta progression sur tous tes appareils.</p>
+<div class="tabs"><button id="acTabNew">Créer un compte</button><button id="acTabLog">Se connecter</button></div>
+<input id="acName" maxlength="16" placeholder="Pseudo" autocomplete="username" aria-label="Pseudo">
+<input id="acPass" type="password" maxlength="64" placeholder="Mot de passe (6 caractères min.)" autocomplete="current-password" aria-label="Mot de passe">
+<input id="acPass2" type="password" maxlength="64" placeholder="Confirme le mot de passe" autocomplete="new-password" aria-label="Confirmation du mot de passe">
+<div class="err" id="acErr"></div><div class="row"><button class="no" id="acClose">Fermer</button><button class="go" id="acGo">Créer</button></div></div>`;
+    document.body.appendChild(ACCO);
+    ACCO.querySelectorAll('input').forEach(i => { i.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') ACCO.querySelector('#acGo').click(); if (e.key === 'Escape') ACCO.hidden = true; }); i.addEventListener('keyup', e => e.stopPropagation()); });
+    ACCO.querySelector('#acTabNew').onclick = () => accForm('new'); ACCO.querySelector('#acTabLog').onclick = () => accForm('login');
+    ACCO.querySelector('#acClose').onclick = () => { ACCO.hidden = true; };
+    ACCO.addEventListener('pointerdown', e => e.stopPropagation());
+    ACCO.querySelector('#acGo').onclick = async () => {
+      const n = ACCO.querySelector('#acName').value.trim(), p = ACCO.querySelector('#acPass').value, p2 = ACCO.querySelector('#acPass2').value, err = ACCO.querySelector('#acErr'), go = ACCO.querySelector('#acGo');
+      if (n.length < 2) return err.textContent = tr('Pseudo trop court (2 caractères minimum)');
+      if (p.length < 6) return err.textContent = tr('Mot de passe trop court (6 caractères minimum)');
+      if (ACCO.dataset.mode === 'new' && p !== p2) return err.textContent = tr('Les deux mots de passe sont différents');
+      go.disabled = true; err.textContent = '…';
+      try {
+        if (ACCO.dataset.mode === 'new') await accRegister(n, p); else await accLogin(n, p);
+        ACCO.hidden = true; sfx.win();
+        modal({ title: ACCO.dataset.mode === 'new' ? tr('COMPTE CRÉÉ ✓') : tr('CONNECTÉ ✓'), lines: [ACC.name, tr('Ta progression est maintenant sauvegardée en ligne.'), tr('Connecte-toi avec ce pseudo sur tes autres appareils.')], yes: 'OK', no: null });
+      } catch (e) { err.textContent = e.message; }
+      go.disabled = false;
+    };
+  }
+  ACCO.dataset.mode = mode; ACCO.hidden = false;
+  const isNew = mode === 'new';
+  ACCO.querySelector('#acTabNew').className = isNew ? 'on' : ''; ACCO.querySelector('#acTabLog').className = isNew ? '' : 'on';
+  ACCO.querySelector('#acPass2').hidden = !isNew; ACCO.querySelector('#acGo').textContent = isNew ? tr('Créer mon compte') : tr('Me connecter');
+  ACCO.querySelector('#acTitle').textContent = tr('Compte joueur'); ACCO.querySelector('#acSub').textContent = tr('Retrouve tes pièces, tes grues et ta progression sur tous tes appareils.');
+  ACCO.querySelector('#acTabNew').textContent = tr('Créer un compte'); ACCO.querySelector('#acTabLog').textContent = tr('Se connecter'); ACCO.querySelector('#acClose').textContent = tr('Fermer');
+  ACCO.querySelector('#acPass').autocomplete = isNew ? 'new-password' : 'current-password';
+  ACCO.querySelector('#acErr').textContent = '';
+  if (isNew && !ACCO.querySelector('#acName').value) ACCO.querySelector('#acName').value = save.name || '';
+  setTimeout(() => ACCO.querySelector('#acName').focus(), 50);
+}
+Object.assign(EN, {
+  'Compte joueur': 'Player account', 'Retrouve tes pièces, tes grues et ta progression sur tous tes appareils.': 'Keep your coins, cranes and progress on all your devices.', 'Créer un compte': 'Create account', 'Se connecter': 'Sign in', 'Fermer': 'Close',
+  'Créer mon compte': 'Create my account', 'Me connecter': 'Sign me in', 'Pseudo trop court (2 caractères minimum)': 'Nickname too short (2 characters min.)', 'Mot de passe trop court (6 caractères minimum)': 'Password too short (6 characters min.)', 'Les deux mots de passe sont différents': 'Passwords do not match',
+  'COMPTE CRÉÉ ✓': 'ACCOUNT CREATED ✓', 'CONNECTÉ ✓': 'SIGNED IN ✓', 'Ta progression est maintenant sauvegardée en ligne.': 'Your progress is now saved online.', 'Connecte-toi avec ce pseudo sur tes autres appareils.': 'Sign in with this nickname on your other devices.',
+});
+setInterval(() => { if (ACCO && !ACCO.hidden && G.screen === 'play' && !G.paused) ACCO.hidden = true; }, 300);
+
+// =====================================================================
+//  PILE POIL — LOGO, PARAMÈTRES, PAUSE ET NAVIGATION (boutons retour partout)
+// =====================================================================
+
+// ---------- logo ----------
+function drawLogo(cx, cy, s = 1) {
+  c.save(); c.translate(cx, cy); c.scale(s, s);
+  // flèche de grue en treillis au-dessus du titre
+  const jy = -112, jx0 = -470, jx1 = 470;
+  ln(jx0, jy, jx1 - 14, jy, '#ffc21a', 6); ln(jx0, jy + 24, jx1, jy + 24, '#ffc21a', 7);
+  c.strokeStyle = '#b9820a'; c.lineWidth = 3; c.beginPath(); for (let x = jx0 + 120; x < jx1 - 24; x += 24) { c.moveTo(x, jy + 24); c.lineTo(x + 12, jy); c.lineTo(x + 24, jy + 24); } c.stroke();
+  c.fillStyle = '#ffc21a'; c.beginPath(); c.moveTo(jx1 - 14, jy); c.lineTo(jx1 + 6, jy + 24); c.lineTo(jx1 - 14, jy + 24); c.fill();
+  // mât, porte-flèche, tirants, contre-poids, cabine
+  ln(jx0 + 96, jy - 70, jx0 + 76, jy, '#ffc21a', 5); ln(jx0 + 96, jy - 70, jx0 + 116, jy, '#ffc21a', 5);
+  ln(jx0 + 96, jy - 70, 230, jy, 'rgba(220,226,232,.8)', 2); ln(jx0 + 96, jy - 70, jx0 + 10, jy, 'rgba(220,226,232,.8)', 2);
+  rr(jx0 - 6, jy + 26, 54, 40, 4); c.fillStyle = '#9aa3ad'; c.fill(); fillR(jx0 - 6, jy + 44, 54, 2, 'rgba(0,0,0,.3)');
+  rr(jx0 + 120, jy + 26, 40, 30, 5); c.fillStyle = '#ffc21a'; c.fill(); fillR(jx0 + 125, jy + 31, 24, 16, '#1f3a5f');
+  // chariot, câble, crochet et bloc qui descend PILE POIL entre les deux mots
+  rr(-26, jy + 26, 52, 14, 3); c.fillStyle = '#d93b2b'; c.fill();
+  ln(-5, jy + 40, -5, -24, '#e6eef8', 2.5); ln(5, jy + 40, 5, -24, '#e6eef8', 2.5);
+  rr(-14, -26, 28, 22, 5); c.fillStyle = '#d93b2b'; c.fill(); c.strokeStyle = '#e6eef8'; c.lineWidth = 4; c.beginPath(); c.arc(-5, 6, 8, 0, Math.PI * 1.1); c.stroke();
+  ln(0, 12, -24, 26, '#e6eef8', 2); ln(0, 12, 24, 26, '#e6eef8', 2);
+  rr(-30, 26, 60, 36, 4); c.fillStyle = lg(0, 26, 0, 62, [[0, '#d6dde3'], [1, '#8f98a1']]); c.fill();
+  // cible verte au sol, exactement sous le bloc
+  c.strokeStyle = '#3cf29b'; c.lineWidth = 5; c.beginPath(); c.moveTo(-40, 72); c.lineTo(-40, 92); c.lineTo(40, 92); c.lineTo(40, 72); c.stroke();
+  // le titre : relief, contour, dégradé
+  const word = (t, x, align) => {
+    c.font = '900 150px Inter'; c.textAlign = align; c.textBaseline = 'alphabetic';
+    for (let d = 10; d > 0; d -= 2) { c.fillStyle = d > 6 ? '#3d2700' : '#7a4f00'; c.fillText(t, x, 92 + d); }
+    c.lineJoin = 'round'; c.strokeStyle = '#2a1a00'; c.lineWidth = 12; c.strokeText(t, x, 92);
+    c.fillStyle = lg(0, -20, 0, 92, [[0, '#fff1a8'], [.45, '#ffc21a'], [1, '#e08e00']]); c.fillText(t, x, 92);
+    c.save(); c.globalCompositeOperation = 'source-atop'; c.restore();
+  };
+  withShadow('rgba(255,194,26,.35)', 40, 0, 0, () => { word('PILE', -52, 'right'); word('POIL', 52, 'left'); });
+  // bande de signalisation
+  c.save(); rr(-360, 112, 720, 16, 8); c.clip(); fillR(-360, 112, 720, 16, '#ffc21a'); c.fillStyle = '#1d2026'; for (let x = -380; x < 380; x += 32) { c.beginPath(); c.moveTo(x, 128); c.lineTo(x + 16, 112); c.lineTo(x + 32, 112); c.lineTo(x + 16, 128); c.fill(); } c.restore();
+  c.textAlign = 'left'; c.restore();
+}
+
+// ---------- réglages : volumes, qualité, vibrations, langue, notifications ----------
+save.volMus = save.volMus ?? 1; save.volSfx = save.volSfx ?? 1; save.quality = save.quality || 'haute'; save.vibrate = save.vibrate ?? true; save.lang = save.lang || ((navigator.language || 'fr').startsWith('fr') ? 'fr' : 'en');
+lightingPass = (prev => function (lvl) { if (save.quality === 'eco') return; prev(lvl); })(lightingPass);
+const buzz = p => { try { if (save.vibrate && navigator.vibrate) navigator.vibrate(p); } catch (e) {} };
+['thud', 'crash', 'fail', 'perfect', 'siren'].forEach(k => { const f = sfx[k]; sfx[k] = function (a) { f.apply(this, arguments); buzz({ thud: Math.round(25 * (a || 1)), crash: [60, 40, 80], fail: 140, perfect: [20, 40, 20, 40, 30], siren: [200, 100, 200] }[k]); }; });
+function applyVolumes() { if (AU.ctx) auSet(AU.sfx.gain, AU.sound ? save.volSfx : 0, .05); }
+
+const SET = { from: 'title', fromPaused: false, sliders: [], drag: null };
+function seg(id, x, y, w, opts, val) {
+  const bw = w / opts.length; rr(x, y, w, 56, 28); c.fillStyle = 'rgba(255,255,255,.08)'; c.fill();
+  opts.forEach(([v, label], i) => { const on = v === val, bx = x + i * bw; if (on) { rr(bx + 4, y + 4, bw - 8, 48, 24); c.fillStyle = '#ffc21a'; c.fill(); } txt(label, bx + bw / 2, y + 37, on ? '#1a1300' : '#e6eef8', 20, 900, 'center'); G.buttons.push({ id: `${id}:${v}`, x: bx, y, w: bw, h: 56 }); });
+}
+function toggle(id, x, y, on, disabled) {
+  rr(x, y, 96, 52, 26); c.fillStyle = disabled ? 'rgba(255,255,255,.08)' : on ? '#3cf29b' : 'rgba(255,255,255,.18)'; c.fill();
+  ell(on ? x + 70 : x + 26, y + 26, 20, 20, disabled ? 'rgba(255,255,255,.3)' : '#fff');
+  if (!disabled) G.buttons.push({ id, x, y, w: 96, h: 52 });
+}
+function slider(key, x, y, w, val) {
+  rr(x, y + 18, w, 14, 7); c.fillStyle = 'rgba(255,255,255,.14)'; c.fill();
+  rr(x, y + 18, Math.max(14, w * val), 14, 7); c.fillStyle = lg(x, 0, x + w, 0, [[0, '#ffc21a'], [1, '#3cf29b']]); c.fill();
+  ell(x + w * val, y + 25, 22, 22, '#fff'); ell(x + w * val, y + 25, 9, 9, '#ffc21a');
+  txt(Math.round(val * 100) + ' %', x + w + 30, y + 34, '#fff', 22, 900);
+  SET.sliders.push({ key, x, y: y - 10, w, h: 70 });
+}
+function panel(x, y, w, h, title) { rr(x, y, w, h, 24); c.fillStyle = 'rgba(12,18,32,.86)'; c.fill(); txt(title, x + 36, y + 52, '#ffc21a', 22, 900); }
+function drawSettings() {
+  screenBg(); SET.sliders = [];
+  txt('PARAMÈTRES', 960, 92, '#ffc21a', 60, 900, 'center');
+  button('setBack', 40, 30, 220, 64, '◀ RETOUR', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  // colonne gauche
+  panel(110, 140, 840, 280, 'SON');
+  txt('Musique', 146, 252, '#e6eef8', 24, 800); slider('volMus', 400, 222, 380, save.volMus);
+  txt('Effets sonores', 146, 352, '#e6eef8', 24, 800); slider('volSfx', 400, 322, 380, save.volSfx);
+  panel(110, 440, 840, 300, 'AFFICHAGE ET JEU');
+  txt('Qualité graphique', 146, 548, '#e6eef8', 24, 800); seg('quality', 470, 512, 440, [['haute', 'Haute'], ['eco', 'Économie']], save.quality);
+  txt('Économie : moins d\'effets de lumière, plus fluide sur les vieux téléphones', 146, 596, '#9fb7cf', 16, 700);
+  txt('Vibrations', 146, 678, '#e6eef8', 24, 800); toggle('vibrate', 814, 642, save.vibrate, !navigator.vibrate);
+  if (!navigator.vibrate) txt('Non disponible sur cet appareil', 470, 676, '#9fb7cf', 17, 700);
+  panel(110, 760, 840, 260, 'LANGUE');
+  seg('lang', 146, 840, 764, [['fr', '🇫🇷  Français'], ['en', '🇬🇧  English']], save.lang);
+  txt('La langue change tout de suite, sans redémarrer', 146, 940, '#9fb7cf', 17, 700);
+  // colonne droite
+  panel(980, 140, 830, 380, 'COMPTE JOUEUR');
+  if (ACC.name) {
+    txt(`Connecté : ${ACC.name}`, 1016, 236, '#3cf29b', 28, 900);
+    const ago = ACC.lastSync ? Math.round((Date.now() - ACC.lastSync) / 1000) : null;
+    txt(ACC.err ? `⚠ ${ACC.err}` : ACC.dirty ? 'Synchronisation en cours…' : ago !== null ? (save.lang === 'en' ? `Synced ✓ ${ago < 60 ? ago + ' s' : Math.round(ago / 60) + ' min'} ago` : `Synchronisé ✓ il y a ${ago < 60 ? ago + ' s' : Math.round(ago / 60) + ' min'}`) : 'Synchronisé ✓', 1016, 276, ACC.err ? '#ff9a8a' : '#9fd6ff', 19, 800);
+    txt('Ta progression, tes pièces et tes grues te suivent sur tous tes appareils.', 1016, 330, '#cfe0ff', 18, 700);
+    smallBtn('accSync', 1016, 400, 360, 66, 'SYNCHRONISER', 'blue'); smallBtn('accLogout', 1400, 400, 370, 66, 'SE DÉCONNECTER', 'off'); G.buttons.push({ id: 'accLogout', x: 1400, y: 400, w: 370, h: 66 });
+  } else {
+    txt('Joue en invité, ou crée un compte gratuit pour', 1016, 236, '#e6eef8', 21, 800);
+    txt('retrouver ta progression sur téléphone et ordinateur.', 1016, 268, '#e6eef8', 21, 800);
+    txt('Ton pseudo sera réservé aux classements.', 1016, 310, '#9fb7cf', 18, 700);
+    smallBtn('accNew', 1016, 400, 360, 66, 'CRÉER UN COMPTE', 'go'); smallBtn('accLog', 1400, 400, 370, 66, 'SE CONNECTER', 'blue');
+    if (DEMO) txt('Comptes indisponibles en mode démo', 1016, 490, '#ffb36b', 17, 700);
+  }
+  panel(980, 540, 830, 200, 'NOTIFICATIONS');
+  txt('Rappel du défi du jour', 1016, 640, '#e6eef8', 24, 800); toggle('notif', 1674, 604, !!save.notif, true);
+  txt('Arrive avec la version installable de l\'application', 1016, 688, '#9fb7cf', 17, 700);
+  panel(980, 760, 830, 260, 'PROGRESSION');
+  smallBtn('resetCareer', 1016, 830, 560, 66, 'RECOMMENCER LA CARRIÈRE AU NIVEAU 1', 'off'); G.buttons.push({ id: 'resetCareer', x: 1016, y: 830, w: 560, h: 66 });
+  txt('Tes pièces, tes grues et tes achats sont conservés.', 1016, 934, '#9fb7cf', 17, 700);
+  txt('PILE POIL · version 1.7', 1016, 990, 'rgba(255,255,255,.4)', 16, 700);
+}
+drawOnline = (prev => function () { if (G.screen === 'settings') drawSettings(); else prev(); })(drawOnline);
+function setSlider(e) {
+  const [x] = toGame(e), s = SET.drag; if (!s) return;
+  save[s.key] = clamp((x - s.x) / s.w, 0, 1); if (s.key === 'volSfx') { applyVolumes(); if (!AU.sound && save.volSfx > 0) setSound(true); } if (s.key === 'volMus' && !AU.music && save.volMus > 0) setMusic(true);
+}
+cv.addEventListener('pointerdown', e => { if (G.screen !== 'settings' || MO) return; const [x, y] = toGame(e); const s = SET.sliders.find(s => x >= s.x - 30 && x <= s.x + s.w + 30 && y >= s.y && y <= s.y + s.h); if (s) { SET.drag = s; setSlider(e); } });
+cv.addEventListener('pointermove', e => { if (SET.drag) setSlider(e); });
+const endDrag = () => { if (SET.drag) { SET.drag = null; writeSave(save); sfx.click(); } };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+
+// ---------- pause : reprendre, paramètres, quitter ----------
+drawPause = withSoundBtns(function () {
+  fillR(0, 0, W, H, 'rgba(6,10,20,.75)');
+  txt('PAUSE', 960, 330, '#ffc21a', 110, 900, 'center');
+  button('resume', 710, 400, 500, 104, 'REPRENDRE', '#3cf29b', '#17a764', '#06210f');
+  button('settings', 710, 528, 500, 90, 'PARAMÈTRES', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  button('quit', 710, 642, 500, 90, 'QUITTER AU MENU', '#ff6a55', '#c4281a', '#fff');
+  txt(TOUCH ? '' : 'ÉCHAP pour reprendre', 960, 790, 'rgba(255,255,255,.55)', 20, 700, 'center');
+});
+// bouton pause toujours visible en jeu (remplace l'ancien bouton tactile)
+TBTN.pause = [-999, -999, 1, 1];
+drawTouch = (prev => function (lvl) {
+  prev(lvl);
+  if (G.screen !== 'play' || G.paused) return;
+  const live = G.mode === 'live', x = 1316, y = 40, w = 196, h = 56;
+  rr(x, y, w, h, 28); c.fillStyle = 'rgba(12,18,32,.78)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2; c.stroke();
+  if (!live) { fillR(x + 26, y + 17, 7, 22, '#fff'); fillR(x + 39, y + 17, 7, 22, '#fff'); } else txt('✕', x + 36, y + 38, '#fff', 24, 900, 'center');
+  txt(live ? 'QUITTER' : 'MENU', x + 118, y + 37, '#fff', 21, 900, 'center');
+  G.buttons.push({ id: live ? 'quit' : 'pauseBtn', x, y, w, h });
+})(drawTouch);
+
+// ---------- boutons retour sur tous les écrans ----------
+const BACK_TO = { checkpoint: 'menu', gameover: 'menu', victory: 'menu', board: 'menu', runEnd: 'menu', duelIntro: 'menu', liveLobby: 'liveMenu', liveEnd: 'liveMenu' };
+function backBtn() { if (BACK_TO[G.screen]) button('goBack', 40, 30, 220, 64, '◀ RETOUR', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff'); }
+drawOnline = (prev => function () { prev(); if (G.screen !== 'settings') backBtn(); })(drawOnline);
+drawCheckpoint = (prev => function () { prev(); backBtn(); })(drawCheckpoint);
+drawGameOver = (prev => function () { prev(); backBtn(); })(drawGameOver);
+drawVictory = (prev => function () { prev(); backBtn(); })(drawVictory);
+
+// ---------- écran titre : engrenage des paramètres + compte ----------
+drawTitle = (prev => function () {
+  prev();
+  ell(1696, 62, 32, 32, 'rgba(12,18,32,.75)'); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2; c.beginPath(); c.arc(1696, 62, 32, 0, 7); c.stroke();
+  c.save(); c.translate(1696, 62); c.rotate(G.t * .15); c.fillStyle = '#fff'; for (let i = 0; i < 8; i++) { c.rotate(Math.PI / 4); c.fillRect(-4, -18, 8, 9); } ell(0, 0, 12, 12, '#fff'); ell(0, 0, 5, 5, '#121a2c'); c.restore();
+  G.buttons.push({ id: 'settings', x: 1664, y: 30, w: 64, h: 64 });
+  const label = ACC.name ? ACC.name : (save.lang === 'en' ? 'Sign in' : 'Se connecter'); c.font = '800 20px Inter'; const w = c.measureText(label).width + 70;
+  rr(40, 108, w, 46, 23); c.fillStyle = ACC.name ? 'rgba(60,242,155,.16)' : 'rgba(12,18,32,.8)'; c.fill(); c.strokeStyle = ACC.name ? 'rgba(60,242,155,.6)' : 'rgba(255,255,255,.3)'; c.lineWidth = 2; c.stroke();
+  ell(66, 124, 7, 7, '#e6eef8'); c.fillStyle = '#e6eef8'; c.beginPath(); c.ellipse(66, 142, 12, 8, 0, Math.PI, 0); c.fill();
+  c.fillStyle = ACC.name ? '#3cf29b' : '#e6eef8'; c.font = '800 20px Inter'; c.fillText(label, 88, 138);
+  G.buttons.push({ id: 'account', x: 40, y: 108, w, h: 46 });
+})(drawTitle);
+
+act = (prev => function (id) {
+  let mt;
+  if (id === 'settings') { sfx.click(); SET.from = G.screen; SET.fromPaused = G.paused; G.screen = 'settings'; return; }
+  if (id === 'setBack') { sfx.click(); writeSave(save); G.screen = SET.from === 'play' ? 'play' : 'title'; return; }
+  if (id === 'pauseBtn') { sfx.click(); G.paused = true; return; }
+  if (id === 'goBack') return act(BACK_TO[G.screen] || 'menu');
+  if (id === 'quit') {
+    const live = G.mode === 'live', career = (G.mode || 'career') === 'career';
+    return modal({ title: live ? 'ABANDONNER LE DUEL ?' : 'QUITTER LA PARTIE ?', lines: [live ? 'Ton adversaire gagnera par forfait.' : career ? `Tu reprendras au checkpoint du niveau ${G.checkpoint}.` : 'Ta partie en cours sera perdue.'], yes: 'QUITTER', no: 'CONTINUER', onYes: () => { G.paused = false; act(live ? 'liveMenu' : 'menu'); } });
+  }
+  if (id === 'account') { if (ACC.name) return act('settings'); sfx.click(); return accForm('new'); }
+  if (id === 'accNew') { sfx.click(); return accForm('new'); }
+  if (id === 'accLog') { sfx.click(); return accForm('login'); }
+  if (id === 'accSync') { sfx.click(); accPull().then(() => accPush()); return toast(save.lang === 'en' ? 'Syncing…' : 'Synchronisation…', '#9fd6ff'); }
+  if (id === 'accLogout') return modal({ title: 'SE DÉCONNECTER ?', lines: ['Ta progression reste sauvegardée sur ton compte.', 'Cet appareil repartira en mode invité.'], yes: 'SE DÉCONNECTER', no: 'ANNULER', onYes: () => accLogout(false) });
+  if (id === 'resetCareer') return modal({ title: 'RECOMMENCER LA CARRIÈRE ?', lines: ['Tu repartiras du niveau 1.', 'Tes pièces, tes grues et tes achats sont conservés.'], yes: 'RECOMMENCER', no: 'ANNULER', onYes: () => { save.checkpoint = 1; save.score = 0; writeSave(save); toast(save.lang === 'en' ? 'Career restarted at level 1' : 'Carrière remise au niveau 1', '#3cf29b'); } });
+  if ((mt = id.match(/^(quality|lang):(\w+)$/))) { sfx.click(); save[mt[1]] = mt[2]; writeSave(save); if (mt[1] === 'lang') applyHtmlLang(); return; }
+  if (id === 'vibrate') { save.vibrate = !save.vibrate; writeSave(save); sfx.click(); buzz(60); return; }
+  return prev(id);
+})(act);
+addEventListener('keydown', e => {
+  if (MO || (ACCO && !ACCO.hidden) || (e.target && e.target.tagName === 'INPUT')) return;
+  if (e.key !== 'Escape') return;
+  if (G.screen === 'settings') act('setBack'); else if (BACK_TO[G.screen]) act('goBack'); else if (G.screen === 'shop') act('shopBack');
+});
+// textes des panneaux HTML selon la langue
+function applyHtmlLang() {
+  const set = (id, fr) => { const el = document.getElementById(id); if (el) { if (el.tagName === 'INPUT') el.placeholder = tr(fr); else el.textContent = tr(fr); } };
+  set('ovName', 'Ton pseudo'); set('ovSend', 'Envoyer'); set('ovCopy', 'Copier le lien'); set('ovMenu', 'Menu'); set('lvName', 'Ton pseudo'); set('lvCreate', 'Créer un salon'); set('lvJoin', 'Rejoindre'); set('lvCopy', 'Copier le lien'); set('lvMenu', 'Menu'); set('bdName', 'Ton pseudo'); set('bdSend', 'Publier mon record'); set('gcoName', 'Nom de ta boîte'); set('gcoOk', 'Peindre');
+}
+setInterval(applyHtmlLang, 1000);
+Object.assign(EN, {
+  'SON': 'SOUND', 'Effets sonores': 'Sound effects', 'AFFICHAGE ET JEU': 'DISPLAY & GAMEPLAY', 'Qualité graphique': 'Graphics quality', 'Haute': 'High', 'Économie': 'Battery saver', "Économie : moins d'effets de lumière, plus fluide sur les vieux téléphones": 'Battery saver: fewer light effects, smoother on older phones',
+  'Vibrations': 'Vibration', 'Non disponible sur cet appareil': 'Not available on this device', 'LANGUE': 'LANGUAGE', 'La langue change tout de suite, sans redémarrer': 'Language changes instantly, no restart needed', 'COMPTE JOUEUR': 'PLAYER ACCOUNT',
+  'Synchronisation en cours…': 'Syncing…', 'Synchronisé ✓': 'Synced ✓', 'Ta progression, tes pièces et tes grues te suivent sur tous tes appareils.': 'Your progress, coins and cranes follow you on all your devices.', 'SYNCHRONISER': 'SYNC NOW', 'SE DÉCONNECTER': 'SIGN OUT',
+  'Joue en invité, ou crée un compte gratuit pour': 'Play as a guest, or create a free account to', 'retrouver ta progression sur téléphone et ordinateur.': 'keep your progress on phone and computer.', 'Ton pseudo sera réservé aux classements.': 'Your nickname will be reserved on leaderboards.',
+  'CRÉER UN COMPTE': 'CREATE ACCOUNT', 'SE CONNECTER': 'SIGN IN', 'Comptes indisponibles en mode démo': 'Accounts unavailable in demo mode', 'NOTIFICATIONS': 'NOTIFICATIONS', 'Rappel du défi du jour': 'Daily challenge reminder', "Arrive avec la version installable de l'application": 'Coming with the installable app version',
+  'PROGRESSION': 'PROGRESS', 'RECOMMENCER LA CARRIÈRE AU NIVEAU 1': 'RESTART CAREER AT LEVEL 1', 'Tes pièces, tes grues et tes achats sont conservés.': 'Your coins, cranes and purchases are kept.', 'PILE POIL · version 1.7': 'PILE POIL · version 1.7',
+  'ÉCHAP pour reprendre': 'ESC to resume', 'QUITTER LA PARTIE ?': 'QUIT THE GAME?', 'ABANDONNER LE DUEL ?': 'FORFEIT THE DUEL?', 'Ton adversaire gagnera par forfait.': 'Your opponent will win by forfeit.', 'Ta partie en cours sera perdue.': 'Your current run will be lost.', 'CONTINUER': 'KEEP PLAYING',
+  'SE DÉCONNECTER ?': 'SIGN OUT?', 'Ta progression reste sauvegardée sur ton compte.': 'Your progress stays saved on your account.', 'Cet appareil repartira en mode invité.': 'This device will go back to guest mode.', 'RECOMMENCER LA CARRIÈRE ?': 'RESTART CAREER?', 'Tu repartiras du niveau 1.': 'You will start again from level 1.', 'RECOMMENCER': 'RESTART',
+  'Ton pseudo': 'Your nickname', 'Envoyer': 'Send', 'Copier le lien': 'Copy link', 'Menu': 'Menu', 'Créer un salon': 'Create room', 'Rejoindre': 'Join', 'Publier mon record': 'Post my record', 'Nom de ta boîte': 'Your company name', 'Peindre': 'Paint',
+  'Déconnecté · ta progression reste sur ton compte': 'Signed out · your progress stays on your account', 'Session expirée : reconnecte-toi': 'Session expired: please sign in again',
+});
+EN_RX.push([/^Tu reprendras au checkpoint du niveau (\d+)\.$/, 'You will resume at the level $1 checkpoint.']);
 
 </script>
 </body></html>
