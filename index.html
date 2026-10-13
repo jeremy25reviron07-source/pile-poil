@@ -4176,8 +4176,11 @@ async function claimPurchases(manual) {
     const coins = (data && data.coins) || 0, items = (data && data.items) || [];
     if (coins > 0) { save.coins += coins; }
     items.forEach(it => { if (it === 'chrome' && !save.skins.includes('chrome')) save.skins.push('chrome'); if (it === 'chrome') save.starterBought = true; });
-    if (coins > 0 || items.length) { writeSave(save); toast(`Merci ! +${coins.toLocaleString('fr-FR')} pièces${items.includes('chrome') ? ' + peinture Chrome' : ''}`, '#3cf29b'); sfx.perfect(); }
-    else if (manual) toast('Aucun achat en attente sur cet appareil', '#9fd6ff');
+    if (coins > 0 || items.length) {
+      writeSave(save); SH.msg = ''; sfx.perfect(); setTimeout(() => sfx.win(), 450); CELEB.at = performance.now();
+      modal({ title: 'MERCI POUR TON ACHAT ! 🎉', lines: [`+${coins.toLocaleString('fr-FR')} pièces ajoutées${items.includes('chrome') ? ' + peinture Chrome' : ''}`, `Nouveau solde : ${save.coins.toLocaleString('fr-FR')} pièces`, 'Direction le garage pour t\'équiper !'], yes: 'AU GARAGE', no: 'PLUS TARD', onYes: () => { G.screen = 'title'; act('garage'); } });
+    }
+    else if (manual) modal({ title: 'AUCUN ACHAT EN ATTENTE', lines: ['Tous tes achats sont déjà crédités sur cet appareil.', 'Un paiement peut mettre quelques secondes à arriver :', 'réessaie dans un instant si besoin.'], yes: 'OK', no: null });
     return coins + items.length;
   } catch (e) { if (manual) toast('Serveur indisponible, réessaie plus tard', '#ff5a48'); return 0; }
 }
@@ -4218,11 +4221,12 @@ function drawShop() {
     smallBtn('of_buy_' + o.id, x + 45, y + 356, w - 90, 64, o.euros, hot ? 'go' : 'buy');
   });
   txt('Paiement sécurisé par Stripe · aucune donnée bancaire ne passe par le jeu · achat définitif', 960, 940, 'rgba(255,255,255,.6)', 18, 700, 'center');
-  smallBtn('restore', 760, 965, 400, 56, 'RESTAURER MES ACHATS', 'off'); G.buttons.push({ id: 'restore', x: 760, y: 965, w: 400, h: 56 });
+  smallBtn('restore', 760, 965, 400, 56, 'RESTAURER MES ACHATS', 'blue');
   if (SH.msg) txt(SH.msg, 960, 1060, '#ffd447', 20, 800, 'center');
 }
 drawOnline = (prev => function () { if (G.screen === 'shop') drawShop(); else prev(); })(drawOnline);
 
+const CELEB = { at: 0 };
 // ---------- calque final : fenêtre de validation, notifications, raccourci pièces ----------
 function overlayLoop() {
   requestAnimationFrame(overlayLoop);
@@ -4231,8 +4235,10 @@ function overlayLoop() {
   if (!MO && (G.screen === 'title' || G.screen === 'garage')) { const px = G.screen === 'title' ? 40 : 1380, py = G.screen === 'title' ? 36 : 34; c.font = '900 30px Inter'; const w = c.measureText(save.coins.toLocaleString('fr-FR')).width + 86; ell(px + w + 22, py + 30, 22, 22, '#c77dff'); txt('+', px + w + 22, py + 41, '#fff', 30, 900, 'center'); G.buttons.push({ id: 'shop', x: px, y: py, w: w + 46, h: 60 }); }
   if (MO) {
     G.buttons = [];
+    const ca = performance.now() - CELEB.at;
     fillR(0, 0, W, H, 'rgba(6,10,20,.72)');
     const lines = MO.lines || [], h = 230 + lines.length * 34 + (MO.price ? 60 : 0), y = 540 - h / 2;
+    if (ca < 4000) for (let i = 0; i < 40; i++) { const sx = (i * 197) % W, sy = ((ca / 1000) * (380 + (i % 7) * 60) + i * 53) % (H + 80) - 40; coinIcon(sx, sy, 14 + (i % 3) * 4); }
     rr(560, y, 800, h, 28); c.fillStyle = '#121a2c'; c.fill(); rr(560, y, 800, h, 28); c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke();
     txt(MO.title, 960, y + 66, '#ffc21a', 34, 900, 'center');
     lines.forEach((l, i) => txt(l, 960, y + 116 + i * 34, i === 0 ? '#fff' : '#cfe0ff', i === 0 ? 26 : 20, i === 0 ? 900 : 700, 'center'));

@@ -34,3 +34,13 @@ La clé « anon » est faite pour être publique : la base n'accepte que les lec
 - Pseudo par appareil, pas de comptes (Supabase Auth pourra s'ajouter).
 - Anti-triche de base : limites en base, mais un joueur qui modifie son navigateur peut tricher. À renforcer avant une grosse diffusion.
 - Offre gratuite Supabase : 200 joueurs connectés en même temps en temps réel. Largement suffisant pour démarrer.
+
+## 4. Boutique (Stripe)
+1. Supabase → SQL Editor → coller `boutique.sql` → Run.
+2. Supabase → Edge Functions → Deploy a new function → Via Editor → nom `stripe-webhook` → coller `supabase/functions/stripe-webhook/index.ts` → Deploy. Dans les réglages de la fonction, **désactiver « Verify JWT »** (Stripe n'envoie pas de jeton Supabase).
+3. Stripe → Catalogue de produits : 5 produits, paiement unique en EUR : 2,99 / 1,99 / 4,99 / 9,99 / 19,99.
+4. Stripe → Liens de paiement : un lien par produit, quantité fixe, codes promo désactivés, après paiement → rediriger vers `https://pile-poil-jeu.netlify.app/?achat=ok`.
+5. Stripe → Développeurs → Webhooks → ajouter un endpoint : `https://bcysxilkhnpayvfhlkju.supabase.co/functions/v1/stripe-webhook`, événements `checkout.session.completed` et `checkout.session.async_payment_succeeded`.
+6. Supabase → Edge Functions → Secrets : `STRIPE_SECRET_KEY` (sk_…) et `STRIPE_WEBHOOK_SECRET` (whsec_…). Ces deux clés ne doivent JAMAIS aller dans GitHub ni dans config.js.
+7. Coller les 5 liens de paiement dans `config.js` (rubrique `shop`).
+8. Tester en mode test Stripe avec la carte 4242 4242 4242 4242.

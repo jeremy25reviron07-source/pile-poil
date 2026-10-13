@@ -69,3 +69,38 @@ end $$;
 grant execute on function public.submit_score(date, text, int, int, int) to anon;
 grant execute on function public.create_duel(text, int, int, int, bigint) to anon;
 grant execute on function public.reply_duel(text, text, int, int, int) to anon;
+
+-- ---------- Classement mondial (carrière) ----------
+create table if not exists public.career (
+  name       text primary key check (char_length(name) between 2 and 16),
+  score      int  not null check (score between 0 and 600000),
+  level      int  not null check (level between 1 and 50),
+  updated_at timestamptz not null default now()
+);
+alter table public.career enable row level security;
+drop policy if exists "lecture career" on public.career;
+create policy "lecture career" on public.career for select using (true);
+create index if not exists career_score_idx on public.career (score desc);
+
+-- Garde le meilleur score de carrière de chaque pseudo et renvoie le rang mondial
+create or replace function public.submit_career(p_name text, p_score int, p_level int)
+returns json language plpgsql security definer set search_path = public as $$
+declare best int; r int; t int;
+begin
+  -- anti-triche de base : score impossible pour le niveau atteint
+  if p_score > 225 * p_level * (p_level + 1) then raise exception 'Score refusé'; end if;
+  insert into career(name, score, level) values (p_name, p_score, p_level)
+  on conflict (name) do update
+    set score = excluded.score, level = excluded.level, updated_at = now()
+    where excluded.score > career.score;
+  select score into best from career where name = p_name;
+  select count(*) + 1 into r from career where score > best;
+  select count(*) into t from career;
+  return json_build_object('rank', r, 'total', t, 'best', best);
+end $$;
+grant execute on function public.submit_career(text, int, int) to anon;
+
+-- Droits de lecture explicites + rechargement de l'API
+grant usage on schema public to anon, authenticated;
+grant select on public.scores, public.duels, public.career to anon, authenticated;
+notify pgrst, 'reload schema';
