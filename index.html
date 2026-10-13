@@ -2280,6 +2280,7 @@ function drawLevel(lvl) {
 
 // ---------------- HUD ----------------
 function hud(lvl) {
+  if (TOUCH) return hudPhone(lvl);
   const C = lvl.C, n = G.level;
   const P = (x, y, w, h) => { rr(x, y, w, h, 22); c.fillStyle = 'rgba(12,18,32,.74)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke(); };
   P(36, 30, 470, 122);
@@ -2316,12 +2317,44 @@ function controlsBar() {
 
 // ---------------- touch controls ----------------
 const TOUCH = window.matchMedia && matchMedia('(pointer: coarse)').matches;
-const TBTN = { left: [40, 880, 150, 150], right: [210, 880, 150, 150], up: [1440, 740, 120, 110], down: [1440, 880, 120, 110], power: [1600, 760, 280, 280], pause: [880, 150, 160, 50] };
+const TBTN = { left: [40, 800, 200, 220], right: [250, 800, 200, 220], up: [1390, 690, 150, 150], down: [1390, 870, 150, 150], power: [1580, 740, 300, 300], pause: [880, 150, 160, 50] };
+// ---------- interface téléphone : HUD compact et lisible, commandes au pouce ----------
+function hudPhone(lvl) {
+  const C = lvl.C, n = G.level, pill = (x, y, w, h) => { rr(x, y, w, h, h / 2); c.fillStyle = 'rgba(10,15,28,.8)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 2; c.stroke(); };
+  // niveau + progression de la tranche
+  pill(30, 24, 470, 104); txt('NIV.', 70, 70, '#ffc21a', 26, 900); txt(String(n), 70, 114, '#fff', 50, 900); c.font = '900 50px Inter'; const nw = c.measureText(String(n)).width; txt('/50', 76 + nw, 114, 'rgba(255,255,255,.55)', 26, 800);
+  txt(TRANCHES[C.t].name.toUpperCase().slice(0, 22), 214, 62, '#cfe0ff', 20, 900);
+  const t0 = CHECKPOINTS[C.t]; for (let i = 0; i < 10; i++) { const l = t0 + i; if (l > 50) break; rr(214 + i * 26, 78, 20, 30, 6); c.fillStyle = l < n ? '#2bd67b' : l === n ? '#ffc21a' : 'rgba(255,255,255,.16)'; c.fill(); }
+  // vies
+  pill(516, 24, 250, 104); { const nh = Math.max(3, G.lives), sp = nh > 3 ? 52 : 68, k = nh > 3 ? .72 : .9; for (let i = 0; i < nh; i++) helmet(574 + i * sp - (nh > 3 ? 10 : 0), 112, k, i < G.lives); }
+  if (G.combo >= 2) { rr(516, 140, 250, 56, 28); c.fillStyle = 'rgba(43,214,123,.92)'; c.fill(); txt(`COMBO ×${Math.min(3, 1 + (G.combo - 1) * .5).toLocaleString('fr-FR')}`, 641, 179, '#06210f', 28, 900, 'center'); }
+  drawLogo(960, 76, .36, false);
+  // score
+  pill(1540, 24, 350, 104); txt('SCORE', 1584, 64, '#ffc21a', 24, 900); txt(G.score.toLocaleString('fr-FR'), 1584, 114, '#fff', 46, 900);
+  // conditions en pastilles
+  const met = [];
+  met.push(C.eg && !C.night ? (TOD[C.eg.tod].sand ? 'cloud' : 'sun') : C.night ? 'moon' : C.rain ? 'rain' : C.t === 2 || C.t === 4 ? 'cloud' : 'sun');
+  let x = 1890, y = 142; const chipR = (w, draw) => { x -= w; pill(x, y, w, 60); draw(x); x -= 12; };
+  chipR(236, cx => { ICONS.wind(cx + 40, y + 30); txt(`${C.wind > 0 ? '→' : C.wind < 0 ? '←' : ''} ${Math.abs(Math.round(C.wind))} km/h`, cx + 76, y + 41, '#fff', 28, 900); });
+  chipR(70, cx => ICONS[met[0]](cx + 35, y + 30));
+  if (C.fog > 0) chipR(150, cx => { ICONS.fog(cx + 36, y + 30); txt(`${Math.round(C.fog * 100)} %`, cx + 66, y + 41, '#fff', 26, 900); });
+  if (C.workers) chipR(124, cx => { ICONS.worker(cx + 34, y + 30); txt(String(C.workers), cx + 66, y + 41, '#fff', 28, 900); });
+}
 function drawTouch(lvl) {
-  if (!TOUCH || G.screen !== 'play') return;
-  const B = (k, label, active) => { const [x, y, w, h] = TBTN[k]; rr(x, y, w, h, 28); c.fillStyle = active ? 'rgba(255,194,26,.85)' : 'rgba(12,18,32,.6)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 3; c.stroke(); txt(label, x + w / 2, y + h / 2 + 16, active ? '#1a1300' : '#fff', k === 'power' ? 34 : 48, 900, 'center'); };
-  B('left', '◀', keys.ArrowLeft); B('right', '▶', keys.ArrowRight); B('up', '▲', keys.ArrowUp); B('down', '▼', keys.ArrowDown);
-  B('power', lvl && lvl.charging ? 'LÂCHER' : 'MAINTENIR', lvl && lvl.charging); B('pause', 'PAUSE', false);
+  if (!TOUCH || G.screen !== 'play' || G.paused) return;
+  const circ = (k, label, active, col = '#ffc21a') => { const [x, y, w, h] = TBTN[k], cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2 - 8;
+    c.save(); c.globalAlpha = active ? 1 : .82; ell(cx, cy + 6, r, r, 'rgba(0,0,0,.35)'); ell(cx, cy, r, r, active ? col : 'rgba(14,20,36,.62)'); c.strokeStyle = active ? '#fff' : 'rgba(255,255,255,.55)'; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
+    c.fillStyle = active ? '#1a1300' : '#fff'; c.beginPath(); const s = r * .42;
+    if (label === 'L') { c.moveTo(cx - s, cy); c.lineTo(cx + s * .6, cy - s); c.lineTo(cx + s * .6, cy + s); } else if (label === 'R') { c.moveTo(cx + s, cy); c.lineTo(cx - s * .6, cy - s); c.lineTo(cx - s * .6, cy + s); }
+    else if (label === 'U') { c.moveTo(cx, cy - s); c.lineTo(cx - s, cy + s * .6); c.lineTo(cx + s, cy + s * .6); } else { c.moveTo(cx, cy + s); c.lineTo(cx - s, cy - s * .6); c.lineTo(cx + s, cy - s * .6); } c.fill(); c.restore(); };
+  circ('left', 'L', keys.ArrowLeft); circ('right', 'R', keys.ArrowRight); circ('up', 'U', keys.ArrowUp); circ('down', 'D', keys.ArrowDown);
+  // gros bouton de lancer : la jauge de puissance tourne autour
+  const [x, y, w, h] = TBTN.power, cx = x + w / 2, cy = y + h / 2, r = w / 2 - 10, on = lvl && lvl.charging, pw = lvl ? lvl.power : 0;
+  ell(cx, cy + 8, r, r, 'rgba(0,0,0,.35)'); ell(cx, cy, r, r, on ? 'rgba(255,194,26,.95)' : 'rgba(14,20,36,.68)');
+  c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 18; c.beginPath(); c.arc(cx, cy, r - 14, 0, 7); c.stroke();
+  if (pw > 0) { c.strokeStyle = pw < .55 ? '#2bd67b' : pw < .85 ? '#ffd447' : '#ff4a3a'; c.lineCap = 'round'; c.beginPath(); c.arc(cx, cy, r - 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pw); c.stroke(); c.lineCap = 'butt'; }
+  c.strokeStyle = on ? '#fff' : 'rgba(255,255,255,.6)'; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
+  txt(on ? 'LÂCHER' : 'MAINTENIR', cx, cy - 4, on ? '#1a1300' : '#fff', 34, 900, 'center'); txt(`${Math.round(pw * 100)} %`, cx, cy + 44, on ? '#1a1300' : '#ffc21a', 34, 900, 'center');
 }
 
 // =====================================================================
@@ -5886,6 +5919,7 @@ hud = (prev => function (lvl) {
   prev(lvl);
   if (!isCareer() || G.replay || !lvl || lvl.C.t === 5) return;
   const g = save.cpGain || 0; c.font = '900 30px Inter'; const w = c.measureText(String(g)).width;
+  if (TOUCH) { txt('GAINS', 1860, 64, '#ffc21a', 20, 900, 'right'); txt(String(g), 1860, 114, '#fff', 30, 900, 'right'); coinIcon(1860 - w - 22, 103, 13); return; }
   txt('GAINS DU CHANTIER', 1860, 66, '#ffc21a', 14, 900, 'right'); txt(String(g), 1860, 124, '#fff', 30, 900, 'right'); coinIcon(1860 - w - 22, 113, 13);
 })(hud);
 // ---------- déclenchement : premier passage aux checkpoints 11, 21, 31, 41 ----------
@@ -8299,7 +8333,7 @@ hud = (prev => function (lvl) {
   prev(lvl); if (!J || !lvl.zone.eg || G.screen !== 'play' || lvl.time < 3.4) return;
   if (J.storm) { const [st, left] = stormState(J), col = st === 'calm' ? 'rgba(43,214,123,.95)' : st === 'warn' ? 'rgba(232,140,40,.95)' : 'rgba(176,90,30,.95)', s = st === 'calm' ? `CALME · ${left.toFixed(1).replace('.', ',')} s` : st === 'warn' ? 'LE KHAMSIN ARRIVE' : 'TEMPÊTE DE SABLE !'; c.font = '900 24px Inter'; const tw = c.measureText(s).width + 50; rr(960 - tw / 2, 180, tw, 50, 25); c.fillStyle = col; c.fill(); txt(s, 960, 214, '#fff', 24, 900, 'center'); }
   if (J.tandem && lvl.phase === 'hang') { const T = J.tandem, ok = Math.abs(T.tilt) <= T.lim, x = 960, y = J.storm ? 250 : 190; rr(x - 170, y, 340, 54, 27); c.fillStyle = ok ? 'rgba(43,160,100,.95)' : 'rgba(196,40,26,.95)'; c.fill(); txt(ok ? 'ÉQUILIBRE OK' : 'ÇA PENCHE', x - 60, y + 35, '#fff', 22, 900, 'center'); rr(x + 30, y + 20, 120, 14, 7); c.fillStyle = 'rgba(255,255,255,.25)'; c.fill(); const q = clamp(T.tilt / .45, -1, 1); ell(x + 90 + q * 56, y + 27, 9, 9, '#fff'); fillR(x + 90 - 56 * T.lim / .45, y + 18, 2, 18, '#ffd447'); fillR(x + 90 + 56 * T.lim / .45, y + 18, 2, 18, '#ffd447'); }
-  if (J.heat) { const H = J.heat, x = 60, y = 860, over = H.over > 0; rr(x, y, 330, 70, 18); c.fillStyle = 'rgba(12,18,32,.88)'; c.fill(); txt(over ? 'SURCHAUFFE !' : 'MOTEUR', x + 20, y + 28, over ? '#ff6a4a' : '#cfd6e4', 17, 900); txt(`${Math.round(40 + H.v * 70)} °C`, x + 310, y + 28, H.v > .75 ? '#ff6a4a' : '#ffd9a0', 17, 900, 'right'); rr(x + 20, y + 40, 290, 14, 7); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); rr(x + 20, y + 40, 290 * H.v, 14, 7); c.fillStyle = H.v > .75 ? '#ff4a3a' : '#ffcf6a'; c.fill(); if (over && Math.sin(G.t * 10) > 0) txt('Moteur bridé : laisse refroidir', x + 165, y + 92, '#ff9a6a', 16, 800, 'center'); }
+  if (J.heat) { const H = J.heat, x = TOUCH ? 30 : 60, y = TOUCH ? 214 : 860, over = H.over > 0; rr(x, y, 330, 70, 18); c.fillStyle = 'rgba(12,18,32,.88)'; c.fill(); txt(over ? 'SURCHAUFFE !' : 'MOTEUR', x + 20, y + 28, over ? '#ff6a4a' : '#cfd6e4', 17, 900); txt(`${Math.round(40 + H.v * 70)} °C`, x + 310, y + 28, H.v > .75 ? '#ff6a4a' : '#ffd9a0', 17, 900, 'right'); rr(x + 20, y + 40, 290, 14, 7); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); rr(x + 20, y + 40, 290 * H.v, 14, 7); c.fillStyle = H.v > .75 ? '#ff4a3a' : '#ffcf6a'; c.fill(); if (over && Math.sin(G.t * 10) > 0) txt('Moteur bridé : laisse refroidir', x + 165, y + 92, '#ff9a6a', 16, 800, 'center'); }
 })(hud);
 function drawKhamsin(lvl, k) { const d = (lvl.jm.storm && lvl.jm.storm.d) || 1; c.save(); fillR(0, 0, W, H, `rgba(196,130,60,${(.42 * k).toFixed(3)})`); seed = 41; for (let i = 0; i < 260 * k; i++) { const sp = 500 + rnd() * 700, x = ((rnd() * W + d * G.t * sp) % (W + 100) + W + 100) % (W + 100) - 50, y = rnd() * H, len = 30 + rnd() * 70; ln(x, y, x - d * len, y + len * .1, `rgba(255,220,160,${(.15 + rnd() * .35).toFixed(2)})`, 1.6); }
   for (let i = 0; i < 4; i++) { const x = ((G.t * 300 * d + i * 520) % (W + 1000) + W + 1000) % (W + 1000) - 500; fillR(x - 400, 0, 800, H, rg(x, 500, 0, 600, [[0, `rgba(170,100,40,${(.3 * k).toFixed(3)})`], [1, 'rgba(170,100,40,0)']])); } c.restore(); }
@@ -8754,6 +8788,17 @@ act = (prev => function (id) {
 // petit rappel une seule fois, à la 3e ouverture sur iPhone
 try { if (IOS && !STANDALONE()) { const k = 'pp_open_count', n = (+localStorage.getItem(k) || 0) + 1; localStorage.setItem(k, n); if (n === 3) setTimeout(() => toast('Astuce : installe PILE POIL sur ton écran d\'accueil (bouton Installer)', '#ffc21a'), 4000); } } catch (e) {}
 Object.assign(EN, { 'Installer': 'Install', "l'application": 'the app', 'INSTALLER PILE POIL': 'INSTALL PILE POIL', 'COMPRIS': 'GOT IT', '1. Dans Safari, touche le bouton Partager (le carré avec une flèche).': '1. In Safari, tap the Share button (square with an arrow).', "2. Choisis « Sur l'écran d'accueil », puis « Ajouter ».": '2. Choose “Add to Home Screen”, then “Add”.', "3. Lance PILE POIL depuis l'icône : plein écran, sans barre Safari.": '3. Open PILE POIL from the icon: full screen, no Safari bar.', "Astuce : installe PILE POIL sur ton écran d'accueil (bouton Installer)": 'Tip: install PILE POIL on your home screen (Install button)' });
+
+// ---------- cadre plein écran : le décor du jeu déborde, flouté, sur les bords de l'écran ----------
+(function () {
+  const amb = document.createElement('canvas'); amb.id = 'amb'; amb.width = 64; amb.height = 36; amb.setAttribute('aria-hidden', 'true');
+  const st = document.createElement('style');
+  st.textContent = `#amb{position:fixed;inset:-8%;width:116%;height:116%;z-index:0;filter:blur(22px) brightness(.55) saturate(1.25);pointer-events:none}
+#c{position:relative;z-index:1}
+@media (pointer:coarse) and (orientation:landscape){#c{box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 40px rgba(0,0,0,.55)}}`;
+  document.head.appendChild(st); document.body.insertBefore(amb, document.body.firstChild);
+  const ax = amb.getContext('2d'); setInterval(() => { if (document.hidden) return; try { ax.drawImage(cv, 0, 0, 64, 36); } catch (e) {} }, 150);
+})();
 
 // =====================================================================
 //  PILE POIL — pages légales (mentions, conditions de vente, confidentialité)
