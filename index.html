@@ -2341,7 +2341,7 @@ function hudPhone(lvl) {
   if (C.workers) chipR(124, cx => { ICONS.worker(cx + 34, y + 30); txt(String(C.workers), cx + 66, y + 41, '#fff', 28, 900); });
 }
 function drawTouch(lvl) {
-  if (!TOUCH || G.screen !== 'play' || G.paused) return;
+  if (!TOUCH || G.screen !== 'play' || G.paused || window.SIDEPAD) return;
   const circ = (k, label, active, col = '#ffc21a') => { const [x, y, w, h] = TBTN[k], cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2 - 8;
     c.save(); c.globalAlpha = active ? 1 : .82; ell(cx, cy + 6, r, r, 'rgba(0,0,0,.35)'); ell(cx, cy, r, r, active ? col : 'rgba(14,20,36,.62)'); c.strokeStyle = active ? '#fff' : 'rgba(255,255,255,.55)'; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
     c.fillStyle = active ? '#1a1300' : '#fff'; c.beginPath(); const s = r * .42;
@@ -2510,7 +2510,7 @@ const pointerKey = {};
 cv.addEventListener('pointerdown', e => {
   startAmbience();
   const [x, y] = toGame(e); cv.setPointerCapture(e.pointerId);
-  if (G.screen === 'play' && !G.paused && TOUCH) {
+  if (G.screen === 'play' && !G.paused && TOUCH && !window.SIDEPAD) {
     const hit = k => { const [bx, by, bw, bh] = TBTN[k]; return x >= bx && x <= bx + bw && y >= by && y <= by + bh; };
     const map = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' };
     for (const k in map) if (hit(k)) { keys[map[k]] = true; pointerKey[e.pointerId] = map[k]; return; }
@@ -8827,12 +8827,12 @@ function drawTuto() {
   const T = G.tuto; if (!T || G.screen !== 'play' || !L) return; const t = L.target, tc = t.x + t.w / 2, pulse = .5 + .5 * Math.sin(G.t * 6);
   // la fouille visée clignote doucement
   if (T.step === 'wait' || T.step === 'now') { c.save(); c.globalAlpha = .35 + .4 * pulse; c.strokeStyle = '#3cf29b'; c.lineWidth = 6; rr(t.x - 18, GY - 18, t.w + 36, 182, 16); c.stroke(); c.restore(); }
-  const pw = TOUCH ? TBTN.power : null, px = pw ? pw[0] + pw[2] / 2 : 960, py = pw ? pw[1] + pw[3] / 2 : 1000;
+  const side = window.SIDEPAD, pw = TOUCH && !side ? TBTN.power : null, px = side ? 1960 : pw ? pw[0] + pw[2] / 2 : 960, py = side ? 760 : pw ? pw[1] + pw[3] / 2 : 1000;
   const retry = T.retryT && G.t - T.retryT < 2.5;
   if (retry) bubble(660, 300, 600, 'Presque !', 'Aucune vie perdue, on recommence');
   else if (T.step === 'wait') bubble(clamp(tc - 300, 40, 1280), GY - 330, 600, 'La grue avance toute seule', 'Attends que la charge arrive au-dessus de la fouille', [clamp(tc, 80, 1840), GY - 30]);
-  if (T.step === 'now') { bubble(TOUCH ? px - 560 : 660, TOUCH ? py - 260 : 820, 600, 'MAINTENANT !', TOUCH ? 'Touche ce bouton puis relâche-le' : 'Appuie sur ESPACE puis relâche', TOUCH ? [px - 120, py - 120] : null); if (TOUCH) hand(px + 30, py + 70, pulse > .5); else { rr(860, 960, 200, 64, 14); c.fillStyle = pulse > .5 ? '#ffc21a' : '#fff'; c.fill(); txt('ESPACE', 960, 1003, '#14233f', 28, 900, 'center'); } }
-  if (T.step === 'release') bubble(TOUCH ? px - 560 : 660, TOUCH ? py - 260 : 820, 600, 'Relâche !', 'Plus tu maintiens, plus la charge part loin', TOUCH ? [px - 120, py - 120] : null);
+  if (T.step === 'now') { bubble(TOUCH ? Math.min(px - 560, 1290) : 660, TOUCH ? py - 260 : 820, 600, 'MAINTENANT !', TOUCH ? 'Touche ce bouton puis relâche-le' : 'Appuie sur ESPACE puis relâche', TOUCH ? [px - 120, py - 120] : null); if (TOUCH && !side) hand(px + 30, py + 70, pulse > .5); else if (!TOUCH) { rr(860, 960, 200, 64, 14); c.fillStyle = pulse > .5 ? '#ffc21a' : '#fff'; c.fill(); txt('ESPACE', 960, 1003, '#14233f', 28, 900, 'center'); } }
+  if (T.step === 'release') bubble(TOUCH ? Math.min(px - 560, 1290) : 660, TOUCH ? py - 260 : 820, 600, 'Relâche !', 'Plus tu maintiens, plus la charge part loin', TOUCH ? [px - 120, py - 120] : null);
   if (T.step === 'bravo') { const k = Math.min(1, (G.t - T.doneT) * 3); c.save(); c.globalAlpha = k; bubble(560, 280, 800, 'Bravo, tu as compris ! 🎉', 'Les 49 chantiers suivants t\'attendent'); c.restore(); }
 }
 function drawTip() { // une seule astuce, au 2e chantier, puis plus rien
@@ -9063,18 +9063,20 @@ Object.assign(EN, { 'Installer': 'Install', "l'application": 'the app', 'INSTALL
   st.textContent = `html,body{touch-action:none;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior:none;overflow:hidden}
 *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 input,textarea{-webkit-user-select:text;user-select:text;font-size:16px!important}
-#amb{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.42;pointer-events:none}
+#amb{display:none}
 #c{position:fixed!important;left:0;top:0;max-width:none!important;max-height:none!important;margin:0;z-index:1}
 #lgo .txt,#lgo .txt *{touch-action:pan-y}`;
   document.head.appendChild(st); document.body.insertBefore(amb, document.body.firstChild);
   const ax = amb.getContext('2d'); setInterval(() => { if (document.hidden) return; try { ax.drawImage(cv, 0, 0, 32, 18); } catch (e) {} }, 200);
+  window.ppAmb = amb;
   // 2. le jeu est dimensionné au pixel près dans la zone vraiment visible (barres de Safari, encoche, barre d'accueil)
   const probe = document.createElement('div'); probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)'; document.body.appendChild(probe);
   function fit() {
     const vv = window.visualViewport, vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
     const ps = getComputedStyle(probe), sl = parseFloat(ps.paddingLeft) || 0, sr = parseFloat(ps.paddingRight) || 0, stp = parseFloat(ps.paddingTop) || 0, sb = parseFloat(ps.paddingBottom) || 0;
     const aw = Math.max(100, vw - sl - sr), ah = Math.max(60, vh - stp - sb), s = Math.min(aw / W, ah / H), w = Math.floor(W * s), h = Math.floor(H * s);
-    cv.style.width = w + 'px'; cv.style.height = h + 'px'; cv.style.left = Math.round(ox + sl + (aw - w) / 2) + 'px'; cv.style.top = Math.round(oy + stp + (ah - h) / 2) + 'px';
+    cv.style.width = w + 'px'; cv.style.height = h + 'px'; const L0 = Math.round(ox + sl + (aw - w) / 2), T0 = Math.round(oy + stp + (ah - h) / 2); cv.style.left = L0 + 'px'; cv.style.top = T0 + 'px';
+    window.GUT = { vw, vh, ox, oy, sl, sr, top: T0, h, l: L0, r: L0 + w, g: Math.min(L0 - ox - sl, ox + vw - sr - (L0 + w)) }; window.SIDEPAD = TOUCH && window.GUT.g >= 76; if (window.ppPadSize) ppPadSize();
   }
   window.ppFit = fit;
   const refit = () => { fit(); setTimeout(fit, 120); setTimeout(fit, 400); setTimeout(fit, 900); };
@@ -9094,6 +9096,49 @@ input,textarea{-webkit-user-select:text;user-select:text;font-size:16px!importan
   requestAnimationFrame(tick);
 })();
 withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.canvas === cv) { if (!ox && !oy) return fn(); return prev(col, Math.min(blur, 6), ox, oy, fn); } return prev(col, blur, ox, oy, fn); })(withShadow);
+
+// =====================================================================
+//  IPHONE DANS SAFARI : quand il reste de la place sur les côtés, les commandes y vont
+//  (comme une manette) au lieu de couvrir le chantier
+// =====================================================================
+(function () {
+  const pad = document.createElement('canvas'); pad.id = 'pad'; pad.setAttribute('aria-hidden', 'true');
+  const st = document.createElement('style'); st.textContent = '#pad{position:fixed;left:0;top:0;width:100%;height:100%;z-index:0;touch-action:none}'; document.head.appendChild(st);
+  document.body.insertBefore(pad, cv); const px = pad.getContext('2d'); let dpr = 1, B = {};
+  window.ppPadSize = () => { dpr = Math.min(2, window.devicePixelRatio || 1); pad.width = Math.round(innerWidth * dpr); pad.height = Math.round(innerHeight * dpr); layout(); };
+  function layout() { const g = window.GUT; if (!g) return; const gl = g.l - g.ox - g.sl, gr = g.ox + g.vw - g.sr - g.r, lx = g.ox + g.sl + gl / 2, rx = g.r + gr / 2, y = (k) => g.top + g.h * k;
+    const d = Math.max(44, Math.min(74, Math.min(gl, gr) * .42)), D = Math.max(60, Math.min(130, gr * .8));
+    const side = gl >= d * 2 + 18;
+    B = { left: side ? [lx - d / 2 - 6, y(.74), d / 2] : [lx, y(.58), d / 2], right: side ? [lx + d / 2 + 6, y(.74), d / 2] : [lx, y(.82), d / 2],
+      up: [rx, y(.2), d / 2 * .9], down: [rx, y(.4), d / 2 * .9], power: [rx, y(.72), D / 2] }; }
+  addEventListener('resize', () => setTimeout(window.ppPadSize, 50)); window.ppPadSize();
+  const act2 = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }, held = {};
+  const hit = (x, y) => { for (const k in B) { const [bx, by, r] = B[k]; if (Math.hypot(x - bx, y - by) <= r + 14) return k; } return null; };
+  pad.addEventListener('pointerdown', e => { if (!window.SIDEPAD || G.screen !== 'play' || G.paused) return; const k = hit(e.clientX, e.clientY); if (!k) return; e.preventDefault(); pad.setPointerCapture(e.pointerId); held[e.pointerId] = k; try { startAmbience(); } catch (er) {} if (k === 'power') pressPower(); else keys[act2[k]] = true; });
+  const up = e => { const k = held[e.pointerId]; if (!k) return; delete held[e.pointerId]; if (k === 'power') releasePower(); else keys[act2[k]] = false; };
+  pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
+  function btn(k, glyph, on) { const [x, y, r] = B[k].map((v, i) => i < 2 ? v * dpr : v * dpr); px.save(); px.globalAlpha = on ? 1 : .9; px.fillStyle = 'rgba(0,0,0,.35)'; px.beginPath(); px.arc(x, y + 3 * dpr, r, 0, 7); px.fill();
+    px.fillStyle = on ? '#ffc21a' : 'rgba(20,28,48,.92)'; px.beginPath(); px.arc(x, y, r, 0, 7); px.fill(); px.strokeStyle = on ? '#fff' : 'rgba(255,255,255,.5)'; px.lineWidth = 2 * dpr; px.stroke();
+    px.fillStyle = on ? '#1a1300' : '#fff'; const s = r * .42; px.beginPath();
+    if (glyph === 'L') { px.moveTo(x - s, y); px.lineTo(x + s * .6, y - s); px.lineTo(x + s * .6, y + s); } else if (glyph === 'R') { px.moveTo(x + s, y); px.lineTo(x - s * .6, y - s); px.lineTo(x - s * .6, y + s); }
+    else if (glyph === 'U') { px.moveTo(x, y - s); px.lineTo(x - s, y + s * .6); px.lineTo(x + s, y + s * .6); } else { px.moveTo(x, y + s); px.lineTo(x - s, y - s * .6); px.lineTo(x + s, y - s * .6); } px.fill(); px.restore(); }
+  function draw() {
+    requestAnimationFrame(draw); if (document.hidden) return; const W2 = pad.width, H2 = pad.height;
+    px.fillStyle = '#0b1020'; px.fillRect(0, 0, W2, H2); px.save(); px.globalAlpha = .4; px.imageSmoothingEnabled = true; try { px.drawImage(window.ppAmb, 0, 0, W2, H2); } catch (e) {} px.restore();
+    if (!window.SIDEPAD || G.screen !== 'play' || G.paused || !B.power) return;
+    const g = window.GUT; px.fillStyle = 'rgba(8,12,24,.55)'; px.fillRect(0, 0, g.l * dpr, H2); px.fillRect(g.r * dpr, 0, W2 - g.r * dpr, H2);
+    btn('left', 'L', keys.ArrowLeft); btn('right', 'R', keys.ArrowRight); btn('up', 'U', keys.ArrowUp); btn('down', 'D', keys.ArrowDown);
+    const [x0, y0, r0] = B.power, x = x0 * dpr, y = y0 * dpr, r = r0 * dpr, on = L && L.charging, pw = L ? L.power : 0;
+    px.fillStyle = 'rgba(0,0,0,.35)'; px.beginPath(); px.arc(x, y + 4 * dpr, r, 0, 7); px.fill(); px.fillStyle = on ? '#ffc21a' : 'rgba(20,28,48,.92)'; px.beginPath(); px.arc(x, y, r, 0, 7); px.fill();
+    px.lineWidth = r * .14; px.strokeStyle = 'rgba(255,255,255,.2)'; px.beginPath(); px.arc(x, y, r * .82, 0, 7); px.stroke();
+    if (pw > 0) { px.strokeStyle = pw < .55 ? '#2bd67b' : pw < .85 ? '#ffd447' : '#ff4a3a'; px.lineCap = 'round'; px.beginPath(); px.arc(x, y, r * .82, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pw); px.stroke(); px.lineCap = 'butt'; }
+    px.strokeStyle = on ? '#fff' : 'rgba(255,255,255,.6)'; px.lineWidth = 2 * dpr; px.beginPath(); px.arc(x, y, r, 0, 7); px.stroke();
+    px.textAlign = 'center'; px.fillStyle = on ? '#1a1300' : '#fff'; px.font = `900 ${Math.round(r * .28)}px Inter, sans-serif`; px.fillText(on ? tr('LÂCHER') : tr('MAINTENIR'), x, y - r * .02);
+    px.fillStyle = on ? '#1a1300' : '#ffc21a'; px.font = `900 ${Math.round(r * .3)}px Inter, sans-serif`; px.fillText(`${Math.round(pw * 100)} %`, x, y + r * .36);
+    if (G.tuto && G.tuto.step === 'now') { const p = Math.sin(performance.now() / 160) > 0; px.font = `${Math.round(r * .9)}px sans-serif`; px.fillText('👆', x + r * .25, y + r * (p ? 1.1 : 1.2)); }
+  }
+  requestAnimationFrame(draw);
+})();
 
 // =====================================================================
 //  PILE POIL — pages légales (mentions, conditions de vente, confidentialité)
