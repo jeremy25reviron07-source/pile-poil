@@ -2481,7 +2481,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -4361,6 +4361,7 @@ function mergeSaves(local, remote, baseCoins) {
   ['skins', 'owned', 'outfits', 'upg', 'cpDone'].forEach(k => { m[k] = [...new Set([...(remote[k] || []), ...(local[k] || [])])]; });
   ['maxLevel', 'best', 'checkpoint'].forEach(k => { m[k] = Math.max(remote[k] || 0, local[k] || 0) || undefined; });
   m.clvl = Object.assign({}, remote.clvl || {}); Object.entries(local.clvl || {}).forEach(([k, v]) => { m.clvl[k] = Math.max(m.clvl[k] || 0, v); });
+  m.tduels = [...(remote.tduels || [])]; (local.tduels || []).forEach(d => { if (!m.tduels.some(x => x.code === d.code)) m.tduels.push(d); });
   m.lvl = Object.assign({}, remote.lvl || {}); Object.entries(local.lvl || {}).forEach(([k, v]) => { const r = m.lvl[k] || { s: 0, p: 0 }; m.lvl[k] = { s: Math.max(r.s || 0, v.s || 0), p: Math.max(r.p || 0, v.p || 0) }; });
   m.coins = Math.max(0, (remote.coins || 0) + ((local.coins || 0) - (baseCoins || 0)));
   if ((local.cbest && local.cbest.score || 0) > (remote.cbest && remote.cbest.score || 0)) m.cbest = local.cbest;
@@ -4950,7 +4951,7 @@ drawTitle = function () {
   const done = save.dailyBonus === todayKey();
   const rows = [
     ['daily', 'orange', 'cal', 'DÉFI DU JOUR', done ? 'Bonus du jour gagné ✓' : `Même tirage pour tous · ${untilMidnight()}`, done ? null : 'NOUVEAU'],
-    ['catDefis', 'violet', 'swords', 'DUELS', 'En direct ou différé', null],
+    ['catDefis', 'violet', 'swords', 'DUELS', 'En direct ou chacun son tour', (typeof tdPendingCount === 'function' && tdPendingCount()) ? `${tdPendingCount()} À TOI` : null],
     ['garage', 'blue', 'crane', 'GARAGE', 'Grues, peinture, équipement', null],
     ['shop', 'gold', 'cart', 'BOUTIQUE', 'Packs de pièces', save.starterBought ? null : 'PROMO'],
     ['board', 'slate', 'trophy', 'CLASSEMENTS', WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour', null],
@@ -5146,6 +5147,247 @@ Object.assign(EN, {
   'Apprentissage': 'Apprenticeship', 'Mouvement': 'Motion', 'Conditions extrêmes': 'Extreme conditions', 'Travail de nuit': 'Night shift', 'Chantier vivant': 'Live site', 'Master': 'Master',
 });
 EN_RX.push([/^Niveau (\d+)$/, 'Level $1'], [/^(.*) · checkpoint (\d+)$/, (m, a, b) => `${tr(a)} · checkpoint ${b}`], [/^★ (\d+) \/ 150 étoiles$/, '★ $1 / 150 stars'], [/^Record (.*)$/, 'Best $1'], [/^(\d+)–(\d+) · ★ (.*)$/, '$1–$2 · ★ $3'], [/^CONTINUER · NIV\. (\d+)$/, 'CONTINUE · LVL $1'], [/^Même tirage pour tous · (.*)$/, 'Same draw for everyone · $1'], [/^\+15 pièces · (.*)$/, '+15 coins · $1'], [/^N°1 : (.*)$/, 'No. 1: $1'], [/^Prochain checkpoint : niveau (\d+)$/, 'Next checkpoint: level $1'], [/^Reprise au checkpoint (\d+) .*$/, 'Restarts at checkpoint $1 (later levels are replayed from there)']);
+
+// =====================================================================
+//  PILE POIL — DUEL « CHACUN SON TOUR »
+//  Un salon avec un code : chaque joueur joue UN lancer à son tour.
+//  5 chantiers, 3 vies chacun, le même tirage. Le meilleur score gagne.
+// =====================================================================
+const TD = { list: {}, cur: null, msg: '', busy: false, fetchedAt: 0, ch: null, chCode: '', turnSeen: {} };
+const tdMine = () => save.tduels || (save.tduels = []);
+const tdEntry = code => tdMine().find(d => d.code === code);
+const TD_FRESH = () => ({ i: 0, score: 0, lives: 3, perfects: 0, done: false });
+
+// ---------- serveur (Supabase) ou démo locale ----------
+function tdApply(r, me, res, pts, perfect) {   // même règle que la fonction SQL tduel_play (mode démo)
+  const ok = res === 'in' || res === 'perfect', s = Object.assign({}, r['s' + me]), o = r['s' + (3 - me)];
+  s.score += Math.max(0, Math.min(3000, pts | 0)); if (ok) { s.i++; if (perfect) s.perfects++; } else s.lives = Math.max(0, s.lives - 1);
+  s.done = s.i >= 5 || s.lives <= 0; r['s' + me] = s;
+  r.turn = !o.done ? 3 - me : me; r.status = s.done && o.done ? 'end' : r.p2 ? 'play' : 'wait';
+  r.moves = [{ p: me, res, pts: Math.max(0, pts | 0) }, ...(r.moves || [])].slice(0, 30); return r;
+}
+const TDB = SB ? {
+  async create(name) { const { data, error } = await SB.rpc('tduel_create', { p_name: name }); err(error); return data; },
+  async join(code, name) { const { data, error } = await SB.rpc('tduel_join', { p_code: code, p_name: name }); err(error); return data; },
+  async get(codes) { const { data, error } = await SB.rpc('tduel_get', { p_codes: codes }); err(error); return data || []; },
+  async play(e, res, pts, perfect) { const { data, error } = await SB.rpc('tduel_play', { p_code: e.code, p_token: e.token, p_res: res, p_pts: pts, p_perfect: perfect }); err(error); return data; },
+} : {
+  _r(c2) { try { return JSON.parse(localStorage.getItem('ppdemo_td_' + c2)); } catch (er) { return null; } },
+  _w(r) { try { localStorage.setItem('ppdemo_td_' + r.code, JSON.stringify(r)); } catch (er) {} },
+  pub(r) { const o = Object.assign({}, r); delete o.t1; delete o.t2; return o; },
+  async create(name) { const code = newCode(), tok = Math.random().toString(36).slice(2), seed = (Math.random() * 1e9) | 0; this._w({ code, seed, p1: name, p2: null, t1: tok, t2: null, s1: TD_FRESH(), s2: TD_FRESH(), turn: 1, status: 'wait', moves: [] }); return { code, token: tok, seed, me: 1 }; },
+  async join(code, name) { const r = this._r(code); if (!r) throw new Error('Code inconnu : vérifie les 5 caractères'); if (r.t2) throw new Error('Ce duel a déjà deux joueurs'); const tok = Math.random().toString(36).slice(2); r.p2 = name; r.t2 = tok; r.status = 'play'; this._w(r); return { code, token: tok, seed: r.seed, me: 2 }; },
+  async get(codes) { return codes.map(c2 => this._r(c2)).filter(Boolean).map(r => this.pub(r)); },
+  async play(e, res, pts, perfect) { const r = this._r(e.code); if (!r) throw new Error('Duel introuvable'); const me = r.t1 === e.token ? 1 : r.t2 === e.token ? 2 : 0; if (!me) throw new Error('Ce duel ne t\'appartient pas'); if (r.status === 'end') throw new Error('Ce duel est terminé'); if (r.turn !== me) throw new Error('Ce n\'est pas ton tour'); tdApply(r, me, res, pts, perfect); this._w(r); return this.pub(r); },
+};
+
+// ---------- état, rafraîchissement et temps réel ----------
+function tdState(code) { const r = TD.list[code], e = tdEntry(code); if (!r || !e) return null; const me = e.me, op = 3 - me;
+  const mine = r['s' + me], his = r['s' + op], oname = r['p' + op] || null;
+  const myTurn = r.status !== 'end' && r.turn === me && !mine.done;
+  return { r, e, me, op, mine, his, oname, myTurn, over: r.status === 'end' }; }
+function tdPendingCount() { return tdMine().filter(e => { const s = tdState(e.code); return s && s.myTurn; }).length; }
+async function tdRefresh(force) {
+  const codes = tdMine().slice(-12).map(e => e.code); if (!codes.length || TD.busy && !force) return;
+  if (!force && Date.now() - TD.fetchedAt < 4000) return; TD.fetchedAt = Date.now();
+  try { const rows = await TDB.get(codes); rows.forEach(r => {
+      const before = TD.list[r.code]; TD.list[r.code] = r; const s = tdState(r.code);
+      // notification « à toi de jouer » quand l'adversaire vient de jouer
+      if (s && s.myTurn && before && before.turn !== r.turn && G.screen !== 'play') { toast(`${s.oname || 'Ton adversaire'} a joué : à toi !`, '#6fb1ff'); try { sfx.click(); } catch (er) {} }
+    }); } catch (er) { TD.msg = er.message; }
+}
+function tdListen(code) {
+  if (TD.chCode === code) return; tdUnlisten(); TD.chCode = code;
+  if (SB) { TD.ch = SB.channel('ppt-' + code); TD.ch.on('broadcast', { event: 'turn' }, () => tdRefresh(true)).subscribe(); }
+  else { TD.ch = new BroadcastChannel('ppt-' + code); TD.ch.onmessage = () => tdRefresh(true); }
+}
+function tdUnlisten() { if (!TD.ch) return; try { SB ? SB.removeChannel(TD.ch) : TD.ch.close(); } catch (er) {} TD.ch = null; TD.chCode = ''; }
+function tdPing() { if (!TD.ch) return; try { SB ? TD.ch.send({ type: 'broadcast', event: 'turn', payload: {} }) : TD.ch.postMessage(1); } catch (er) {} }
+setInterval(() => {
+  if (G.screen === 'tdRoom' || G.screen === 'defis') tdRefresh();
+  else if (G.screen === 'title' && Date.now() - TD.fetchedAt > 20000) tdRefresh();
+}, 1000);
+setTimeout(() => tdRefresh(true), 1500);
+
+// ---------- jouer son lancer ----------
+function tdStartTurn() {
+  const s = tdState(TD.cur); if (!s || !s.myTurn) return;
+  const levels = runLevels(s.r.seed);
+  G.mode = 'turn'; G.runSeed = s.r.seed; G.run = { levels, i: s.mine.i, seed: s.r.seed, td: s.e, base: s.mine.score };
+  G.score = s.mine.score; G.lives = s.mine.lives; G.perfects = 0; G.livesLost = 0; G.workersHit = 0; G.checkpoint = levels[s.mine.i];
+  hideOverlay(); startLevel(levels[s.mine.i]);
+}
+async function tdSendTurn(res) {
+  const e = G.run.td, pts = Math.max(0, G.score - G.run.base);
+  G.mode = 'career'; G.runSeed = 0; G.screen = 'tdRoom'; TD.busy = true; TD.msg = 'Envoi de ton lancer…';
+  try { const r = await TDB.play(e, res, pts, res === 'perfect'); TD.list[e.code] = r; TD.msg = ''; tdPing();
+    const s = tdState(e.code);
+    toast(res === 'perfect' ? `PILE POIL ! +${pts}` : res === 'in' ? `Chantier réussi · +${pts}` : 'Raté : une vie en moins', res === 'in' || res === 'perfect' ? '#3cf29b' : '#ff6b5b');
+    if (s && s.over) toast(s.mine.score > s.his.score ? 'Duel terminé : victoire !' : s.mine.score < s.his.score ? 'Duel terminé : défaite' : 'Duel terminé : égalité', '#ffc21a');
+  } catch (er) { TD.msg = er.message; }
+  TD.busy = false;
+}
+afterResult = (prev => function () {
+  if (G.mode !== 'turn') return prev();
+  tdSendTurn(L.result === 'perfect' ? 'perfect' : L.result === 'in' ? 'in' : 'miss');
+})(afterResult);
+
+// ---------- formulaire HTML : pseudo + code ----------
+let TDO = null;
+function tdOverlay() {
+  if (TDO) return TDO;
+  TDO = document.createElement('div'); TDO.id = 'tdo';
+  TDO.innerHTML = `<style>
+#tdo[hidden],#tdo [hidden]{display:none!important}
+#tdo{position:fixed;z-index:6;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;font-family:Inter,system-ui,sans-serif;transform-origin:center top}
+#tdo input{font:800 18px Inter,sans-serif;padding:13px 16px;border-radius:16px;border:2px solid rgba(255,255,255,.18);background:rgba(10,15,30,.9);color:#fff;width:190px}
+#tdo input#tdCode{width:120px;text-transform:uppercase;letter-spacing:4px;text-align:center}
+#tdo button{font:900 17px Inter,sans-serif;padding:14px 20px;border-radius:16px;border:0;background:linear-gradient(#5cc4ff,#2c63f0);color:#fff;cursor:pointer;box-shadow:0 5px 0 #16399a}
+#tdo button.alt{background:linear-gradient(#4d5f82,#283651);box-shadow:0 5px 0 #161f33}
+#tdo .sep{color:#9db0c8;font:800 15px Inter,sans-serif;padding:0 6px}
+#tdo button:focus-visible,#tdo input:focus-visible{outline:3px solid #fff}</style>
+<input id="tdName" maxlength="16" placeholder="Ton pseudo" aria-label="Pseudo"><button id="tdCreate">Créer le duel</button>
+<span class="sep">ou</span><input id="tdCode" maxlength="5" placeholder="CODE" aria-label="Code du duel"><button id="tdJoin" class="alt">Rejoindre</button>`;
+  document.body.appendChild(TDO);
+  TDO.querySelectorAll('input').forEach(i => { i.addEventListener('keydown', ev => ev.stopPropagation()); i.addEventListener('keyup', ev => ev.stopPropagation()); });
+  const name = () => { const n = TDO.querySelector('#tdName').value.replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16); if (n.length < 2) { TD.msg = 'Entre un pseudo (2 à 16 caractères)'; return null; } save.name = n; writeSave(save); return n; };
+  const enter = d => { tdMine().push({ code: d.code, token: d.token, me: d.me }); writeSave(save); TD.cur = d.code; TD.msg = ''; G.screen = 'tdRoom'; tdListen(d.code); tdRefresh(true).then(tdPing); };
+  TDO.querySelector('#tdCreate').onclick = async () => { const n = name(); if (!n || TD.busy) return; TD.busy = true; TD.msg = 'Création…'; try { enter(await TDB.create(n)); } catch (er) { TD.msg = er.message; } TD.busy = false; };
+  TDO.querySelector('#tdJoin').onclick = async () => { const n = name(); if (!n || TD.busy) return; const code = TDO.querySelector('#tdCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 5) { TD.msg = 'Le code fait 5 caractères'; return; }
+    if (tdEntry(code)) { TD.cur = code; G.screen = 'tdRoom'; tdListen(code); return; }
+    TD.busy = true; TD.msg = 'Connexion…'; try { enter(await TDB.join(code, n)); } catch (er) { TD.msg = er.message; } TD.busy = false; };
+  return TDO;
+}
+setInterval(() => {
+  const show = G.screen === 'tdForm' && !MO;
+  if (!show) { if (TDO && !TDO.hidden) TDO.hidden = true; return; }
+  const o = tdOverlay(), r = cv.getBoundingClientRect(), k = r.width / W;
+  if (o.hidden) { o.hidden = false; if (!o.querySelector('#tdName').value) o.querySelector('#tdName').value = playerName(); if (TD.prefill) { o.querySelector('#tdCode').value = TD.prefill; TD.prefill = ''; } }
+  o.style.left = (r.left + r.width / 2) + 'px'; o.style.top = (r.top + 760 * k) + 'px'; o.style.transform = `translateX(-50%) scale(${Math.max(.7, Math.min(1.4, k * 1.5))})`;
+}, 120);
+
+// ---------- écrans ----------
+const TD_RES = { perfect: ['PILE POIL', '#ffc21a'], in: ['Réussi', '#3cf29b'], miss: ['Raté', '#ff6b5b'] };
+function tdStatus(s) {
+  if (!s) return ['…', PAL.sub];
+  if (s.over) return s.mine.score > s.his.score ? ['VICTOIRE', '#3cf29b'] : s.mine.score < s.his.score ? ['DÉFAITE', '#ff6b5b'] : ['ÉGALITÉ', '#ffc21a'];
+  if (s.myTurn) return ['À TOI', '#6fb1ff'];
+  if (!s.oname) return ['CODE À ENVOYER', PAL.sub];
+  return ['SON TOUR', PAL.sub];
+}
+// écran DUELS (remplace l'ancien Défis et duels : le défi du jour reste sur l'accueil)
+drawDefis = function () {
+  screenBg(); navBar('defBack', 'DUELS');
+  const cards = [
+    ['live', 'red', 'bolt', 'DUEL EN DIRECT', 'Vous jouez en même temps', 'Salon avec un code'],
+    ['tdNew', 'blue', 'swords', 'CHACUN SON TOUR', 'Un lancer chacun, à ton rythme', 'Salon avec un code'],
+  ];
+  cards.forEach(([id, col, ic, title, sub, pill], i) => {
+    const x = 110 + i * 500, y = 170, w = 460, h = 680, d = relief(x, y, w, h, CARD[col][0], CARD[col][1], RAD + 4, 12);
+    iconBtn(id, x + 36, y + h - 146, w - 72, 106, 'play', 'JOUER', '#ffffff', '#e8eef6', CARD[col][2], 46);
+    G.buttons.push({ id, x, y, w, h });
+    c.save(); rr(x, y, w, h, RAD + 4); c.clip(); c.globalAlpha = .1; icon(ic, x + w - 90, y + 120, 260, '#fff'); c.restore();
+    rr(x + w / 2 - 80, y + 70 + d, 160, 160, 48); c.fillStyle = 'rgba(255,255,255,.2)'; c.fill(); icon(ic, x + w / 2, y + 150 + d, 96, '#fff');
+    T(title, x + w / 2, y + 330 + d + 4, 'rgba(0,0,0,.2)', 48, 'center'); T(title, x + w / 2, y + 330 + d, '#fff', 48, 'center');
+    txt(sub, x + w / 2, y + 382 + d, 'rgba(255,255,255,.95)', 26, 800, 'center');
+    c.font = '900 24px Inter'; const pw = c.measureText(tr(pill)).width + 44; rr(x + w / 2 - pw / 2, y + 410 + d, pw, 46, 23); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); txt(pill, x + w / 2, y + 441 + d, '#fff', 24, 900, 'center');
+  });
+  // mes duels chacun son tour
+  const px = 1100, py = 170, pw = 710, ph = 680; uiPanel(px, py, pw, ph);
+  T('MES DUELS', px + 40, py + 70, PAL.text, 44);
+  const n = tdPendingCount(); if (n) { c.font = '900 22px Inter'; const t = `${n} à toi de jouer`, bw = c.measureText(tr(t)).width + 36; rr(px + pw - 40 - bw, py + 36, bw, 44, 22); c.fillStyle = '#2c63f0'; c.fill(); txt(t, px + pw - 40 - bw / 2, py + 66, '#fff', 22, 900, 'center'); }
+  const list = tdMine().slice().reverse().filter(e => TD.list[e.code]).sort((a, b) => (tdState(b.code).myTurn - tdState(a.code).myTurn) || (tdState(a.code).over - tdState(b.code).over)).slice(0, 5);
+  if (!list.length) { txt(tdMine().length ? 'Chargement…' : 'Aucun duel pour l\'instant.', px + 40, py + 140, PAL.sub, 24, 800); txt('Crée un duel « chacun son tour » et envoie le code à un ami.', px + 40, py + 180, PAL.sub, 22, 700); }
+  list.forEach((e, k) => {
+    const s = tdState(e.code), y = py + 108 + k * 104, [st, sc] = tdStatus(s), hv = hov(px + 24, y, pw - 48, 92);
+    rr(px + 24, y, pw - 48, 92, 26); c.fillStyle = hv ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.06)'; c.fill();
+    if (s.myTurn) { rr(px + 24, y, pw - 48, 92, 26); c.strokeStyle = '#6fb1ff'; c.lineWidth = 2.5; c.stroke(); }
+    txt(s.oname ? `contre ${s.oname}` : 'En attente d\'un adversaire', px + 52, y + 40, PAL.text, 25, 900);
+    txt(`${s.mine.score.toLocaleString('fr-FR')}  –  ${s.his.score.toLocaleString('fr-FR')}  ·  code ${e.code}`, px + 52, y + 74, PAL.sub, 20, 800);
+    c.font = '900 20px Inter'; const bw = c.measureText(tr(st)).width + 32; rr(px + pw - 96 - bw, y + 26, bw, 40, 20); c.fillStyle = s.myTurn ? '#2c63f0' : 'rgba(255,255,255,.1)'; c.fill(); txt(st, px + pw - 96 - bw / 2, y + 53, s.myTurn ? '#fff' : sc, 20, 900, 'center');
+    icon('chev', px + pw - 58, y + 46, 30, PAL.sub);
+    G.buttons.push({ id: 'tdOpen:' + e.code, x: px + 24, y, w: pw - 48, h: 92 });
+  });
+  chip(660, 924, 600, 84); txt('5 chantiers  ·  3 vies  ·  même tirage', 960, 976, PAL.sub, 28, 800, 'center');
+};
+function drawTdForm() {
+  screenBg(); navBar('tdFormBack', 'CHACUN SON TOUR');
+  uiPanel(360, 170, 1200, 520);
+  T('Comment ça marche', 420, 250, PAL.text, 46);
+  [['1', 'Crée le duel et envoie le code (ou le lien) à un ami.'], ['2', 'Chacun joue UN lancer à son tour, quand il veut.'], ['3', 'Raté = une vie en moins. Réussi = chantier suivant.'], ['4', 'Après 5 chantiers ou 3 vies perdues, le meilleur score gagne.']].forEach(([n, s], k) => {
+    const y = 330 + k * 84; ell(450, y - 10, 30, 30, '#2c63f0'); txt(n, 450, y, '#fff', 28, 900, 'center'); txt(s, 506, y, PAL.text, 28, 800); });
+  if (TD.msg) txt(TD.msg, 960, 900, '#ffd447', 26, 800, 'center');
+}
+function drawTdRoom() {
+  screenBg(); const s = tdState(TD.cur);
+  navBar('tdBack', `DUEL · ${TD.cur || ''}`);
+  if (!s) { txt(TD.msg || 'Chargement du duel…', 960, 500, PAL.sub, 30, 800, 'center'); return; }
+  // les deux joueurs
+  const levels = runLevels(s.r.seed);
+  const side = (x, name, st, col, active) => {
+    uiPanel(x, 170, 620, 470); if (active) { rr(x, 170, 620, 470, RAD); c.strokeStyle = col; c.lineWidth = 4; c.stroke(); }
+    txt(name || '?', x + 310, 240, name ? col : PAL.sub, 34, 900, 'center');
+    T(st.score.toLocaleString('fr-FR'), x + 310, 350, '#fff', 96, 'center'); txt('points', x + 310, 390, PAL.sub, 22, 800, 'center');
+    for (let k = 0; k < 5; k++) { const cx = x + 150 + k * 80, cy = 470, dn = k < st.i, cu = k === st.i && !st.done;
+      ell(cx, cy, 30, 30, dn ? '#16a463' : cu ? '#ffc21a' : 'rgba(255,255,255,.08)'); txt(String(levels[k]), cx, cy + 9, dn || cu ? '#fff' : PAL.sub, 22, 900, 'center'); }
+    txt('chantiers', x + 310, 530, PAL.sub, 20, 800, 'center');
+    for (let k = 0; k < 3; k++) { const on = k < st.lives; ell(x + 250 + k * 60, 584, 20, 18, on ? '#ffc21a' : 'rgba(255,255,255,.12)'); fillR(x + 226 + k * 60, 584, 48, 6, on ? '#c98d00' : 'rgba(255,255,255,.08)'); }
+  };
+  side(130, 'Toi', s.mine, '#3cf29b', s.myTurn); side(1170, s.oname || 'En attente…', s.his, '#ff9a6b', !s.myTurn && !s.over && !!s.oname);
+  T('VS', 960, 420, PAL.sub, 72, 'center');
+  // action
+  const [st, sc] = tdStatus(s);
+  if (s.over) { T(st, 960, 730, sc, 80, 'center'); iconBtn('tdNew', 660, 780, 600, 110, 'swords', 'NOUVEAU DUEL', CARD.blue[0], CARD.blue[1], '#fff', 44); }
+  else if (s.myTurn) {
+    const n = s.mine.i + 1; iconBtn('tdPlay', 560, 690, 800, 130, 'play', `JOUER MON LANCER · CHANTIER ${n}/5`, PAL.gold[0], PAL.gold[1], '#2a1a00', 44);
+    { const ph = (G.t % 3) / 1; if (ph < 1) { c.save(); rr(560, 690, 800, 130, 65); c.clip(); const sx = 360 + ph * 1200; c.fillStyle = lg(sx, 0, sx + 160, 0, [[0, 'rgba(255,255,255,0)'], [.5, 'rgba(255,255,255,.4)'], [1, 'rgba(255,255,255,0)']]); c.fillRect(sx, 690, 160, 130); c.restore(); } }
+  } else {
+    const dots = '.'.repeat(1 + Math.floor(G.t * 2) % 3);
+    T(s.oname ? `Au tour de ${s.oname}${dots}` : `En attente d'un adversaire${dots}`, 960, 740, '#cfe0ff', 50, 'center');
+    txt(s.oname ? 'Tu peux fermer le jeu : le duel t\'attend dans DUELS.' : `Envoie-lui le code ${s.r.code} ou le lien.`, 960, 790, PAL.sub, 24, 800, 'center');
+  }
+  iconBtn('tdCopy', 1460, 930, 400, 84, null, 'Copier le lien', CARD.slate[0], CARD.slate[1], '#fff', 30);
+  // derniers lancers
+  const mv = (s.r.moves || []).slice(0, 4);
+  mv.forEach((m, k) => { const who = m.p === s.me ? 'Toi' : (s.oname || 'Adversaire'), [lab, col] = TD_RES[m.res] || TD_RES.miss;
+    txt(`${who} : ${lab}${m.pts ? ' +' + m.pts : ''}`, 130, 900 + k * 34 - (mv.length - 1) * 0, k ? PAL.sub : col, 22, 800); });
+  if (TD.msg) txt(TD.msg, 960, 1050, '#ffd447', 22, 800, 'center');
+}
+drawOnline = (prev => function () { if (G.screen === 'tdRoom') drawTdRoom(); else if (G.screen === 'tdForm') drawTdForm(); else prev(); })(drawOnline);
+
+// ---------- actions ----------
+act = (prev => function (id) {
+  let mt;
+  if (id === 'tdNew') { sfx.click(); TD.msg = ''; tdUnlisten(); G.screen = 'tdForm'; return; }
+  if (id === 'tdFormBack' || id === 'tdBack') { sfx.click(); tdUnlisten(); TD.msg = ''; G.screen = 'defis'; return; }
+  if ((mt = id.match(/^tdOpen:(\w+)$/))) { sfx.click(); TD.cur = mt[1]; TD.msg = ''; G.screen = 'tdRoom'; tdListen(mt[1]); tdRefresh(true); return; }
+  if (id === 'tdPlay') { sfx.click(); return tdStartTurn(); }
+  if (id === 'tdCopy') { const link = `${location.origin}${location.pathname}?tour=${TD.cur}`; try { navigator.clipboard.writeText(link).then(() => toast('Lien copié : envoie-le à ton adversaire', '#6fb1ff'), () => toast(`Code : ${TD.cur}`, '#6fb1ff')); } catch (er) { toast(`Code : ${TD.cur}`, '#6fb1ff'); } return; }
+  // quitter pendant son lancer = lancer raté (pas d'abandon gratuit)
+  if ((id === 'menu' || id === 'liveMenu') && G.mode === 'turn' && G.screen === 'play') { G.paused = false; return tdSendTurn('miss'); }
+  return prev(id);
+})(act);
+// le bouton « Quitter » du menu pause prévient
+act = (prev => function (id) {
+  if (id === 'quit' && G.mode === 'turn') return modal({ title: 'QUITTER TON LANCER ?', lines: ['Ce lancer comptera comme raté (une vie en moins).'], yes: 'QUITTER', no: 'CONTINUER', onYes: () => { G.paused = false; act('menu'); } });
+  return prev(id);
+})(act);
+addEventListener('keydown', ev => { if (ev.key !== 'Escape' || MO) return; if (G.screen === 'tdRoom' || G.screen === 'tdForm') act('tdBack'); });
+// lien reçu : ?tour=CODE
+(function () {
+  const code = (new URLSearchParams(location.search).get('tour') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); if (code.length !== 5) return;
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => { if (tdEntry(code)) { TD.cur = code; G.screen = 'tdRoom'; tdListen(code); tdRefresh(true); } else { TD.prefill = code; TD.msg = 'Entre ton pseudo puis « Rejoindre »'; G.screen = 'tdForm'; } }, 300);
+})();
+
+Object.assign(EN, {
+  'DUELS': 'DUELS', 'DUEL EN DIRECT': 'LIVE DUEL', 'Vous jouez en même temps': 'You play at the same time', 'CHACUN SON TOUR': 'TURN BY TURN', 'Un lancer chacun, à ton rythme': 'One drop each, at your own pace', 'MES DUELS': 'MY DUELS', 'Aucun duel pour l\'instant.': 'No duels yet.', 'Crée un duel « chacun son tour » et envoie le code à un ami.': 'Create a turn-by-turn duel and send the code to a friend.',
+  'Comment ça marche': 'How it works', 'Crée le duel et envoie le code (ou le lien) à un ami.': 'Create the duel and send the code (or link) to a friend.', 'Chacun joue UN lancer à son tour, quand il veut.': 'Each player makes ONE drop per turn, whenever they like.', 'Raté = une vie en moins. Réussi = chantier suivant.': 'Miss = one life lost. Success = next site.', 'Après 5 chantiers ou 3 vies perdues, le meilleur score gagne.': 'After 5 sites or 3 lives lost, the best score wins.',
+  'Toi': 'You', 'points': 'points', 'chantiers': 'sites', 'VICTOIRE': 'VICTORY', 'DÉFAITE': 'DEFEAT', 'ÉGALITÉ': 'DRAW', 'À TOI': 'YOUR TURN', 'SON TOUR': 'THEIR TURN', 'CODE À ENVOYER': 'SEND THE CODE', 'NOUVEAU DUEL': 'NEW DUEL', 'Copier le lien': 'Copy link', 'Tu peux fermer le jeu : le duel t\'attend dans DUELS.': 'You can close the game: the duel waits for you in DUELS.', 'En attente…': 'Waiting…', 'En direct ou chacun son tour': 'Live or turn by turn',
+  'QUITTER TON LANCER ?': 'QUIT YOUR DROP?', 'Ce lancer comptera comme raté (une vie en moins).': 'This drop will count as a miss (one life lost).',
+});
+EN_RX.push([/^(\d+) à toi de jouer$/, '$1 your turn'], [/^(\d+) À TOI$/, '$1 YOUR TURN'], [/^contre (.*)$/, 'vs $1'], [/^JOUER MON LANCER · CHANTIER (\d)\/5$/, 'PLAY MY DROP · SITE $1/5'], [/^Au tour de (.*)$/, "$1's turn"], [/^DUEL · (.*)$/, 'DUEL · $1'], [/^(.*) a joué : à toi !$/, '$1 played: your turn!']);
 
 // =====================================================================
 //  PILE POIL — REMISE À ZÉRO DE SAISON (une seule fois par appareil)

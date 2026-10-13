@@ -1,0 +1,3 @@
+-- Duel « chacun son tour » (déjà appliqué sur Supabase le 13/10/2026)
+-- Table td_duels + fonctions tduel_create / tduel_join / tduel_get / tduel_play
+-- Voir la migration « duel_chacun_son_tour » dans Supabase > Database > Migrations.
