@@ -2481,7 +2481,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -2845,8 +2845,9 @@ function drawTitle() {
   button('daily', 980, 400, 480, 96, 'DÉFI DU JOUR', '#ffd447', '#c98d00', '#2a1a00');
   button('live', 460, 512, 480, 96, 'DUEL EN DIRECT', '#ff6a55', '#c4281a', '#ffffff');
   button('duel', 980, 512, 480, 96, 'DUEL DIFFÉRÉ', '#5fa8ff', '#2a62c4', '#061a3a');
-  button('board', 460, 624, 480, 84, 'CLASSEMENTS', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
-  button('garage', 980, 624, 480, 84, 'GARAGE', '#ff9a3c', '#c45f0a', '#2a1200');
+  button('board', 460, 624, 313, 84, 'CLASSEMENTS', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  button('garage', 803, 624, 313, 84, 'GARAGE', '#ff9a3c', '#c45f0a', '#2a1200');
+  button('shop', 1146, 624, 314, 84, 'BOUTIQUE', '#c77dff', '#7b2cbf', '#ffffff');
   if (cp > 1) button('restart', 700, 724, 520, 56, 'RECOMMENCER LA CARRIÈRE', 'rgba(255,255,255,.14)', 'rgba(255,255,255,.06)', '#fff');
   txt('Défis et duels : 5 chantiers, 3 vies, le même tirage pour chaque joueur', 960, 812, '#9fb7cf', 21, 700, 'center');
   if (DEMO) txt('Mode démo : scores et duels restent sur cet appareil (ajoute tes clés Supabase pour jouer en ligne)', 960, 840, '#ffb36b', 16, 700, 'center');
@@ -3338,16 +3339,17 @@ act = (prev => function (id) {
 function hexShade(hex, amt) { const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, v + amt)).toString(16).padStart(2, '0'); return '#' + f(n >> 16) + f((n >> 8) & 255) + f(n & 255); }
 const SKINS = [
   { id: 'jaune', name: 'Jaune chantier', col: '#f6b81a', dark: '#b9820a', trolley: '#d93b2b', price: 0 },
-  { id: 'rouge', name: 'Rouge pompier', col: '#d9362b', dark: '#8e1d16', trolley: '#2b2f36', price: 120 },
-  { id: 'bleu', name: 'Bleu acier', col: '#2f6fd1', dark: '#1c437f', trolley: '#f6b81a', price: 220 },
-  { id: 'vert', name: 'Vert forêt', col: '#2e8b57', dark: '#1b5434', trolley: '#f2f2f2', price: 320 },
-  { id: 'blanc', name: 'Blanc perle', col: '#e9edf2', dark: '#9aa3ad', trolley: '#d93b2b', price: 450 },
-  { id: 'noir', name: 'Noir carbone', col: '#3a3f46', dark: '#1d2026', trolley: '#ffc21a', price: 650 },
-  { id: 'or', name: 'Or massif', col: '#ffd447', dark: '#b8860b', trolley: '#1d2026', price: 1500 },
+  { id: 'rouge', name: 'Rouge pompier', col: '#d9362b', dark: '#8e1d16', trolley: '#2b2f36', price: 400 },
+  { id: 'bleu', name: 'Bleu acier', col: '#2f6fd1', dark: '#1c437f', trolley: '#f6b81a', price: 700 },
+  { id: 'vert', name: 'Vert forêt', col: '#2e8b57', dark: '#1b5434', trolley: '#f2f2f2', price: 1000 },
+  { id: 'blanc', name: 'Blanc perle', col: '#e9edf2', dark: '#9aa3ad', trolley: '#d93b2b', price: 1500 },
+  { id: 'noir', name: 'Noir carbone', col: '#3a3f46', dark: '#1d2026', trolley: '#ffc21a', price: 2200 },
+  { id: 'or', name: 'Or massif', col: '#ffd447', dark: '#b8860b', trolley: '#1d2026', price: 4000 },
+  { id: 'chrome', name: 'Chrome', col: '#d3dbe2', dark: '#7d8892', trolley: '#1d2026', price: 0, shop: true },
 ];
 const UPGRADES = [
-  { id: 'casque', name: 'Casque de réserve', desc: '4 vies par checkpoint au lieu de 3', price: 700, icon: 'worker' },
-  { id: 'laser', name: 'Viseur laser', desc: 'Trajectoire visible dès le niveau 11', price: 1000, icon: 'sun' },
+  { id: 'casque', name: 'Casque de réserve', desc: '4 vies par checkpoint au lieu de 3', price: 2500, icon: 'worker' },
+  { id: 'laser', name: 'Viseur laser', desc: 'Trajectoire visible dès le niveau 11', price: 4000, icon: 'sun' },
 ];
 save.coins = save.coins || 0; save.skins = save.skins || ['jaune']; save.upg = save.upg || []; save.skin = save.skin || 'jaune';
 function craneSkin() { return SKINS.find(s => s.id === save.skin) || SKINS[0]; }
@@ -3359,7 +3361,7 @@ function laserOn() { return isCareer() && hasUpg('laser'); }
 finish = (prev => function (lvl, res) {
   prev(lvl, res);
   if (res !== 'in' && res !== 'perfect') return;
-  const t = lvl.C.t, gain = isCareer() ? (t === 5 ? 200 : 10 + 3 * t) + (res === 'perfect' ? 10 : 0) : 8 + (res === 'perfect' ? 6 : 0);
+  const t = lvl.C.t, gain = isCareer() ? (t === 5 ? 40 : 2 + Math.floor(lvl.C.n / 10)) + (res === 'perfect' ? 2 : 0) : G.mode === 'daily' ? 2 + (res === 'perfect' ? 1 : 0) : 1 + (res === 'perfect' ? 1 : 0);
   save.coins += gain; writeSave(save);
   if (lvl.target) FX.pops.push({ text: `+${gain} pièces`, x: lvl.target.x + lvl.target.w / 2, y: GY - 120, t: -.25, col: '#ffd447' });
   tone(1568, .08, 'square', .03, .35); tone(2093, .12, 'square', .03, .42);
@@ -3470,14 +3472,14 @@ function wrapText(s, x, y, maxW, lh, col, size) { c.font = `700 ${size}px Inter`
 function drawStyle() {
   txt('PEINTURE DES GRUES', 60, 234, '#ffc21a', 24, 900);
   SKINS.forEach((sk, i) => {
-    const x = 60 + i * 258, y = 254, w = 240, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
+    const x = 60 + i * 226, y = 254, w = 212, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
     rr(x, y, w, h, 18); c.fillStyle = eq ? 'rgba(60,242,155,.18)' : 'rgba(12,18,32,.84)'; c.fill();
     rr(x, y, w, h, 18); c.strokeStyle = eq ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 4 : 2; c.stroke();
     const sx = x + 22, sy = y + 22; fillR(sx, sy, w - 44, 9, sk.col); fillR(sx, sy + 32, w - 44, 9, sk.col);
     c.strokeStyle = sk.dark; c.lineWidth = 3; c.beginPath(); for (let xx = sx; xx < sx + w - 54; xx += 24) { c.moveTo(xx, sy + 36); c.lineTo(xx + 12, sy + 5); c.lineTo(xx + 24, sy + 36); } c.stroke();
     rr(x + w / 2 - 22, sy + 48, 44, 16, 4); c.fillStyle = sk.trolley; c.fill();
     txt(sk.name, x + w / 2, y + 108, '#fff', 19, 800, 'center');
-    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 136, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 136, '#9fd6ff', 17, 900, 'center'); else price(x + w / 2 - 40, y + 138, sk.price, save.coins >= sk.price, 18);
+    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 136, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 136, '#9fd6ff', 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 136, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 138, sk.price, save.coins >= sk.price, 18);
     G.buttons.push({ id: 'sk_' + sk.id, x, y, w, h });
   });
   // nom de l'entreprise
@@ -3499,7 +3501,7 @@ function drawStyle() {
   });
   rr(60, 720, 860, 300, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
   txt('COMMENT GAGNER DES PIÈCES', 100, 774, '#ffc21a', 22, 900);
-  [['Chantier réussi en Carrière', '10 à 22'], ['Lancer parfait', '+10'], ['Master Niveau réussi', '+200'], ['Défi du jour et duels (par chantier)', '8 · parfait +6']].forEach(([a, b], i) => { txt(a, 100, 822 + i * 48, '#e6eef8', 21, 700); coinIcon(720, 815 + i * 48, 11); txt(b, 880, 822 + i * 48, '#ffd447', 21, 900, 'right'); });
+  [['Chantier réussi en Carrière', '2 à 6'], ['Lancer parfait', '+2'], ['1er passage d\'un checkpoint', '+25'], ['Défi du jour terminé (1 fois/jour)', '+15']].forEach(([a, b], i) => { txt(a, 100, 822 + i * 48, '#e6eef8', 21, 700); coinIcon(720, 815 + i * 48, 11); txt(b, 880, 822 + i * 48, '#ffd447', 21, 900, 'right'); });
 }
 function companySignBig(x, y, w) { rr(x, y - 50, w, 70, 8); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 4; c.stroke(); let fs = 44; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 40 && fs > 18) { fs--; c.font = `900 ${fs}px Inter`; } txt(companyName(), x + w / 2, y + 2, '#1a1300', fs, 900, 'center'); }
 function drawEquip() {
@@ -3593,24 +3595,24 @@ const CRANES = {
   tower: [
     { id: 'elements', name: 'Grue à montage par éléments', st: [3, 3, 3], req: 1, price: 0,
       desc: 'La grue à tour classique à tête marteau : porte-flèche, tirants et contre-flèche lestée. Polyvalente sur tous les chantiers.' },
-    { id: 'automontante', name: 'Grue automontante', st: [5, 2, 2.5], req: 5, price: 350,
+    { id: 'automontante', name: 'Grue automontante', st: [5, 2, 2.5], req: 5, price: 1200,
       desc: 'Petite grue de lotissement qui se déplie seule. Lest au pied, pilotée à la radiocommande depuis le sol. Très vive, mais la charge balance.' },
-    { id: 'flattop', name: 'Grue flat-top', st: [4, 3.5, 2.5], req: 12, price: 700,
+    { id: 'flattop', name: 'Grue flat-top', st: [4, 3.5, 2.5], req: 12, price: 2500,
       desc: 'Sans porte-flèche ni tirants : idéale en ville quand plusieurs grues se croisent. Chariot rapide, flèche plus sensible au vent.' },
-    { id: 'xxl', name: 'Grue XXL sur rails', st: [2.5, 5, 4.5], req: 31, price: 1400,
+    { id: 'xxl', name: 'Grue XXL sur rails', st: [2.5, 5, 4.5], req: 31, price: 6000,
       desc: 'Mât renforcé, châssis sur bogies et rails, double lest : la grue des grands ouvrages. Lourde à manœuvrer, mais d\'une stabilité redoutable.' },
   ],
   mobile: [
     { id: 'treillis', name: 'Grue à chenilles treillis', st: [3, 3, 3], req: 1, price: 0,
       desc: 'La grue sur chenilles à flèche treillis des chantiers industriels. Équilibrée et fiable.' },
-    { id: 'telescopique', name: 'Grue mobile télescopique', st: [4.5, 3.5, 2.5], req: 21, price: 600,
+    { id: 'telescopique', name: 'Grue mobile télescopique', st: [4.5, 3.5, 2.5], req: 21, price: 2000,
       desc: 'Porteur routier à 5 essieux, stabilisateurs déployés, flèche télescopique à 4 éléments. Précise et rapide à mettre en place.' },
-    { id: 'superlift', name: 'Chenillée lourde à superlift', st: [2, 5, 5], req: 26, price: 1200,
+    { id: 'superlift', name: 'Chenillée lourde à superlift', st: [2, 5, 5], req: 26, price: 5000,
       desc: 'Le monstre des levages exceptionnels : mât arrière, plateau de contrepoids superlift. Lente, mais le vent ne la fait pas broncher.' },
   ],
 };
 const STAT_NAMES = ['MANIABILITÉ', 'STABILITÉ', 'TENUE AU VENT'];
-const UPG_COST = [150, 300, 500];
+const UPG_COST = [400, 900, 1800];
 save.crane = save.crane || { tower: 'elements', mobile: 'treillis' };
 save.owned = save.owned || ['elements', 'treillis'];
 save.clvl = save.clvl || {};
@@ -3628,7 +3630,7 @@ const modelOf = (slot, id) => CRANES[slot].find(m => m.id === id) || CRANES[slot
 const equipped = slot => modelOf(slot, save.crane[slot]);
 const tierOf = (slot, id) => CRANES[slot].findIndex(m => m.id === id);
 function statsOf(slot, id) { const m = modelOf(slot, id), lv = save.clvl[id] || 0; return m.st.map(v => v + lv * .5); }
-function upgCost(slot, id) { const lv = save.clvl[id] || 0; return lv >= 3 ? 0 : Math.round(UPG_COST[lv] * (1 + tierOf(slot, id) * .5)); }
+function upgCost(slot, id) { const lv = save.clvl[id] || 0; return lv >= 3 ? 0 : Math.round(UPG_COST[lv] * (1 + tierOf(slot, id) * .4) / 50) * 50; }
 function companyName() { return (save.company || 'PILE POIL').toUpperCase(); }
 
 // ---------- effets en jeu (Carrière uniquement : défis et duels à armes égales) ----------
@@ -3650,11 +3652,11 @@ setInterval(() => { if (isCareer() && G.level > (save.maxLevel || 1) && (G.scree
 // ---------- tenue du grutier ----------
 const OUTFITS = [
   { id: 'classique', name: 'Classique', helm: '#f3f5f7', jacket: '#1f3a5f', stripe: 'rgba(255,200,40,.9)', vest: '#1f3a5f', price: 0 },
-  { id: 'orange', name: 'Orange HV', helm: '#ffc21a', jacket: '#ff7a1a', stripe: '#e9edf2', vest: '#ff7a1a', price: 80 },
-  { id: 'fluo', name: 'Jaune fluo', helm: '#f3f5f7', jacket: '#d4f02a', stripe: '#9aa3ad', vest: '#d4f02a', price: 80 },
-  { id: 'chef', name: 'Chef de chantier', helm: '#2f6fd1', jacket: '#2b3a55', stripe: '#ffd21a', vest: '#ffd21a', price: 150 },
-  { id: 'pompier', name: 'Rouge', helm: '#d9362b', jacket: '#8e1d16', stripe: '#e9edf2', vest: '#d9362b', price: 150 },
-  { id: 'noir', name: 'Noir & or', helm: '#1d2026', jacket: '#1d2026', stripe: '#ffd447', vest: '#2b2f36', price: 300 },
+  { id: 'orange', name: 'Orange HV', helm: '#ffc21a', jacket: '#ff7a1a', stripe: '#e9edf2', vest: '#ff7a1a', price: 250 },
+  { id: 'fluo', name: 'Jaune fluo', helm: '#f3f5f7', jacket: '#d4f02a', stripe: '#9aa3ad', vest: '#d4f02a', price: 250 },
+  { id: 'chef', name: 'Chef de chantier', helm: '#2f6fd1', jacket: '#2b3a55', stripe: '#ffd21a', vest: '#ffd21a', price: 600 },
+  { id: 'pompier', name: 'Rouge', helm: '#d9362b', jacket: '#8e1d16', stripe: '#e9edf2', vest: '#d9362b', price: 600 },
+  { id: 'noir', name: 'Noir & or', helm: '#1d2026', jacket: '#1d2026', stripe: '#ffd447', vest: '#2b2f36', price: 1200 },
 ];
 save.outfits = save.outfits || ['classique'];
 function opLook() { return OUTFITS.find(o => o.id === save.outfit) || OUTFITS[0]; }
@@ -4092,6 +4094,160 @@ drawLevel = (prev => function (lvl) {
     rr(x - tw / 2, y - 22, tw, 32, 16); c.fillStyle = 'rgba(232,72,59,.92)'; c.fill(); txt(t, x, y, '#fff', 18, 900, 'center'); c.restore();
   }
 })(drawLevel);
+
+// =====================================================================
+//  PILE POIL — BOUTIQUE (Stripe) + validation de tous les achats + bonus de progression
+// =====================================================================
+const SHOP_LINKS = (window.PP_CONFIG && window.PP_CONFIG.shop) || {};
+const OFFERS = [
+  { id: 'starter', name: 'Pack Démarrage', coins: 2500, euros: '2,99 €', once: true, item: 'chrome', tag: 'UNE SEULE FOIS', desc: '2 500 pièces + peinture Chrome exclusive' },
+  { id: 'p1', name: 'Poignée de pièces', coins: 1000, euros: '1,99 €' },
+  { id: 'p2', name: 'Sac de pièces', coins: 3000, euros: '4,99 €', bonus: '+20 %' },
+  { id: 'p3', name: 'Coffre de chantier', coins: 6500, euros: '9,99 €', bonus: '+30 %', tag: 'POPULAIRE' },
+  { id: 'p4', name: 'Benne de pièces', coins: 14000, euros: '19,99 €', bonus: '+40 %', tag: 'MEILLEURE OFFRE' },
+];
+if (!save.pid) { save.pid = (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16))); writeSave(save); }
+save.cpDone = save.cpDone || [];
+
+// ---------- bonus de progression ----------
+function giveCoins(n, why) { save.coins += n; writeSave(save); toast(`+${n.toLocaleString('fr-FR')} pièces · ${why}`, '#ffd447'); tone(1568, .08, 'square', .03); tone(2093, .12, 'square', .03, .08); }
+gotoCheckpointScreen = (prev => function (n) {
+  prev(n);
+  if (isCareer() && n > 1 && !save.cpDone.includes(n)) { save.cpDone.push(n); giveCoins(25, `checkpoint niveau ${n} atteint`); }
+})(gotoCheckpointScreen);
+finish = (prev => function (lvl, res) {
+  prev(lvl, res);
+  if (lvl.C.t === 5 && (res === 'in' || res === 'perfect') && isCareer() && !save.masterDone) { save.masterDone = true; giveCoins(150, 'premier Master Niveau réussi !'); }
+})(finish);
+endRun = (prev => function (done) {
+  const r = prev(done);
+  if (G.mode === 'daily' && save.dailyBonus !== todayKey()) { save.dailyBonus = todayKey(); giveCoins(15, 'défi du jour terminé'); }
+  return r;
+})(endRun);
+
+// ---------- petites notifications ----------
+const TOASTS = [];
+function toast(t, col) { TOASTS.push({ t, col: col || '#3cf29b', at: performance.now() }); }
+
+// ---------- fenêtre de validation (achats en pièces et paiements) ----------
+let MO = null;
+function modal(o) { MO = o; sfx.click(); }
+function purchaseInfo(id) {
+  let mt;
+  if ((mt = id.match(/^buy_(\w+)_(\w+)$/))) { const m = modelOf(mt[1], mt[2]); if (save.owned.includes(m.id) || (save.maxLevel || 1) < m.req) return null; return { name: m.name, price: m.price }; }
+  if ((mt = id.match(/^up_(\w+)_(\w+)$/))) { const cost = upgCost(mt[1], mt[2]); if (!cost) return null; const m = modelOf(mt[1], mt[2]); return { name: `Amélioration ${(save.clvl[m.id] || 0) + 1}/3 · ${m.name}`, price: cost }; }
+  if (id.startsWith('sk_')) { const sk = SKINS.find(s => s.id === id.slice(3)); if (!sk || save.skins.includes(sk.id)) return null; return sk.shop ? { name: `Peinture ${sk.name}`, shopOnly: true } : { name: `Peinture ${sk.name}`, price: sk.price }; }
+  if (id.startsWith('of_')) { const o = OUTFITS.find(s => s.id === id.slice(3)); if (!o || save.outfits.includes(o.id)) return null; return { name: `Tenue ${o.name}`, price: o.price }; }
+  if (id.startsWith('ug_')) { const u = UPGRADES.find(s => s.id === id.slice(3)); if (!u || hasUpg(u.id)) return null; return { name: u.name, price: u.price }; }
+  return null;
+}
+act = (prev => function (id) {
+  if (id === 'mo_no') { MO = null; sfx.click(); return; }
+  if (id === 'mo_yes') { const f = MO && MO.onYes; MO = null; if (f) f(); return; }
+  if (MO) return;
+  if (id === 'shop') { sfx.click(); SH.from = G.screen === 'shop' ? SH.from : G.screen; G.screen = 'shop'; claimPurchases(false); return; }
+  if (id === 'shopBack') { sfx.click(); G.screen = SH.from === 'garage' ? 'garage' : 'title'; return; }
+  if (id === 'restore') { sfx.click(); claimPurchases(true); return; }
+  if (id.startsWith('of_buy_')) return askPay(OFFERS.find(o => o.id === id.slice(7)));
+  const info = purchaseInfo(id);
+  if (info && !SH.confirmed) {
+    if (info.shopOnly) return modal({ title: 'EXCLUSIVITÉ BOUTIQUE', lines: [`${info.name} n'existe que dans le Pack Démarrage.`], yes: 'VOIR LA BOUTIQUE', onYes: () => act('shop') });
+    if (save.coins < info.price) return modal({ title: 'PIÈCES INSUFFISANTES', lines: [info.name, `Il te manque ${(info.price - save.coins).toLocaleString('fr-FR')} pièces.`, 'Continue à jouer, ou passe par la boutique.'], yes: 'BOUTIQUE', onYes: () => act('shop'), no: 'PLUS TARD' });
+    return modal({ title: 'CONFIRMER L\'ACHAT', lines: [info.name], price: info.price, yes: 'ACHETER', onYes: () => { SH.confirmed = true; try { act(id); } finally { SH.confirmed = false; } } });
+  }
+  return prev(id);
+})(act);
+addEventListener('keydown', e => { if (MO && e.key === 'Escape') { MO = null; e.stopImmediatePropagation(); } }, true);
+
+// ---------- paiement Stripe ----------
+const SH = { from: 'title', msg: '', busy: false, confirmed: false };
+function askPay(o) {
+  if (!o) return;
+  if (o.once && save.starterBought) return modal({ title: 'DÉJÀ ACHETÉ', lines: ['Le Pack Démarrage ne s\'achète qu\'une fois.'], yes: 'OK', no: null });
+  const link = SHOP_LINKS[o.id];
+  if (!link || DEMO) return modal({ title: 'BOUTIQUE EN PRÉPARATION', lines: ['Les paiements ne sont pas encore activés.', 'Reviens bientôt !'], yes: 'OK', no: null });
+  modal({ title: `${o.name.toUpperCase()} · ${o.euros}`, lines: [`${o.coins.toLocaleString('fr-FR')} pièces${o.item ? ' + peinture Chrome exclusive' : ''}`, 'Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay).', 'Contenu numérique livré tout de suite : tu renonces au délai', 'de rétractation de 14 jours. Mineur ? Demande l\'accord d\'un parent.'], yes: `PAYER ${o.euros}`, no: 'ANNULER',
+    onYes: () => { const u = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(save.pid); location.href = u; } });
+}
+async function claimPurchases(manual) {
+  if (!SB) { if (manual) toast('Boutique indisponible en mode démo', '#ffb36b'); return 0; }
+  try {
+    const { data, error } = await SB.rpc('claim_purchases', { p_pid: save.pid }); if (error) throw error;
+    const coins = (data && data.coins) || 0, items = (data && data.items) || [];
+    if (coins > 0) { save.coins += coins; }
+    items.forEach(it => { if (it === 'chrome' && !save.skins.includes('chrome')) save.skins.push('chrome'); if (it === 'chrome') save.starterBought = true; });
+    if (coins > 0 || items.length) { writeSave(save); toast(`Merci ! +${coins.toLocaleString('fr-FR')} pièces${items.includes('chrome') ? ' + peinture Chrome' : ''}`, '#3cf29b'); sfx.perfect(); }
+    else if (manual) toast('Aucun achat en attente sur cet appareil', '#9fd6ff');
+    return coins + items.length;
+  } catch (e) { if (manual) toast('Serveur indisponible, réessaie plus tard', '#ff5a48'); return 0; }
+}
+// retour de Stripe : ?achat=ok → on attend que le paiement soit confirmé (quelques secondes)
+(function () {
+  const q = new URLSearchParams(location.search); if (q.get('achat') !== 'ok') { setTimeout(() => claimPurchases(false), 2500); return; }
+  history.replaceState(null, '', location.pathname); G.screen = 'shop'; SH.msg = 'Paiement reçu, crédit des pièces en cours…';
+  let n = 0; const tick = async () => { n++; const got = await claimPurchases(false); if (got) { SH.msg = ''; return; } if (n < 15) setTimeout(tick, 2500); else SH.msg = 'Le crédit prend du retard : touche « Restaurer mes achats » dans un moment.'; };
+  setTimeout(tick, 1200);
+})();
+
+// ---------- écran BOUTIQUE ----------
+function coinPile(x, y, n) { const k = [3, 6, 10, 15, 20][n]; for (let i = 0; i < k; i++) { const r = Math.floor(i / 5), cx = x + ((i % 5) - 2) * 22 + (r % 2) * 11, cy = y - r * 14; coinIcon(cx, cy, 16); } }
+function drawShop() {
+  screenBg();
+  txt('BOUTIQUE', 960, 92, '#c77dff', 64, 900, 'center');
+  button('shopBack', 40, 30, 220, 64, '◀ RETOUR', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
+  coinPill(1380, 34);
+  txt('Fais avancer ton parc de grues plus vite · les pièces achetées sont créditées sur cet appareil', 960, 150, '#cfe0ff', 21, 700, 'center');
+  // pack démarrage
+  const st = OFFERS[0], owned = !!save.starterBought;
+  rr(110, 190, 1700, 230, 26); c.fillStyle = lg(110, 0, 1810, 0, [[0, 'rgba(199,125,255,.32)'], [1, 'rgba(255,212,71,.22)']]); c.fill(); rr(110, 190, 1700, 230, 26); c.strokeStyle = '#ffd447'; c.lineWidth = 3; c.stroke();
+  rr(140, 210, 190, 34, 17); c.fillStyle = '#ffd447'; c.fill(); txt(st.tag, 235, 234, '#2a1a00', 16, 900, 'center');
+  txt(st.name.toUpperCase(), 140, 300, '#fff', 44, 900); txt(st.desc, 140, 344, '#ffe6b0', 24, 800); txt('La peinture Chrome ne se gagne pas en jeu.', 140, 382, 'rgba(255,255,255,.7)', 19, 700);
+  // aperçu de la flèche chromée
+  const sk = SKINS.find(s => s.id === 'chrome'); const sx = 900, sy = 270; fillR(sx, sy, 420, 16, sk.col); fillR(sx, sy + 56, 420, 16, sk.col); c.strokeStyle = sk.dark; c.lineWidth = 4; c.beginPath(); for (let xx = sx; xx < sx + 400; xx += 40) { c.moveTo(xx, sy + 64); c.lineTo(xx + 20, sy + 8); c.lineTo(xx + 40, sy + 64); } c.stroke(); fillR(sx, sy + 4, 420, 3, 'rgba(255,255,255,.8)');
+  coinPile(1430, 360, 3);
+  if (owned) smallBtn('', 1560, 280, 220, 70, '✓ ACHETÉ', 'off'); else smallBtn('of_buy_starter', 1560, 280, 220, 70, st.euros, 'buy');
+  // packs de pièces
+  OFFERS.slice(1).forEach((o, i) => {
+    const x = 110 + i * 430, y = 450, w = 410, h = 440, hot = !!o.tag;
+    rr(x, y, w, h, 24); c.fillStyle = 'rgba(12,18,32,.86)'; c.fill(); rr(x, y, w, h, 24); c.strokeStyle = hot ? '#c77dff' : 'rgba(255,255,255,.14)'; c.lineWidth = hot ? 4 : 2; c.stroke();
+    if (o.tag) { rr(x + w / 2 - 110, y - 18, 220, 36, 18); c.fillStyle = '#c77dff'; c.fill(); txt(o.tag, x + w / 2, y + 7, '#fff', 16, 900, 'center'); }
+    c.save(); c.beginPath(); c.rect(x, y + 30, w, 200); c.clip(); fillR(x, y + 30, w, 200, rg(x + w / 2, y + 150, 10, 200, [[0, 'rgba(255,212,71,.22)'], [1, 'rgba(255,212,71,0)']])); coinPile(x + w / 2, y + 190, i + 1); c.restore();
+    txt(o.name, x + w / 2, y + 268, '#fff', 26, 900, 'center');
+    coinIcon(x + w / 2 - 92, y + 314, 20); txt(o.coins.toLocaleString('fr-FR'), x + w / 2 + 12, y + 328, '#ffd447', 44, 900, 'center');
+    if (o.bonus) { rr(x + w - 104, y + 40, 84, 34, 17); c.fillStyle = '#3cf29b'; c.fill(); txt(o.bonus, x + w - 62, y + 64, '#06210f', 17, 900, 'center'); }
+    smallBtn('of_buy_' + o.id, x + 45, y + 356, w - 90, 64, o.euros, hot ? 'go' : 'buy');
+  });
+  txt('Paiement sécurisé par Stripe · aucune donnée bancaire ne passe par le jeu · achat définitif', 960, 940, 'rgba(255,255,255,.6)', 18, 700, 'center');
+  smallBtn('restore', 760, 965, 400, 56, 'RESTAURER MES ACHATS', 'off'); G.buttons.push({ id: 'restore', x: 760, y: 965, w: 400, h: 56 });
+  if (SH.msg) txt(SH.msg, 960, 1060, '#ffd447', 20, 800, 'center');
+}
+drawOnline = (prev => function () { if (G.screen === 'shop') drawShop(); else prev(); })(drawOnline);
+
+// ---------- calque final : fenêtre de validation, notifications, raccourci pièces ----------
+function overlayLoop() {
+  requestAnimationFrame(overlayLoop);
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1;
+  // la pastille de pièces ouvre la boutique
+  if (!MO && (G.screen === 'title' || G.screen === 'garage')) { const px = G.screen === 'title' ? 40 : 1380, py = G.screen === 'title' ? 36 : 34; c.font = '900 30px Inter'; const w = c.measureText(save.coins.toLocaleString('fr-FR')).width + 86; ell(px + w + 22, py + 30, 22, 22, '#c77dff'); txt('+', px + w + 22, py + 41, '#fff', 30, 900, 'center'); G.buttons.push({ id: 'shop', x: px, y: py, w: w + 46, h: 60 }); }
+  if (MO) {
+    G.buttons = [];
+    fillR(0, 0, W, H, 'rgba(6,10,20,.72)');
+    const lines = MO.lines || [], h = 230 + lines.length * 34 + (MO.price ? 60 : 0), y = 540 - h / 2;
+    rr(560, y, 800, h, 28); c.fillStyle = '#121a2c'; c.fill(); rr(560, y, 800, h, 28); c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke();
+    txt(MO.title, 960, y + 66, '#ffc21a', 34, 900, 'center');
+    lines.forEach((l, i) => txt(l, 960, y + 116 + i * 34, i === 0 ? '#fff' : '#cfe0ff', i === 0 ? 26 : 20, i === 0 ? 900 : 700, 'center'));
+    if (MO.price) { const py = y + 116 + lines.length * 34 + 20; c.font = '900 40px Inter'; const tw = c.measureText(MO.price.toLocaleString('fr-FR')).width; coinIcon(960 - tw / 2 - 30, py - 13, 20); txt(MO.price.toLocaleString('fr-FR'), 960 + 14, py, '#ffd447', 40, 900, 'center'); txt(`Solde après achat : ${(save.coins - MO.price).toLocaleString('fr-FR')}`, 960, py + 36, '#9fb7cf', 18, 700, 'center'); }
+    const by = y + h - 96;
+    if (MO.no !== null) { smallBtn('mo_no', 610, by, 330, 70, MO.no || 'ANNULER', 'off'); G.buttons.push({ id: 'mo_no', x: 610, y: by, w: 330, h: 70 }); smallBtn('mo_yes', 980, by, 330, 70, MO.yes || 'OK', 'go'); }
+    else smallBtn('mo_yes', 795, by, 330, 70, MO.yes || 'OK', 'go');
+  }
+  // notifications
+  const now = performance.now();
+  for (let i = TOASTS.length - 1; i >= 0; i--) if (now - TOASTS[i].at > 3200) TOASTS.splice(i, 1);
+  TOASTS.forEach((t, i) => { const age = now - t.at, a = Math.min(1, age / 200, (3200 - age) / 400); c.save(); c.globalAlpha = a; c.font = '900 24px Inter'; const tw = c.measureText(t.t).width + 60, y = 200 + i * 62 - (1 - Math.min(1, age / 200)) * 20; rr(960 - tw / 2, y, tw, 50, 25); c.fillStyle = 'rgba(12,18,32,.94)'; c.fill(); c.strokeStyle = t.col; c.lineWidth = 3; c.stroke(); txt(t.t, 960, y + 34, t.col, 24, 900, 'center'); c.restore(); });
+}
+// démarre après la boucle principale pour dessiner par-dessus
+(function waitFrame() { if (G.t > 0) requestAnimationFrame(overlayLoop); else setTimeout(waitFrame, 200); })();
 
 </script>
 </body></html>
