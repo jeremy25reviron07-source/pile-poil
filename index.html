@@ -2539,7 +2539,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate', 'wheel', 'epreuves', 'survEnd', 'survPalier', 'regions', 'jpmap', 'egmap'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate', 'wheel', 'epreuves', 'survEnd', 'survPalier', 'regions', 'jpmap', 'egmap', 'profile'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -5001,7 +5001,7 @@ function coinChip(x, y, alignRight) {   // pièces + « + » vers la boutique
 }
 function topBarUI() {
   // compte (gauche)
-  const named = !!ACC.name, an = named ? ACC.name : (save.lang === 'en' ? 'Sign in' : 'Se connecter');
+  const named = !!ACC.name, an = named ? ACC.name : (save.lang === 'en' ? 'My profile' : 'Mon profil');
   c.font = '900 28px Inter'; const nw = c.measureText(an).width; c.font = '800 26px Inter'; const lvTxt = named ? ` · ${tr('Niv.')} ${careerLevel()}` : '', lw = c.measureText(lvTxt).width, aw = nw + lw + 112;
   window.ACC_CHIP_W = aw; chip(40, 40, aw, 72); ell(80, 76, 26, 26, named ? PAL.orange : 'rgba(255,255,255,.14)');
   if (named) txt(an[0].toUpperCase(), 80, 86, '#2a1400', 28, 900, 'center'); else icon('user', 80, 76, 26, PAL.sub);
@@ -8888,6 +8888,137 @@ Object.assign(EN, {
   'Relâche !': 'Let go!', 'Plus tu maintiens, plus la charge part loin': 'The longer you hold, the further it flies', 'Presque !': 'Almost!', 'Aucune vie perdue, on recommence': 'No life lost, try again', "Les 49 chantiers suivants t'attendent": '49 more sites are waiting for you',
   '📸  Partager ce PILE POIL': '📸  Share this PILE POIL', '📤  PARTAGER MON RÉSULTAT': '📤  SHARE MY RESULT', 'Copié ! Colle-le dans ton groupe 📋': 'Copied! Paste it in your group chat 📋',
 });
+
+// =====================================================================
+//  PILE POIL — MON PROFIL : avatar personnalisable, grade de grutier, statistiques
+//  On l'ouvre depuis la pastille du profil (en haut à gauche de l'accueil)
+// =====================================================================
+// ---------- statistiques ----------
+function ST() {
+  if (save.st) return save.st;
+  const all = ['fr', 'jp', 'eg'].map(r => regData(r).lvl || {}), recs = all.flatMap(o => Object.values(o));
+  save.st = { ok: recs.length, perfect: recs.filter(v => v.p > 0).length, miss: 0, combo: 0, workers: 0, time: 0, games: 0, streak: 0, bestStreak: 0, lastDay: '', tons: 0, best: null, heavy: null, cable: 0, long: 0, reg: {}, dailyBest: 0, duelW: 0, duelL: 0 };
+  return save.st;
+}
+const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+release = (prev => function (lvl) { try { lvl.relX = loadState(lvl).x; } catch (e) {} prev(lvl); })(release);
+finish = (prev => function (lvl, res) {
+  prev(lvl, res); const s = ST(), ok = res === 'in' || res === 'perfect';
+  if (ok) { s.ok++; s.tons = Math.round((s.tons + (lvl.tons || 0)) * 10) / 10; s.reg[window.REGION] = (s.reg[window.REGION] || 0) + 1;
+    if (!s.heavy || (lvl.tons || 0) > s.heavy.t) s.heavy = { t: Math.round((lvl.tons || 0) * 10) / 10, name: (LOADS[lvl.load] || LOADS.bloc).name };
+    if (lvl.fly) { const t = lvl.target, err = Math.abs(lvl.fly.x - (t.x + t.w / 2)) / PXM * 100; if (s.best === null || err < s.best) s.best = Math.round(err * 10) / 10; if (lvl.relX !== undefined) s.long = Math.max(s.long, Math.round(Math.abs(lvl.fly.x - lvl.relX) / PXM)); } }
+  if (res === 'perfect') s.perfect++; if (res === 'miss') s.miss++;
+  s.combo = Math.max(s.combo, G.combo || 0);
+  if ((G.workersHit || 0) < (G._wh || 0)) G._wh = 0; if (G.workersHit > (G._wh || 0)) { s.workers += G.workersHit - (G._wh || 0); G._wh = G.workersHit; }
+  writeSave(save);
+})(finish);
+startLevel = (prev => function (n) {
+  const s = ST(); if (G.screen !== 'play') s.games++;
+  const today = dayKey(new Date()), y = new Date(); y.setDate(y.getDate() - 1);
+  if (s.lastDay !== today) { s.streak = s.lastDay === dayKey(y) ? s.streak + 1 : 1; s.bestStreak = Math.max(s.bestStreak, s.streak); s.lastDay = today; }
+  prev(n); G._lh = null;
+})(startLevel);
+endRun = (prev => function (done) { const s = ST(); if (G.mode === 'daily') s.dailyBest = Math.max(s.dailyBest, G.score || 0); if (G.mode === 'duel' && G.run && G.run.duel) { if (G.score > G.run.duel.score) s.duelW++; else s.duelL++; } writeSave(save); return prev(done); })(endRun);
+setInterval(() => { if (G.screen === 'play' && !G.paused && !document.hidden) { const s = ST(); s.time++; if (s.time % 10 === 0) writeSave(save); } }, 1000);
+drawTouch = (prev => function (lvl) { prev(lvl); if (lvl && lvl.Lh !== undefined) { if (G._lh != null && lvl.Lh > G._lh) ST().cable += (lvl.Lh - G._lh) / PXM; G._lh = lvl.Lh; } })(drawTouch);
+
+// ---------- grades ----------
+const GRADES = [[0, 'Apprenti'], [20, 'Grutier'], [60, 'Chef de chantier'], [150, 'Maître grutier'], [400, 'Légende du chantier']];
+function gradeOf(p = ST().perfect) { let i = 0; GRADES.forEach(([n], k) => { if (p >= n) i = k; }); return i; }
+
+// ---------- avatar ----------
+const AV_SKIN = ['#f3d2b3', '#e3ae86', '#c98a5e', '#a86a42', '#7a4a2a', '#4f2f1c'];
+const AV_HELM = [['#f2f4f7', 0], ['#ffd21a', 0], ['#ff7a1a', 0], ['#e8402a', 0], ['#2f6fd1', 0], ['#2bb673', 0], ['#2b2f36', 0], ['#e8b830', 3], ['#cfd8e2', 4]];
+const AV_ACC = [['', 'Aucun'], ['lun', 'Lunettes'], ['sol', 'Soleil'], ['mou', 'Moustache'], ['bar', 'Barbe'], ['aud', 'Casque antibruit', 2]];
+const AV_BG = [['#d9f2ff', '#3b6f96'], ['#ffe2bc', '#d9733a'], ['#e2ffd9', '#2f8a5a'], ['#ffd9ef', '#a8386a'], ['#e9e2ff', '#5a46b0'], ['#2a3350', '#0b1020']];
+const AV = () => (save.av = Object.assign({ skin: 1, helm: 0, acc: 0, bg: 0 }, save.av || {}));
+function drawAvatar(cx, cy, r, av = AV()) {
+  const sk = AV_SKIN[av.skin] || AV_SKIN[1], hc = (AV_HELM[av.helm] || AV_HELM[0])[0], acc = (AV_ACC[av.acc] || AV_ACC[0])[0], bg = AV_BG[av.bg] || AV_BG[0], O = opLook();
+  c.save(); c.beginPath(); c.arc(cx, cy, r, 0, 7); c.clip(); fillR(cx - r, cy - r, r * 2, r * 2, lg(0, cy - r, 0, cy + r, [[0, bg[0]], [1, bg[1]]]));
+  // épaules et veste
+  c.fillStyle = O.jacket || '#23324d'; c.beginPath(); c.ellipse(cx, cy + r * 1.02, r * .86, r * .52, 0, Math.PI, 0); c.fill(); fillR(cx - r * .86, cy + r * .74, r * 1.72, r * .08, O.stripe || '#ffd21a');
+  fillR(cx - r * .14, cy + r * .32, r * .28, r * .22, sk);
+  // visage
+  ell(cx, cy + r * .1, r * .4, r * .44, sk); ell(cx - r * .4, cy + r * .12, r * .08, r * .12, sk); ell(cx + r * .4, cy + r * .12, r * .08, r * .12, sk);
+  ell(cx - r * .15, cy + r * .06, r * .045, r * .055, '#1a1a1a'); ell(cx + r * .15, cy + r * .06, r * .045, r * .055, '#1a1a1a');
+  c.strokeStyle = '#6a3a2a'; c.lineWidth = Math.max(1.5, r * .035); c.lineCap = 'round'; c.beginPath(); c.arc(cx, cy + r * .2, r * .13, .25, Math.PI - .25); c.stroke(); c.lineCap = 'butt';
+  if (acc === 'bar') { c.fillStyle = '#4a2f1e'; c.beginPath(); c.moveTo(cx - r * .38, cy + r * .08); c.quadraticCurveTo(cx - r * .36, cy + r * .58, cx, cy + r * .6); c.quadraticCurveTo(cx + r * .36, cy + r * .58, cx + r * .38, cy + r * .08); c.quadraticCurveTo(cx, cy + r * .44, cx - r * .38, cy + r * .08); c.fill(); }
+  if (acc === 'mou' || acc === 'bar') { c.fillStyle = '#4a2f1e'; c.beginPath(); c.ellipse(cx - r * .08, cy + r * .2, r * .1, r * .045, -.2, 0, 7); c.ellipse(cx + r * .08, cy + r * .2, r * .1, r * .045, .2, 0, 7); c.fill(); }
+  if (acc === 'lun' || acc === 'sol') { const dark = acc === 'sol'; c.strokeStyle = '#1a1a1a'; c.lineWidth = Math.max(1.5, r * .035); [-1, 1].forEach(k => { c.beginPath(); c.ellipse(cx + k * r * .16, cy + r * .06, r * .12, r * .1, 0, 0, 7); if (dark) { c.fillStyle = '#14181f'; c.fill(); } c.stroke(); }); ln(cx - r * .04, cy + r * .05, cx + r * .04, cy + r * .05, '#1a1a1a', Math.max(1.5, r * .03)); }
+  // casque
+  c.fillStyle = lg(cx - r * .5, 0, cx + r * .5, 0, [[0, mixc(hc, '#ffffff', .25)], [1, mixc(hc, '#000000', .18)]]); c.beginPath(); c.ellipse(cx, cy - r * .16, r * .5, r * .42, 0, Math.PI, 0); c.fill();
+  fillR(cx - r * .62, cy - r * .2, r * 1.24, r * .1, mixc(hc, '#000000', .12)); fillR(cx - r * .05, cy - r * .56, r * .1, r * .38, mixc(hc, '#ffffff', .3));
+  if (acc === 'aud') { [-1, 1].forEach(k => { ell(cx + k * r * .44, cy + r * .1, r * .1, r * .16, '#e8402a'); }); }
+  c.restore(); c.strokeStyle = '#ffc21a'; c.lineWidth = Math.max(2, r * .07); c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
+}
+// la pastille du profil sur l'accueil montre l'avatar et ouvre « Mon profil »
+topBarUI = (prev => function () { prev(); drawAvatar(80, 76, 26); G.buttons.forEach(b => { if (b.id === 'account' && b.y === 40) b.id = 'profile'; }); })(topBarUI);
+
+// ---------- écran « Mon profil » ----------
+const PF = { edit: false };
+const fmtTime = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`; };
+const fmtN = n => Math.round(n).toLocaleString('fr-FR');
+function pcard(x, y, w, h) { rr(x, y, w, h, 28); c.fillStyle = 'rgba(12,18,32,.86)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 2; c.stroke(); }
+function drawProfile() {
+  screenBg(); fillR(0, 0, W, H, 'rgba(4,6,16,.55)'); navBar('profBack', 'MON PROFIL');
+  const s = ST(), g = gradeOf(), next = GRADES[g + 1], name = (ACC.name || save.name || 'Joueur').toUpperCase();
+  // identité
+  pcard(40, 150, 1036, 230); drawAvatar(152, 265, 78); ell(212, 322, 22, 22, '#ffc21a'); txt('✎', 212, 331, '#2a1a00', 24, 900, 'center'); G.buttons.push({ id: 'avEdit', x: 70, y: 183, w: 166, h: 166 });
+  T(name.slice(0, 16), 266, 236, '#fff', 58); c.font = '900 22px Inter'; const gw = c.measureText(`⭐ ${GRADES[g][1].toUpperCase()}`).width + 36; rr(266, 254, gw, 44, 22); c.fillStyle = lg(0, 254, 0, 298, [[0, '#ffd36a'], [1, '#f2a20f']]); c.fill(); txt(`⭐ ${GRADES[g][1].toUpperCase()}`, 266 + gw / 2, 284, '#2a1a00', 22, 900, 'center');
+  const k = next ? clamp((s.perfect - GRADES[g][0]) / (next[0] - GRADES[g][0]), 0, 1) : 1; rr(266, 316, 520, 18, 9); c.fillStyle = 'rgba(255,255,255,.12)'; c.fill(); if (k > 0) { rr(266, 316, 520 * k, 18, 9); c.fillStyle = lg(266, 0, 786, 0, [[0, '#3cf29b'], [1, '#ffd447']]); c.fill(); }
+  txt(next ? `Encore ${next[0] - s.perfect} poses parfaites pour devenir ${next[1]}` : 'Grade maximum atteint !', 266, 362, '#9fb0d0', 20, 800);
+  const accT = ACC.name ? '✓ Compte connecté' : '👤 Se connecter'; c.font = '800 19px Inter'; const aw = c.measureText(accT).width + 40; rr(1046 - aw, 172, aw, 46, 23); c.fillStyle = ACC.name ? 'rgba(60,242,155,.16)' : 'rgba(255,255,255,.08)'; c.fill(); txt(accT, 1046 - aw / 2, 202, ACC.name ? '#3cf29b' : '#e6eef8', 19, 800, 'center'); G.buttons.push({ id: 'account', x: 1046 - aw, y: 172, w: aw, h: 46 });
+  // progression par pays
+  pcard(1106, 150, 774, 230);
+  [['fr', 'France', '#5cc4ff'], ['jp', 'Japon', '#ff7aa8'], ['eg', 'Égypte', '#ffcf6a']].forEach(([r, n, col], i) => { const y = 206 + i * 62, d = regData(r), done = Object.keys(d.lvl || {}).length, st = Object.values(d.lvl || {}).reduce((a, v) => a + (v.s || 0), 0), lock = r === 'jp' ? !jpUnlocked() : r === 'eg' ? !egUnlocked() : false;
+    flag(r, 1140, y - 22); txt(n, 1214, y + 8, '#fff', 24, 800); rr(1340, y - 6, 340, 14, 7); c.fillStyle = 'rgba(255,255,255,.12)'; c.fill(); if (done) { rr(1340, y - 6, 340 * Math.min(1, done / 50), 14, 7); c.fillStyle = col; c.fill(); }
+    txt(lock ? '🔒 verrouillé' : `${Math.min(50, done)}/50 · ${st} ★`, 1850, y + 8, lock ? '#7f8cab' : '#fff', 21, 900, 'right'); });
+  // trois blocs
+  const blk = (x, title, ico) => { pcard(x, 420, 594, 480); txt(ico, x + 34, 482, '#fff', 30, 900); T(title, x + 82, 484, '#fff', 34); };
+  const big = (x, y, v, l, col = '#fff') => { rr(x, y, 256, 96, 18); c.fillStyle = 'rgba(255,255,255,.06)'; c.fill(); c.font = '900 42px Inter'; let fs = 42; while (c.measureText(v).width > 226 && fs > 22) { fs -= 2; c.font = `900 ${fs}px Inter`; } txt(v, x + 18, y + 54, col, fs, 900); txt(l, x + 18, y + 80, '#9fb0d0', 17, 800); };
+  const row = (x, y, l, v, col = '#fff') => { fillR(x, y - 36, 528, 1, 'rgba(255,255,255,.08)'); txt(l, x, y, '#cfd6ea', 21, 800); txt(v, x + 528, y, col, 23, 900, 'right'); };
+  // mes chantiers
+  { const x = 40; blk(x, 'Mes chantiers', '🏗️'); big(x + 34, 512, fmtN(s.ok), 'chantiers réussis'); big(x + 306, 512, fmtN(s.perfect), 'poses parfaites', '#3cf29b');
+    const tot = s.ok + s.miss, pr = tot ? s.ok / tot : 0, cx = x + 86, cy = 680; c.lineWidth = 14; c.strokeStyle = 'rgba(255,255,255,.12)'; c.beginPath(); c.arc(cx, cy, 48, 0, 7); c.stroke(); if (pr > 0) { c.strokeStyle = '#3cf29b'; c.lineCap = 'round'; c.beginPath(); c.arc(cx, cy, 48, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pr); c.stroke(); c.lineCap = 'butt'; }
+    txt(`${Math.round(pr * 100)} %`, cx, cy + 9, '#fff', 25, 900, 'center'); txt('de précision', x + 160, cy - 4, '#e6eef8', 22, 800); txt(`${fmtN(s.miss)} lancers ratés sur ${fmtN(tot)}`, x + 160, cy + 26, '#9fb0d0', 18, 800);
+    row(x + 34, 800, 'Meilleur combo', s.combo >= 2 ? `×${Math.min(3, 1 + (s.combo - 1) * .5).toLocaleString('fr-FR')}` : '—'); row(x + 34, 860, 'Ouvriers touchés', fmtN(s.workers)); }
+  // mon temps
+  { const x = 663; blk(x, 'Mon temps', '⏱️'); big(x + 34, 512, fmtTime(s.time), 'de jeu'); big(x + 306, 512, `🔥 ${s.streak}`, `jour${s.streak > 1 ? 's' : ''} d'affilée`, '#ff9a3a');
+    row(x + 34, 680, 'Parties jouées', fmtN(s.games)); row(x + 34, 740, 'Record du défi du jour', s.dailyBest ? fmtN(s.dailyBest) : '—'); row(x + 34, 800, 'Record survie', survRecord() ? `${survRecord()} paliers` : '—'); row(x + 34, 860, 'Duels', s.duelW + s.duelL ? `${s.duelW} V · ${s.duelL} D` : '—'); }
+  // mes records
+  { const x = 1286; blk(x, 'Mes records', '🎯'); big(x + 34, 512, `${fmtN(s.tons)} t`, 'soulevées au total'); big(x + 306, 512, s.best === null ? '—' : `${s.best.toLocaleString('fr-FR')} cm`, 'plus belle pose', '#ffd447');
+    const fav = Object.entries(s.reg || {}).sort((a, b) => b[1] - a[1])[0], favN = fav ? { fr: '🇫🇷 France', jp: '🗾 Japon', eg: '🐫 Égypte' }[fav[0]] : '—';
+    row(x + 34, 680, 'Charge la plus lourde', s.heavy ? `${s.heavy.t.toLocaleString('fr-FR')} t · ${s.heavy.name.length > 14 ? s.heavy.name.split(' ')[0] : s.heavy.name}` : '—', '#ffd447'); row(x + 34, 740, 'Câble déroulé', s.cable >= 1000 ? `${(s.cable / 1000).toFixed(1).replace('.', ',')} km` : `${fmtN(s.cable)} m`, '#ffd447'); row(x + 34, 800, 'Pays préféré', favN, '#ffd447'); row(x + 34, 860, 'Lancer le plus long', s.long ? `${s.long} m` : '—', '#ffd447'); }
+  txt(ACC.name ? 'Statistiques enregistrées sur ton compte' : 'Connecte-toi pour retrouver tes statistiques sur tous tes appareils', 960, 1010, '#7f8cab', 18, 800, 'center');
+  if (PF.edit) drawAvatarEditor();
+}
+function flag(r, x, y) { c.save(); rr(x, y, 56, 38, 8); c.clip(); if (r === 'fr') { fillR(x, y, 19, 38, '#1f4fbf'); fillR(x + 19, y, 19, 38, '#f2f2f2'); fillR(x + 38, y, 18, 38, '#e8402a'); } else if (r === 'jp') { fillR(x, y, 56, 38, '#f2f2f2'); ell(x + 28, y + 19, 10, 10, '#e8402a'); } else { fillR(x, y, 56, 13, '#e8402a'); fillR(x, y + 13, 56, 12, '#f2f2f2'); fillR(x, y + 25, 56, 13, '#1a1a1a'); ell(x + 28, y + 19, 4, 4, '#c9a43a'); } c.restore(); }
+function drawAvatarEditor() {
+  fillR(0, 0, W, H, 'rgba(4,6,16,.78)'); const x0 = 300, y0 = 120, w = 1320, h = 840, av = AV(), g = gradeOf();
+  rr(x0, y0, w, h, 34); c.fillStyle = '#121a2e'; c.fill(); c.strokeStyle = 'rgba(255,194,26,.5)'; c.lineWidth = 3; c.stroke();
+  T('MON PERSONNAGE', x0 + 60, y0 + 84, '#ffc21a', 46); drawAvatar(x0 + 230, y0 + 400, 160, av); txt('La tenue se change au Garage', x0 + 230, y0 + 620, '#9fb0d0', 18, 800, 'center');
+  const rowY = [y0 + 190, y0 + 330, y0 + 480, y0 + 660], X = x0 + 480;
+  const opt = (id, x, y, sel, draw, lockG) => { const lk = lockG && g < lockG; ell(x, y, 38, 38, sel ? '#ffc21a' : 'rgba(255,255,255,.08)'); draw(x, y); if (lk) { ell(x, y, 34, 34, 'rgba(10,14,26,.7)'); icon('lock', x, y, 26, '#fff'); } if (hov(x - 40, y - 40, 80, 80) && lk) txt(`Grade ${GRADES[lockG][1]}`, x, y + 62, '#ffd447', 15, 900, 'center'); G.buttons.push({ id: lk ? 'avLock:' + lockG : id, x: x - 40, y: y - 40, w: 80, h: 80 }); };
+  txt('TEINT', X, rowY[0] - 56, '#e6eef8', 20, 900); AV_SKIN.forEach((col, i) => opt('avS:' + i, X + 40 + i * 96, rowY[0], av.skin === i, (x, y) => ell(x, y, 30, 30, col)));
+  txt('CASQUE', X, rowY[1] - 56, '#e6eef8', 20, 900); AV_HELM.forEach(([col, lg2], i) => opt('avH:' + i, X + 40 + i * 88, rowY[1], av.helm === i, (x, y) => { c.fillStyle = col; c.beginPath(); c.ellipse(x, y + 8, 26, 22, 0, Math.PI, 0); c.fill(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1.5; c.stroke(); fillR(x - 32, y + 6, 64, 7, mixc(col, '#000000', .15)); }, lg2));
+  txt('ACCESSOIRE', X, rowY[2] - 56, '#e6eef8', 20, 900); AV_ACC.forEach(([id, n, lg2], i) => opt('avA:' + i, X + 40 + i * 120, rowY[2], av.acc === i, (x, y) => { const tmp = Object.assign({}, av, { acc: i }); c.save(); c.beginPath(); c.arc(x, y, 34, 0, 7); c.clip(); drawAvatar(x, y + 6, 40, tmp); c.restore(); }, lg2));
+  AV_ACC.forEach(([, n], i) => txt(n, X + 40 + i * 120, rowY[2] + 62, '#9fb0d0', 14, 800, 'center'));
+  txt('FOND', X, rowY[3] - 56, '#e6eef8', 20, 900); AV_BG.forEach(([a, b], i) => opt('avB:' + i, X + 40 + i * 96, rowY[3], av.bg === i, (x, y) => ell(x, y, 30, 30, lg(0, y - 30, 0, y + 30, [[0, a], [1, b]]))));
+  button('avDone', x0 + w - 380, y0 + h - 120, 320, 84, 'VALIDER', '#3cf29b', '#17a764', '#06210f');
+}
+drawOnline = (prev => function () { if (G.screen === 'profile') drawProfile(); else prev(); })(drawOnline);
+act = (prev => function (id) {
+  let m;
+  if (id === 'profile') { sfx.click(); PF.edit = false; G.screen = 'profile'; return; }
+  if (id === 'profBack') { sfx.click(); if (PF.edit) { PF.edit = false; return; } G.screen = 'title'; return; }
+  if (id === 'avEdit') { sfx.click(); PF.edit = true; return; }
+  if (id === 'avDone') { sfx.click(); PF.edit = false; writeSave(save); toast('Personnage enregistré ✓', '#3cf29b'); return; }
+  if ((m = id.match(/^av([SHAB]):(\d+)$/))) { sfx.click(); const a = AV(); a[{ S: 'skin', H: 'helm', A: 'acc', B: 'bg' }[m[1]]] = +m[2]; writeSave(save); return; }
+  if ((m = id.match(/^avLock:(\d+)$/))) { sfx.click(); toast(`Débloqué au grade ${GRADES[+m[1]][1]} (poses parfaites)`, '#ffd447'); return; }
+  return prev(id);
+})(act);
+addEventListener('keydown', e => { if (e.key !== 'Escape' || MO || G.screen !== 'profile') return; act('profBack'); });
+Object.assign(EN, { 'MON PROFIL': 'MY PROFILE', 'Mes chantiers': 'My sites', 'Mon temps': 'My time', 'Mes records': 'My records', 'MON PERSONNAGE': 'MY CHARACTER', 'VALIDER': 'SAVE', 'Personnage enregistré ✓': 'Character saved ✓' });
 
 // =====================================================================
 //  PILE POIL — TÉLÉPHONE (iPhone en priorité) : survol tactile, installation sur l'écran d'accueil
