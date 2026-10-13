@@ -9053,16 +9053,47 @@ act = (prev => function (id) {
 try { if (IOS && !STANDALONE()) { const k = 'pp_open_count', n = (+localStorage.getItem(k) || 0) + 1; localStorage.setItem(k, n); if (n === 3) setTimeout(() => toast('Astuce : installe PILE POIL sur ton écran d\'accueil (bouton Installer)', '#ffc21a'), 4000); } } catch (e) {}
 Object.assign(EN, { 'Installer': 'Install', "l'application": 'the app', 'INSTALLER PILE POIL': 'INSTALL PILE POIL', 'COMPRIS': 'GOT IT', '1. Dans Safari, touche le bouton Partager (le carré avec une flèche).': '1. In Safari, tap the Share button (square with an arrow).', "2. Choisis « Sur l'écran d'accueil », puis « Ajouter ».": '2. Choose “Add to Home Screen”, then “Add”.', "3. Lance PILE POIL depuis l'icône : plein écran, sans barre Safari.": '3. Open PILE POIL from the icon: full screen, no Safari bar.', "Astuce : installe PILE POIL sur ton écran d'accueil (bouton Installer)": 'Tip: install PILE POIL on your home screen (Install button)' });
 
-// ---------- cadre plein écran : le décor du jeu déborde, flouté, sur les bords de l'écran ----------
+// =====================================================================
+//  IPHONE : cadrage exact, aucun zoom parasite, fluidité
+// =====================================================================
 (function () {
-  const amb = document.createElement('canvas'); amb.id = 'amb'; amb.width = 64; amb.height = 36; amb.setAttribute('aria-hidden', 'true');
+  // 1. bords de l'écran remplis par le décor (sans filtre de flou : trop coûteux sur iPhone)
+  const amb = document.createElement('canvas'); amb.id = 'amb'; amb.width = 32; amb.height = 18; amb.setAttribute('aria-hidden', 'true');
   const st = document.createElement('style');
-  st.textContent = `#amb{position:fixed;inset:-8%;width:116%;height:116%;z-index:0;filter:blur(22px) brightness(.55) saturate(1.25);pointer-events:none}
-#c{position:relative;z-index:1}
-@media (pointer:coarse) and (orientation:landscape){#c{box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 40px rgba(0,0,0,.55)}}`;
+  st.textContent = `html,body{touch-action:none;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior:none;overflow:hidden}
+*{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+input,textarea{-webkit-user-select:text;user-select:text;font-size:16px!important}
+#amb{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.42;pointer-events:none}
+#c{position:fixed!important;left:0;top:0;max-width:none!important;max-height:none!important;margin:0;z-index:1}
+#lgo .txt,#lgo .txt *{touch-action:pan-y}`;
   document.head.appendChild(st); document.body.insertBefore(amb, document.body.firstChild);
-  const ax = amb.getContext('2d'); setInterval(() => { if (document.hidden) return; try { ax.drawImage(cv, 0, 0, 64, 36); } catch (e) {} }, 150);
+  const ax = amb.getContext('2d'); setInterval(() => { if (document.hidden) return; try { ax.drawImage(cv, 0, 0, 32, 18); } catch (e) {} }, 200);
+  // 2. le jeu est dimensionné au pixel près dans la zone vraiment visible (barres de Safari, encoche, barre d'accueil)
+  const probe = document.createElement('div'); probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)'; document.body.appendChild(probe);
+  function fit() {
+    const vv = window.visualViewport, vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+    const ps = getComputedStyle(probe), sl = parseFloat(ps.paddingLeft) || 0, sr = parseFloat(ps.paddingRight) || 0, stp = parseFloat(ps.paddingTop) || 0, sb = parseFloat(ps.paddingBottom) || 0;
+    const aw = Math.max(100, vw - sl - sr), ah = Math.max(60, vh - stp - sb), s = Math.min(aw / W, ah / H), w = Math.floor(W * s), h = Math.floor(H * s);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px'; cv.style.left = Math.round(ox + sl + (aw - w) / 2) + 'px'; cv.style.top = Math.round(oy + stp + (ah - h) / 2) + 'px';
+  }
+  window.ppFit = fit;
+  const refit = () => { fit(); setTimeout(fit, 120); setTimeout(fit, 400); setTimeout(fit, 900); };
+  addEventListener('resize', refit); addEventListener('orientationchange', refit); addEventListener('pageshow', refit);
+  if (window.visualViewport) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
+  document.fonts && document.fonts.ready.then(fit); fit();
+  // 3. aucun zoom ni défilement parasite (pincement, double appui, glissé de la page)
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove', e => { const t = e.target; if (t && t.closest && t.closest('#lgo .txt')) return; if (e.touches && e.touches.length > 1) return e.preventDefault(); if (!(t && t.closest && t.closest('input,textarea,select'))) e.preventDefault(); }, { passive: false });
+  let lastTap = 0; document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastTap < 320 && !(e.target.closest && e.target.closest('input,textarea,button,a'))) e.preventDefault(); lastTap = now; }, { passive: false });
+  document.addEventListener('focusout', () => setTimeout(() => { window.scrollTo(0, 0); fit(); }, 60));
+  addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
+  // 4. fluidité : si le téléphone peine (images trop lentes), on coupe les halos lumineux en jeu
+  let n = 0, acc = 0, last = 0; window.LOWFX = false;
+  const tick = t => { if (last && !document.hidden) { const d = t - last; if (d < 200) { acc += d; n++; } if (n >= 90) { const avg = acc / n; if (!window.LOWFX && avg > 24) window.LOWFX = true; else if (window.LOWFX && avg < 15) window.LOWFX = false; n = 0; acc = 0; } } last = t; requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
 })();
+withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.canvas === cv) { if (!ox && !oy) return fn(); return prev(col, Math.min(blur, 6), ox, oy, fn); } return prev(col, blur, ox, oy, fn); })(withShadow);
 
 // =====================================================================
 //  PILE POIL — pages légales (mentions, conditions de vente, confidentialité)
