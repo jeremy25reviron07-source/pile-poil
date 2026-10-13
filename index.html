@@ -2481,7 +2481,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -3345,6 +3345,7 @@ const SKINS = [
   { id: 'noir', name: 'Noir carbone', col: '#3a3f46', dark: '#1d2026', trolley: '#ffc21a', price: 2200 },
   { id: 'or', name: 'Or massif', col: '#ffd447', dark: '#b8860b', trolley: '#1d2026', price: 4000 },
   { id: 'chrome', name: 'Chrome', col: '#d3dbe2', dark: '#7d8892', trolley: '#1d2026', price: 0, shop: true },
+  { id: 'neon', name: 'Néon', col: '#39ff9f', dark: '#0b8f63', trolley: '#ff3df2', price: 0, crate: true },
 ];
 const UPGRADES = [
   { id: 'casque', name: 'Casque de réserve', desc: '4 vies par checkpoint au lieu de 3', price: 2500, icon: 'worker' },
@@ -3471,14 +3472,14 @@ function wrapText(s, x, y, maxW, lh, col, size) { c.font = `700 ${size}px Inter`
 function drawStyle() {
   txt('PEINTURE DES GRUES', 60, 234, '#ffc21a', 24, 900);
   SKINS.forEach((sk, i) => {
-    const x = 60 + i * 226, y = 254, w = 212, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
+    const st = Math.floor(1800 / SKINS.length), x = 60 + i * st, y = 254, w = st - 14, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
     rr(x, y, w, h, 18); c.fillStyle = eq ? 'rgba(60,242,155,.18)' : 'rgba(12,18,32,.84)'; c.fill();
     rr(x, y, w, h, 18); c.strokeStyle = eq ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 4 : 2; c.stroke();
     const sx = x + 22, sy = y + 22; fillR(sx, sy, w - 44, 9, sk.col); fillR(sx, sy + 32, w - 44, 9, sk.col);
     c.strokeStyle = sk.dark; c.lineWidth = 3; c.beginPath(); for (let xx = sx; xx < sx + w - 54; xx += 24) { c.moveTo(xx, sy + 36); c.lineTo(xx + 12, sy + 5); c.lineTo(xx + 24, sy + 36); } c.stroke();
     rr(x + w / 2 - 22, sy + 48, 44, 16, 4); c.fillStyle = sk.trolley; c.fill();
     txt(sk.name, x + w / 2, y + 108, '#fff', 19, 800, 'center');
-    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 136, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 136, '#9fd6ff', 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 136, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 138, sk.price, save.coins >= sk.price, 18);
+    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 136, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 136, '#9fd6ff', 17, 900, 'center'); else if (sk.crate) txt('🎁 CAISSE', x + w / 2, y + 136, '#39ff9f', 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 136, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 138, sk.price, save.coins >= sk.price, 18);
     G.buttons.push({ id: 'sk_' + sk.id, x, y, w, h });
   });
   // nom de l'entreprise
@@ -4135,7 +4136,7 @@ function purchaseInfo(id) {
   let mt;
   if ((mt = id.match(/^buy_(\w+)_(\w+)$/))) { const m = modelOf(mt[1], mt[2]); if (save.owned.includes(m.id) || (save.maxLevel || 1) < m.req) return null; return { name: m.name, price: m.price }; }
   if ((mt = id.match(/^up_(\w+)_(\w+)$/))) { const cost = upgCost(mt[1], mt[2]); if (!cost) return null; const m = modelOf(mt[1], mt[2]); return { name: `Amélioration ${(save.clvl[m.id] || 0) + 1}/3 · ${m.name}`, price: cost }; }
-  if (id.startsWith('sk_')) { const sk = SKINS.find(s => s.id === id.slice(3)); if (!sk || save.skins.includes(sk.id)) return null; return sk.shop ? { name: `Peinture ${sk.name}`, shopOnly: true } : { name: `Peinture ${sk.name}`, price: sk.price }; }
+  if (id.startsWith('sk_')) { const sk = SKINS.find(s => s.id === id.slice(3)); if (!sk || save.skins.includes(sk.id)) return null; return sk.crate ? { name: `Peinture ${sk.name}`, crateOnly: true } : sk.shop ? { name: `Peinture ${sk.name}`, shopOnly: true } : { name: `Peinture ${sk.name}`, price: sk.price }; }
   if (id.startsWith('of_')) { const o = OUTFITS.find(s => s.id === id.slice(3)); if (!o || save.outfits.includes(o.id)) return null; return { name: `Tenue ${o.name}`, price: o.price }; }
   if (id.startsWith('ug_')) { const u = UPGRADES.find(s => s.id === id.slice(3)); if (!u || hasUpg(u.id)) return null; return { name: u.name, price: u.price }; }
   return null;
@@ -4150,6 +4151,7 @@ act = (prev => function (id) {
   if (id.startsWith('of_buy_')) return askPay(OFFERS.find(o => o.id === id.slice(7)));
   const info = purchaseInfo(id);
   if (info && !SH.confirmed) {
+    if (info.crateOnly) return modal({ title: 'EXCLUSIVITÉ CAISSE', lines: [`${info.name} se gagne seulement dans la caisse du chantier.`, 'Une caisse gratuite chaque jour sur l\'accueil !'], yes: 'OK', no: null });
     if (info.shopOnly) return modal({ title: 'EXCLUSIVITÉ BOUTIQUE', lines: [`${info.name} n'existe que dans le Pack Démarrage.`], yes: 'VOIR LA BOUTIQUE', onYes: () => act('shop') });
     if (save.coins < info.price) return modal({ title: 'PIÈCES INSUFFISANTES', lines: [info.name, `Il te manque ${(info.price - save.coins).toLocaleString('fr-FR')} pièces.`, 'Continue à jouer, ou passe par la boutique.'], yes: 'BOUTIQUE', onYes: () => act('shop'), no: 'PLUS TARD' });
     return modal({ title: 'CONFIRMER L\'ACHAT', lines: [info.name], price: info.price, yes: 'ACHETER', onYes: () => { SH.confirmed = true; try { act(id); } finally { SH.confirmed = false; } } });
@@ -4971,7 +4973,7 @@ drawTitle = function () {
     ['catDefis', 'violet', 'swords', 'DUELS', 'En direct ou chacun son tour', (typeof tdPendingCount === 'function' && tdPendingCount()) ? `${tdPendingCount()} À TOI` : null],
     ['garage', 'blue', 'crane', 'GARAGE', 'Grues, peinture, équipement', null],
     ['shop', 'gold', 'cart', 'BOUTIQUE', 'Packs de pièces', save.starterBought ? null : 'PROMO'],
-    ['board', 'slate', 'trophy', 'CLASSEMENTS', WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour', null],
+    ['board', 'slate', 'trophy', 'CLASSEMENTS', (typeof crateNews === 'function' && crateNews()) || (WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour'), null],
   ];
   rows.forEach(([id, col, ic, title, sub, badge], i) => {
     const rx = 1080, ry = 184 + i * 170, rw = 720, rh = 144, d = relief(rx, ry, rw, rh, CARD[col][0], CARD[col][1], RAD, 10), tc = col === 'gold' ? '#2a1a00' : '#fff';
@@ -5434,6 +5436,287 @@ Object.assign(EN, {
   'QUITTER TON LANCER ?': 'QUIT YOUR DROP?', 'Ce lancer comptera comme raté (une vie en moins).': 'This drop will count as a miss (one life lost).',
 });
 EN_RX.push([/^(\d+) victoires?$/, '$1 wins'], [/^(\d+) défaites?$/, '$1 losses'], [/^(\d+) en cours$/, '$1 ongoing'], [/^Envoie le code (.*)$/, 'Send code $1'], [/^code (.*)$/, 'code $1'], [/^(\d+) à toi de jouer$/, '$1 your turn'], [/^(\d+) À TOI$/, '$1 YOUR TURN'], [/^contre (.*)$/, 'vs $1'], [/^Chantier (\d)\/5 · code (.*)$/, 'Site $1/5 · code $2'], [/^\+ (\d+) autres?$/, '+ $1 more'], [/^JOUER MON LANCER · CHANTIER (\d)\/5$/, 'PLAY MY DROP · SITE $1/5'], [/^Au tour de (.*)$/, "$1's turn"], [/^DUEL · (.*)$/, 'DUEL · $1'], [/^(.*) a joué : à toi !$/, '$1 played: your turn!']);
+
+// =====================================================================
+//  PILE POIL — CAISSE DU CHANTIER : 1 caisse gratuite par jour livrée par la grue,
+//  série de 7 jours (caisse dorée), garantie, jackpot annoncé. Tirage côté serveur.
+// =====================================================================
+const CTIER = {
+  commun: ['COMMUN', '#cfd8e3', 'rgba(220,230,240,'], peu: ['PEU COMMUN', '#3cf29b', 'rgba(60,242,155,'],
+  rare: ['RARE', '#5cc4ff', 'rgba(92,196,255,'], epique: ['ÉPIQUE', '#b58bff', 'rgba(181,139,255,'], legend: ['LÉGENDAIRE', '#ffc21a', 'rgba(255,194,26,'],
+};
+// caisse en bois vue de 3/4 : face avant + dessus ; o = { s, crack, glow, golden, lid, rot }
+function crateDraw(cx, cy, o = {}) {
+  const s = o.s || 1, w = 300 * s, h = 230 * s, d = 70 * s, x = cx - w / 2, y = cy - h / 2, g = o.golden;
+  const wood = g ? ['#ffe27a', '#e0a400', '#9a6a00'] : ['#d9a066', '#b07038', '#6e4220'];
+  c.save(); c.translate(cx, cy); c.rotate(o.rot || 0); c.translate(-cx, -cy);
+  // ombre au sol
+  if (o.shadow !== false) ell(cx + 10 * s, y + h + 12 * s, w * .55, 18 * s, 'rgba(0,0,0,.35)');
+  // côté droit (profondeur)
+  c.fillStyle = lg(x + w, 0, x + w + d * .6, 0, [[0, wood[2]], [1, g ? '#7a5200' : '#4e2e16']]);
+  c.beginPath(); c.moveTo(x + w, y); c.lineTo(x + w + d * .6, y - d * .45); c.lineTo(x + w + d * .6, y + h - d * .45); c.lineTo(x + w, y + h); c.fill();
+  // dessus (couvercle)
+  const lid = o.lid || 0;
+  if (lid < 1) {
+    c.save(); c.translate(0, -lid * 260 * s); c.rotate(-lid * .5);
+    c.fillStyle = lg(0, y - d * .45, 0, y, [[0, g ? '#fff0a8' : '#e8b880'], [1, wood[0]]]);
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + d * .6, y - d * .45); c.lineTo(x + w + d * .6, y - d * .45); c.lineTo(x + w, y); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 2 * s; for (let k = 1; k < 4; k++) { const t = k / 4; c.beginPath(); c.moveTo(x + w * t, y); c.lineTo(x + w * t + d * .6, y - d * .45); c.stroke(); }
+    c.restore();
+  }
+  // face avant : 4 planches
+  c.save(); rr(x, y, w, h, 6 * s); c.clip();
+  for (let k = 0; k < 4; k++) { const py = y + k * h / 4; fillR(x, py, w, h / 4, lg(0, py, 0, py + h / 4, [[0, wood[0]], [1, wood[1]]])); fillR(x, py + h / 4 - 3 * s, w, 3 * s, 'rgba(0,0,0,.28)');
+    if (!g) { c.strokeStyle = 'rgba(90,50,20,.25)'; c.lineWidth = 1.5 * s; for (let q = 0; q < 3; q++) { c.beginPath(); c.moveTo(x, py + 12 * s + q * 14 * s); c.bezierCurveTo(x + w * .3, py + 6 * s + q * 14 * s, x + w * .6, py + 20 * s + q * 14 * s, x + w, py + 10 * s + q * 14 * s); c.stroke(); } } }
+  // croisillon en Z
+  c.strokeStyle = g ? '#b98200' : '#8a5428'; c.lineWidth = 26 * s; c.beginPath(); c.moveTo(x + 20 * s, y + h - 20 * s); c.lineTo(x + w - 20 * s, y + 20 * s); c.stroke();
+  c.strokeStyle = g ? 'rgba(255,240,180,.4)' : 'rgba(255,220,170,.25)'; c.lineWidth = 3 * s; c.beginPath(); c.moveTo(x + 14 * s, y + h - 30 * s); c.lineTo(x + w - 30 * s, y + 14 * s); c.stroke();
+  // fissures + lumière qui s'échappe
+  if (o.crack) {
+    const cr = [[[.18, .08], [.3, .3], [.24, .5], [.36, .72]], [[.62, .2], [.55, .42], [.68, .6], [.6, .92]], [[.42, .3], [.5, .48], [.44, .66]]];
+    for (let k = 0; k < Math.min(3, o.crack); k++) {
+      const pts = cr[k].map(([a, b]) => [x + a * w, y + b * h]);
+      if (o.glow) { c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = o.glow + '.9)'; c.shadowColor = o.glow + '1)'; c.shadowBlur = 30 * s; c.lineWidth = 7 * s; c.beginPath(); pts.forEach(([a, b], i) => i ? c.lineTo(a, b) : c.moveTo(a, b)); c.stroke(); c.restore(); }
+      c.strokeStyle = o.glow ? '#fff' : 'rgba(40,20,5,.8)'; c.lineWidth = 2.5 * s; c.beginPath(); pts.forEach(([a, b], i) => i ? c.lineTo(a, b) : c.moveTo(a, b)); c.stroke();
+    }
+  }
+  c.restore();
+  // bande de signalisation + pochoir
+  c.save(); rr(x, y + h * .5 - 24 * s, w, 48 * s, 0); c.clip(); for (let k = -2; k < 16; k++) { c.fillStyle = k % 2 ? '#1b1b1b' : '#ffc21a'; c.beginPath(); c.moveTo(x + k * 26 * s, y + h * .5 + 24 * s); c.lineTo(x + k * 26 * s + 26 * s, y + h * .5 + 24 * s); c.lineTo(x + k * 26 * s + 50 * s, y + h * .5 - 24 * s); c.lineTo(x + k * 26 * s + 24 * s, y + h * .5 - 24 * s); c.fill(); } c.restore();
+  rr(cx - 100 * s, y + h * .5 - 20 * s, 200 * s, 40 * s, 6 * s); c.fillStyle = 'rgba(20,20,20,.88)'; c.fill();
+  txt(g ? 'CAISSE DORÉE' : 'PILE POIL', cx, y + h * .5 + 10 * s, g ? '#ffd84f' : '#ffc21a', 26 * s, 900, 'center');
+  txt('↑ HAUT · FRAGILE', cx, y + 34 * s, g ? 'rgba(90,60,0,.75)' : 'rgba(60,30,10,.65)', 15 * s, 900, 'center');
+  // cornières métal + rivets
+  [[x, y], [x + w - 34 * s, y], [x, y + h - 34 * s], [x + w - 34 * s, y + h - 34 * s]].forEach(([a, b]) => { rr(a, b, 34 * s, 34 * s, 4 * s); c.fillStyle = lg(a, b, a + 34 * s, b + 34 * s, [[0, '#e3e8ee'], [1, '#7e8794']]); c.fill(); ell(a + 17 * s, b + 17 * s, 4 * s, 4 * s, '#4b5563'); });
+  c.restore();
+}
+function crRays(cx, cy, col, a = .5, r = 700, n = 16) {
+  c.save(); c.globalCompositeOperation = 'lighter'; c.translate(cx, cy); c.rotate(G.t * .1);
+  for (let k = 0; k < n; k++) { c.rotate(Math.PI * 2 / n); c.fillStyle = lg(0, 0, r, 0, [[0, col + a + ')'], [1, col + '0)']]); c.beginPath(); c.moveTo(0, 0); c.lineTo(r, -r * .09); c.lineTo(r, r * .09); c.fill(); }
+  c.restore(); fillR(0, 0, W, H, rg(cx, cy, 0, r * .8, [[0, col + (a * .8) + ')'], [1, col + '0)']]));
+}
+function crDim(a = .72) { fillR(0, 0, W, H, `rgba(4,6,16,${a})`); }
+function crPill(xc, y, t, bg, fg, size = 24) { c.font = `900 ${size}px Inter`; const w = c.measureText(t).width + size * 1.6; rr(xc - w / 2, y, w, size * 1.9, size * .95); c.fillStyle = bg; c.fill(); txt(t, xc, y + size * 1.32, fg, size, 900, 'center'); }
+function crStreak(x, y, w, today, claimed) {   // bandeau 7 jours
+  const cw = (w - 6 * 14) / 7;
+  for (let k = 0; k < 7; k++) { const cx = x + k * (cw + 14), done = k < claimed, now = k === today, gold = k === 6;
+    rr(cx, y, cw, 150, 26); c.fillStyle = now ? 'rgba(255,194,26,.18)' : 'rgba(255,255,255,.06)'; c.fill(); if (now) { c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke(); }
+    txt(`JOUR ${k + 1}`, cx + cw / 2, y + 30, now ? '#ffc21a' : PAL.sub, 18, 900, 'center');
+    crateDraw(cx + cw / 2, y + 88, { s: .2, golden: gold, shadow: false });
+    if (done) { c.fillStyle = 'rgba(8,14,30,.55)'; rr(cx, y, cw, 150, 26); c.fill(); ell(cx + cw / 2, y + 88, 22, 22, '#16a463'); ICN.check(cx + cw / 2, y + 88, '#fff', 1); }
+    txt(gold ? 'DORÉE' : done ? 'OUVERTE' : now ? 'AUJOURD\'HUI' : '', cx + cw / 2, y + 138, gold ? '#ffc21a' : done ? '#3cf29b' : '#fff', 15, 900, 'center'); }
+}
+function crCoins(cx, cy, n, spread, seedv = 3) { let sd = seedv; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < n; k++) { const a = r() * Math.PI * 2, d = r() * spread; coinIcon(cx + Math.cos(a) * d * 1.4, cy + Math.sin(a) * d * .8 - r() * 60, 14 + r() * 14); } }
+function crConfetti(n, seedv = 9) { let sd = seedv; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647; const cols = ['#ffc21a', '#3cf29b', '#5cc4ff', '#ff6b5b', '#b58bff', '#fff'];
+  for (let k = 0; k < n; k++) { c.save(); c.translate(r() * W, r() * H * .85); c.rotate(r() * 6); c.fillStyle = cols[k % 6]; c.fillRect(-7, -3, 14, 6); c.restore(); } }
+
+
+// ---------- état ----------
+const CR = { st: null, busy: false, phase: null, t0: 0, hits: 0, hitT: -9, res: null, feed: [], feedAt: 0, stAt: 0 };
+const crAvail = () => CR.st ? (CR.st.free ? 1 : 0) + (CR.st.extra || 0) : 0;
+const CR_PRIZE = { c10: '10 PIÈCES', c20: '20 PIÈCES', c30: '30 PIÈCES', c50: '50 PIÈCES', c75: '75 PIÈCES', c100: '100 PIÈCES', c150: '150 PIÈCES', c250: '250 PIÈCES', bonus: 'CAISSE BONUS', neon: 'PEINTURE NÉON', neon_dup: '300 PIÈCES', jackpot: 'JACKPOT' };
+const CR_TIER_ORDER = ['commun', 'peu', 'rare', 'epique', 'legend'];
+
+// ---------- serveur (Supabase) ou démo locale ----------
+const CRDB = SB ? {
+  async status() { const { data, error } = await SB.rpc('crate_status', { p_pid: save.pid }); if (error) throw new Error(error.message); return data; },
+  async bonus() { const { data, error } = await SB.rpc('crate_bonus', { p_pid: save.pid }); if (error) throw new Error(error.message); return data; },
+  async open() { const { data, error } = await SB.rpc('crate_open', { p_pid: save.pid, p_name: playerName() || ACC.name || '', p_has_neon: save.skins.includes('neon') }); if (error) throw new Error(error.message); return data; },
+  async feed() { const { data, error } = await SB.rpc('crate_feed'); if (error) throw new Error(error.message); return data || []; },
+} : {
+  _r() { try { return JSON.parse(localStorage.getItem('ppdemo_crate')) || {}; } catch (e) { return {}; } },
+  _w(o) { try { localStorage.setItem('ppdemo_crate', JSON.stringify(o)); } catch (e) {} },
+  _day(off = 0) { const d = new Date(todayKey() + 'T12:00:00'); d.setDate(d.getDate() + off); return d.toISOString().slice(0, 10); },
+  async status() { const r = this._r(), d = this._day(), y = this._day(-1); const st = r.last && r.last >= y ? r.streak : 0;
+    return { free: !r.last || r.last < d, extra: r.extra || 0, streak: st, next: r.last === d ? st : (st % 7) + 1, pity: r.pity || 0 }; },
+  async bonus() { const r = this._r(), d = this._day(); if (r.bonus !== d) { r.extra = Math.min(5, (r.extra || 0) + 1); r.bonus = d; this._w(r); } return this.status(); },
+  async open() {
+    const r = this._r(), d = this._day(), free = !r.last || r.last < d; if (!free && !(r.extra > 0)) throw new Error('Plus de caisse aujourd\'hui : reviens demain !');
+    const st = free ? (r.last === this._day(-1) ? ((r.streak || 0) % 7) + 1 : 1) : r.streak, golden = free && st === 7;
+    let roll = Math.floor(Math.random() * 10000); if (!golden && (r.pity || 0) >= 9) roll = 7800 + Math.floor(Math.random() * 2200);
+    const T2 = golden ? [[5000, 'c100'], [8000, 'c150'], [9000, 'c250'], [9600, 'bonus'], [9850, 'neon'], [1e9, 'jackpot']] : [[2500, 'c10'], [4800, 'c20'], [6700, 'c30'], [7800, 'c50'], [8700, 'c75'], [9200, 'c100'], [9500, 'c150'], [9620, 'c250'], [9920, 'bonus'], [9970, 'neon'], [1e9, 'jackpot']];
+    let k = T2.find(([lim]) => roll < lim)[1]; if (k === 'neon' && save.skins.includes('neon')) k = 'neon_dup';
+    const coins = { c10: 10, c20: 20, c30: 30, c50: 50, c75: 75, c100: 100, c150: 150, c250: 250, jackpot: 1000, neon_dup: 300 }[k] || 0;
+    const tier = /c10|c20|c30/.test(k) && k.length === 3 ? 'commun' : /c50|c75/.test(k) ? 'peu' : /c100|c150/.test(k) ? 'rare' : /c250|bonus/.test(k) ? 'epique' : 'legend';
+    if (free) { r.last = d; r.streak = st; } else r.extra--; if (k === 'bonus') r.extra = (r.extra || 0) + 1;
+    r.pity = coins >= 75 || k === 'bonus' || k === 'neon' ? 0 : (r.pity || 0) + 1; this._w(r);
+    if (tier === 'legend') { const f = JSON.parse(localStorage.getItem('ppdemo_cfeed') || '[]'); f.unshift({ name: playerName() || 'Toi', prize: k, coins, at: new Date().toISOString() }); localStorage.setItem('ppdemo_cfeed', JSON.stringify(f.slice(0, 5))); }
+    return { key: k, tier, coins, item: k === 'neon' ? 'neon' : null, golden, status: await this.status() };
+  },
+  async feed() { try { return JSON.parse(localStorage.getItem('ppdemo_cfeed') || '[]'); } catch (e) { return []; } },
+};
+async function crRefresh(force) {
+  if (!force && Date.now() - CR.stAt < 60000) return; CR.stAt = Date.now();
+  try { CR.st = await CRDB.status(); } catch (e) {}
+  if (Date.now() - CR.feedAt > 120000 || force) { CR.feedAt = Date.now(); try { CR.feed = await CRDB.feed(); } catch (e) {} }
+}
+setTimeout(() => crRefresh(true), 1200);
+setInterval(() => { if (G.screen === 'title') crRefresh(); }, 5000);
+// +1 caisse en finissant le défi du jour (une fois par jour)
+endRun = (prev => function (done) { const r = prev(done); if (G.mode === 'daily') CRDB.bonus().then(s => { if (s && CR.st && s.extra > CR.st.extra) toast('+1 caisse du chantier !', '#ffc21a'); CR.st = s; }).catch(() => {}); return r; })(endRun);
+// annonce des gros lots (dernières 24 h)
+function crateNews() {
+  const f = (CR.feed || [])[0]; if (!f || Date.now() - new Date(f.at).getTime() > 864e5) return null;
+  return `👑 ${f.name} a décroché ${f.prize === 'jackpot' ? 'le jackpot' : 'la peinture Néon'} !`;
+}
+
+// ---------- sons ----------
+function crSound(kind, tier) {
+  try {
+    if (kind === 'crack') { tone(110, .14, 'sawtooth', .10); tone(70, .2, 'square', .07, .03); tone(900 + Math.random() * 400, .03, 'square', .03, .01); }
+    else if (kind === 'land') { tone(60, .25, 'sine', .14); tone(45, .3, 'triangle', .1, .05); }
+    else if (kind === 'tick') tone(1800, .02, 'square', .015);
+    else if (kind === 'reveal') { const n = CR_TIER_ORDER.indexOf(tier) + 2; for (let k = 0; k < n; k++) tone(523 * Math.pow(1.26, k), .14, 'triangle', .07, k * .09); }
+    else if (kind === 'horn') { tone(330, .45, 'square', .07); tone(415, .45, 'square', .05); tone(262, .7, 'square', .07, .5); tone(330, .7, 'square', .05, .5); }
+  } catch (e) {}
+}
+
+// ---------- ouverture ----------
+async function crateStart() {
+  if (CR.busy) return; await crRefresh(true);
+  if (!crAvail()) { CR.phase = 'info'; CR.res = null; G.screen = 'crate'; return; }
+  CR.busy = true;
+  try {
+    const r = await CRDB.open(); CR.res = r; CR.st = r.status; CR.hits = 0; CR.phase = 'deliver'; CR.t0 = G.t; CR.taken = false; G.screen = 'crate';
+    // la récompense est créditée tout de suite (même si on quitte pendant l'animation), le toast vient à la révélation
+    if (r.coins) { save.coins += r.coins; }
+    if (r.item === 'neon' && !save.skins.includes('neon')) save.skins.push('neon');
+    if (r.tier === 'legend') setTimeout(() => CRDB.feed().then(f => { CR.feed = f; CR.feedAt = Date.now(); }).catch(() => {}), 500);
+    writeSave(save);
+  } catch (e) { toast(e.message, '#ff6b5b'); }
+  CR.busy = false;
+}
+function crGlowTier() {   // la lumière monte de couleur à chaque coup : suspense jusqu'au 3e
+  const real = CR_TIER_ORDER.indexOf(CR.res.tier); const cap = [0, Math.min(real, 1), Math.min(real, 2), real][CR.hits] ?? real;
+  return CR_TIER_ORDER[CR.hits >= 3 ? real : cap];
+}
+
+// ---------- écran ----------
+function crNav(label) { c.font = `400 40px ${TF}`; const w = c.measureText(tr(label)).width + 130; iconBtn('crateBack', 40, 34, w, 84, 'back', label, CARD.slate[0], CARD.slate[1], '#fff', 40); }
+function drawCrateInfo(withStreak) {
+  const st = CR.st || { streak: 0, next: 1 }, opened = CR.st && !CR.st.free;
+  uiPanel(100, 150, 1720, 330);
+  T('Série de 7 jours', 150, 225, '#fff', 50); txt('Reviens chaque jour : le 7ᵉ jour, c\'est la CAISSE DORÉE (que du rare ou mieux).', 150, 270, PAL.sub, 24, 800);
+  crStreak(150, 300, 1620, opened ? st.streak - 1 : st.next - 1, opened ? st.streak : st.next - 1);
+  uiPanel(100, 510, 1060, 520);
+  T('Ce que contient une caisse', 150, 585, '#fff', 44);
+  [['legend', 'Jackpot 1 000 pièces · Peinture Néon (exclusive)', '0,8 %'], ['epique', '250 pièces · Caisse bonus', '4,2 %'], ['rare', '100 ou 150 pièces', '8 %'], ['peu', '50 ou 75 pièces', '20 %'], ['commun', '10, 20 ou 30 pièces', '67 %']].forEach(([k, s, p], i) => {
+    const y = 620 + i * 78, t = CTIER[k]; rr(150, y, 960, 64, 20); c.fillStyle = 'rgba(255,255,255,.05)'; c.fill(); rr(150, y, 12, 64, 6); c.fillStyle = t[1]; c.fill();
+    txt(t[0], 186, y + 41, t[1], 22, 900); txt(s, 400, y + 41, PAL.text, 22, 800); txt(p, 1086, y + 41, '#fff', 24, 900, 'right'); });
+  uiPanel(1190, 510, 630, 520);
+  T('Les règles', 1240, 585, '#fff', 44);
+  ['1 caisse gratuite par jour', '+1 caisse en finissant le défi du jour', 'Garantie : 75 pièces ou plus', 'toutes les 10 caisses au maximum', 'Jackpot annoncé dans le classement', 'Rien à acheter : aucune caisse payante'].forEach((s, i) => { const y = 650 + i * 58; if (i !== 3) { ell(1258, y - 8, 14, 14, 'rgba(60,242,155,.2)'); ICN.check(1258, y - 8, '#3cf29b', .7); } txt(s, 1286, y, i === 3 ? PAL.sub : PAL.text, 23, 800); });
+  if (!crAvail()) txt(`Prochaine caisse dans ${untilMidnight()}`, 1525, 990, '#ffc21a', 24, 900, 'center');
+  else iconBtn('crateGo', 1300, 950, 450, 70, 'play', 'OUVRIR MA CAISSE', PAL.gold[0], PAL.gold[1], '#2a1a00', 30);
+}
+function drawCrate() {
+  const t = G.t, e = t - CR.t0, R = CR.res;
+  screenBg(); fillR(0, 0, W, H, lg(0, 0, 0, H, [[0, 'rgba(5,8,22,.78)'], [1, 'rgba(4,6,16,.88)']]));
+  if (CR.phase === 'info' || !R) { crNav('CAISSE DU JOUR'); drawCrateInfo(true); return; }
+  const golden = R.golden, gt = crGlowTier(), gcol = CTIER[gt][2];
+  if (CR.phase === 'deliver') {
+    titleCrane(t, 960);
+    const k = clamp(e / 1.7, 0, 1), ease = 1 - Math.pow(1 - k, 3), cy = -260 + (640 - -260) * ease, sw = Math.sin(t * 2.2) * .05 * (1 - k);
+    if (Math.floor(e * 10) !== Math.floor((e - G.dt) * 10) && k < 1) crSound('tick');
+    c.save(); c.translate(960, 180); c.rotate(sw);
+    const cc = cy - 180, hookY = cc - 300; ln(-5, -18, -5, hookY, '#dfe7f0', 3); ln(5, -18, 5, hookY, '#dfe7f0', 3);
+    rr(-24, hookY, 48, 36, 8); c.fillStyle = lg(-24, 0, 24, 0, [[0, '#ff6a5a'], [1, '#c82536']]); c.fill();
+    ln(0, hookY + 46, -160, cc - 132, 'rgba(230,236,244,.9)', 3); ln(0, hookY + 46, 195, cc - 165, 'rgba(230,236,244,.9)', 3);
+    crateDraw(0, cy - 180, { s: 1.15, golden, shadow: false });
+    c.restore();
+    rr(700, 762, 520, 26, 6); c.fillStyle = '#8a6234'; c.fill();
+    T(golden ? 'CAISSE DORÉE !' : 'LIVRAISON DU JOUR', 960, 930, golden ? '#ffd84f' : '#fff', 70, 'center');
+    txt('Le grutier dépose ta caisse…', 960, 985, PAL.sub, 30, 800, 'center');
+    if (k >= 1) { CR.phase = 'force'; CR.t0 = t; crSound('land'); FX.shake = 10; }
+    return;
+  }
+  // caisse posée sur la palette
+  const sh = Math.max(0, .25 - (t - CR.hitT)) * 40, ox = (Math.random() - .5) * sh, rot = (Math.random() - .5) * sh * .002;
+  if (CR.phase === 'force') {
+    if (CR.hits) fillR(0, 0, W, H, rg(960, 600, 0, 650, [[0, gcol + (.12 + CR.hits * .06) + ')'], [1, gcol + '0)']]));
+    crNav(golden ? 'CAISSE DORÉE' : 'CAISSE DU JOUR');
+    const st = CR.st || { streak: 1 }; crStreak(410, 140, 1100, st.streak - 1, st.streak - 1);
+    rr(700, 762, 520, 26, 6); c.fillStyle = '#8a6234'; c.fill(); [0, 1, 2].forEach(q => fillR(720 + q * 220, 788, 40, 22, '#6b4a28'));
+    crateDraw(960 + ox, 640, { s: 1.15, crack: CR.hits, glow: CR.hits ? gcol : null, golden, rot });
+    // pied-de-biche qui frappe
+    const sw2 = Math.max(0, .18 - (t - CR.hitT)) / .18; c.save(); c.translate(1230, 560); c.rotate(-.7 + sw2 * .5); rr(-10, -150, 20, 300, 10); c.fillStyle = lg(-10, 0, 10, 0, [[0, '#9aa6b5'], [1, '#4b5563']]); c.fill(); c.strokeStyle = '#c0392b'; c.lineWidth = 20; c.beginPath(); c.arc(-26, -150, 26, 0, Math.PI, true); c.stroke(); c.restore();
+    if (t - CR.hitT < .5) txt('CRAC !', 1250, 430, '#fff', 44 + (1 - (t - CR.hitT) * 2) * 20, 900, 'center');
+    const pu = 1 + Math.sin(t * 5) * .03; c.save(); c.translate(960, 890); c.scale(pu, pu); T('Touche pour forcer la caisse', 0, 10, '#fff', 54, 'center'); c.restore();
+    [0, 1, 2].forEach(q => ell(910 + q * 50, 950, 14, 14, q < CR.hits ? '#ffc21a' : 'rgba(255,255,255,.15)'));
+    if (CR.hits) txt('La couleur de la lumière annonce la rareté…', 960, 1010, CTIER[gt][1], 24, 800, 'center');
+    G.buttons.unshift({ id: 'crateBack', x: 40, y: 34, w: 400, h: 84 }); G.buttons.push({ id: 'crateHit', x: 0, y: 120, w: W, h: H - 120 });
+    return;
+  }
+  // révélation
+  const tier = CTIER[R.tier], legend = R.tier === 'legend', k = clamp(e / .6, 0, 1);
+  crRays(960, 560, tier[2], legend ? .5 : .32 + (R.tier === 'epique' ? .1 : 0), legend ? 900 : 760, legend ? 20 : 16);
+  if (legend) crConfetti(140, Math.floor(t * 8));
+  crNav(golden ? 'CAISSE DORÉE' : 'CAISSE DU JOUR');
+  rr(golden ? 560 : 700, 762, golden ? 800 : 520, 26, 6); c.fillStyle = '#8a6234'; c.fill();
+  crateDraw(960, 650, { s: 1.15, lid: k, golden, crack: 3, glow: tier[2] });
+  const ny = { commun: 8, peu: 14, rare: 26, epique: 36, legend: 60 }[R.tier];
+  if (R.coins) crCoins(960, 600 - k * 10, Math.round(ny * k), 70 + k * 90, 7);
+  const pop = Math.min(1, e / .35), sc = .6 + .4 * pop + Math.max(0, Math.sin(e * 9) * .05 * (1 - Math.min(1, e)));
+  c.save(); c.translate(960, 0); c.scale(sc, sc); c.translate(-960, 0);
+  crPill(960, legend ? 120 : 150, legend ? '👑 ' + tier[0] : tier[0], R.tier === 'commun' ? 'rgba(255,255,255,.18)' : tier[1], R.tier === 'commun' || R.tier === 'rare' || R.tier === 'epique' ? '#fff' : '#2a1a00', 30);
+  if (R.key === 'jackpot') { T('JACKPOT', 960, 290, '#ffd84f', 130, 'center'); T('1 000 PIÈCES', 960, 390, '#fff', 70, 'center'); }
+  else if (R.key === 'neon') { T('PEINTURE NÉON', 960, 300, '#39ff9f', 100, 'center'); txt('Exclusive : à équiper dans Garage · Peinture & tenue', 960, 360, '#fff', 28, 800, 'center'); }
+  else if (R.key === 'bonus') { T('CAISSE BONUS !', 960, 300, '#c9b3ff', 100, 'center'); txt('Une caisse de plus à ouvrir tout de suite', 960, 360, '#fff', 28, 800, 'center'); }
+  else { T(CR_PRIZE[R.key], 960, 330, '#fff', 110, 'center'); if (R.key === 'neon_dup') txt('Tu as déjà la peinture Néon : elle est convertie en pièces', 960, 380, '#fff', 24, 800, 'center'); }
+  c.restore();
+  if (e > .6) {
+    const more = crAvail() > 0;
+    iconBtn('crateTake', more ? 460 : 710, 870, 500, 116, null, 'RÉCUPÉRER', legend ? PAL.gold[0] : PAL.play[0], legend ? PAL.gold[1] : PAL.play[1], legend ? '#2a1a00' : '#fff', 52);
+    if (more) iconBtn('crateNext', 1000, 870, 460, 116, 'play', `CAISSE SUIVANTE (${crAvail()})`, PAL.gold[0], PAL.gold[1], '#2a1a00', 38);
+    const p = CR.st ? CR.st.pity || 0 : 0; txt(`Garantie : 75 pièces ou plus dans ${Math.max(1, 10 - p)} caisse${10 - p > 1 ? 's' : ''} maximum`, 960, 1030, PAL.sub, 22, 800, 'center');
+  }
+}
+function crTake() {
+  if (!CR.res || CR.taken) return; CR.taken = true; const R = CR.res;
+  if (R.coins) toast(`+${R.coins.toLocaleString('fr-FR')} pièces · caisse du chantier`, '#ffd447');
+  if (R.item === 'neon') toast('Peinture Néon débloquée !', '#39ff9f');
+}
+
+// ---------- accueil : la caisse pend à un 2e crochet sous la flèche ----------
+drawTitle = (prev => function () {
+  prev();
+  const n = crAvail(), hx = 985, hy = 160, sw = Math.sin(G.t * 1.3) * (n ? .04 : .015), on = n > 0;
+  c.save(); c.translate(hx, hy); c.rotate(sw);
+  rr(-30, -6, 60, 20, 6); c.fillStyle = '#e8edf3'; c.fill();
+  ln(-4, 14, -4, 70, '#dfe7f0', 2.5); ln(4, 14, 4, 70, '#dfe7f0', 2.5);
+  rr(-16, 70, 32, 24, 6); c.fillStyle = '#e0392b'; c.fill();
+  ln(0, 94, -46, 128, 'rgba(230,236,244,.9)', 2.5); ln(0, 94, 46, 128, 'rgba(230,236,244,.9)', 2.5);
+  if (on) { const pr = (G.t % 1.4) / 1.4; c.strokeStyle = `rgba(255,194,26,${.8 * (1 - pr)})`; c.lineWidth = 5; c.beginPath(); c.arc(0, 180, 70 + pr * 40, 0, 7); c.stroke(); }
+  if (!on) c.globalAlpha = .6;
+  crateDraw(0, 182, { s: .36, shadow: false, golden: on && CR.st && CR.st.free && CR.st.next === 7 });
+  c.restore();
+  if (on) { crPill(hx, 262, tr('CAISSE DU JOUR'), '#ffc21a', '#2a1a00', 17); ell(hx + 62, 132, 18, 18, '#e0392b'); txt(String(n), hx + 62, 140, '#fff', 20, 900, 'center'); }
+  else crPill(hx, 262, `${tr('Demain')} · ${untilMidnight()}`, 'rgba(255,255,255,.12)', '#cfd8e3', 15);
+  G.buttons.unshift({ id: 'crate', x: hx - 75, y: hy - 10, w: 150, h: 300 });
+})(drawTitle);
+drawOnline = (prev => function () { if (G.screen === 'crate') drawCrate(); else prev(); })(drawOnline);
+act = (prev => function (id) {
+  if (id === 'crate' || id === 'crateGo') { sfx.click(); crateStart(); return; }
+  if (id === 'crateHit') { if (CR.phase !== 'force' || G.t - CR.hitT < .22) return; CR.hits++; CR.hitT = G.t; crSound('crack'); if (typeof buzz === 'function') buzz(30);
+    if (CR.hits >= 3) { CR.phase = 'reveal'; CR.t0 = G.t + .25; setTimeout(() => { crSound(CR.res.key === 'jackpot' ? 'horn' : 'reveal', CR.res.tier); }, 250); } return; }
+  if (id === 'crateTake') { sfx.click(); crTake(); CR.phase = null; CR.res = null; G.screen = 'title'; return; }
+  if (id === 'crateNext') { crTake(); CR.res = null; crateStart(); return; }
+  if (id === 'crateBack') { sfx.click(); if (CR.res && !CR.taken) crTake(); CR.phase = null; CR.res = null; G.screen = 'title'; return; }
+  return prev(id);
+})(act);
+addEventListener('keydown', ev => { if (G.screen !== 'crate' || MO) return; if (ev.key === 'Escape') act('crateBack'); else if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); if (CR.phase === 'force') act('crateHit'); } });
+
+Object.assign(EN, {
+  'CAISSE DU JOUR': 'DAILY CRATE', 'Demain': 'Tomorrow', 'CAISSE DORÉE': 'GOLDEN CRATE', 'CAISSE DORÉE !': 'GOLDEN CRATE!', 'LIVRAISON DU JOUR': "TODAY'S DELIVERY", 'Le grutier dépose ta caisse…': 'The crane operator drops your crate…',
+  'Touche pour forcer la caisse': 'Tap to force the crate open', 'La couleur de la lumière annonce la rareté…': 'The colour of the light reveals the rarity…', 'RÉCUPÉRER': 'COLLECT', 'CRAC !': 'CRACK!',
+  'Série de 7 jours': '7-day streak', 'Reviens chaque jour : le 7ᵉ jour, c\'est la CAISSE DORÉE (que du rare ou mieux).': 'Come back every day: day 7 is the GOLDEN CRATE (rare or better only).', 'Ce que contient une caisse': "What's in a crate", 'Les règles': 'Rules',
+  'Jackpot 1 000 pièces · Peinture Néon (exclusive)': 'Jackpot 1,000 coins · Neon paint (exclusive)', '250 pièces · Caisse bonus': '250 coins · Bonus crate', '100 ou 150 pièces': '100 or 150 coins', '50 ou 75 pièces': '50 or 75 coins', '10, 20 ou 30 pièces': '10, 20 or 30 coins',
+  '1 caisse gratuite par jour': '1 free crate per day', '+1 caisse en finissant le défi du jour': '+1 crate for finishing the daily challenge', 'Garantie : 75 pièces ou plus': 'Guaranteed: 75 coins or more', 'toutes les 10 caisses au maximum': 'at least every 10 crates', 'Jackpot annoncé dans le classement': 'Jackpot announced on the leaderboard', 'Rien à acheter : aucune caisse payante': 'Nothing to buy: no paid crates',
+  'OUVRIR MA CAISSE': 'OPEN MY CRATE', 'PEINTURE NÉON': 'NEON PAINT', 'CAISSE BONUS !': 'BONUS CRATE!', 'JACKPOT': 'JACKPOT', 'Exclusive : à équiper dans Garage · Peinture & tenue': 'Exclusive: equip it in Garage · Paint & outfit', 'Une caisse de plus à ouvrir tout de suite': 'One more crate to open right now', 'Tu as déjà la peinture Néon : elle est convertie en pièces': 'You already have the Neon paint: converted to coins',
+  'COMMUN': 'COMMON', 'PEU COMMUN': 'UNCOMMON', 'RARE': 'RARE', 'ÉPIQUE': 'EPIC', 'LÉGENDAIRE': 'LEGENDARY', 'OUVERTE': 'OPENED', "AUJOURD'HUI": 'TODAY', 'DORÉE': 'GOLDEN', 'Néon': 'Neon', '+1 caisse du chantier !': '+1 site crate!', 'Peinture Néon débloquée !': 'Neon paint unlocked!',
+});
+EN_RX.push([/^JOUR (\d)$/, 'DAY $1'], [/^(\d+) PIÈCES$/, '$1 COINS'], [/^1 000 PIÈCES$/, '1,000 COINS'], [/^CAISSE SUIVANTE \((\d+)\)$/, 'NEXT CRATE ($1)'], [/^Prochaine caisse dans (.*)$/, 'Next crate in $1'], [/^Garantie : 75 pièces ou plus dans (\d+) caisses? maximum$/, 'Guaranteed 75+ coins within $1 crate(s)'], [/^👑 (.*) a décroché le jackpot !$/, '👑 $1 hit the jackpot!'], [/^👑 (.*) a décroché la peinture Néon !$/, '👑 $1 won the Neon paint!'], [/^\+(.*) pièces · caisse du chantier$/, '+$1 coins · site crate']);
 
 // =====================================================================
 //  PILE POIL — REMISE À ZÉRO DE SAISON (une seule fois par appareil)

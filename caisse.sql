@@ -1,0 +1,2 @@
+-- Caisse du chantier (déjà appliqué sur Supabase le 13/10/2026, migration « caisse_du_chantier »)
+-- Tables crates + crate_log ; fonctions crate_status / crate_bonus / crate_open / crate_feed
