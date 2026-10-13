@@ -4879,16 +4879,15 @@ function truss(x0, x1, y, h, col, dk) {   // poutre treillis horizontale
 function beacon(x, y, t, ph = 0) { const on = Math.sin(t * 3.2 + ph) > .2; if (on) ell(x, y, 22, 22, 'rgba(255,60,60,.18)'); ell(x, y, 6, 6, on ? '#ff4a4a' : '#5a1a1a'); }
 function titleCrane(t, trolleyX) {
   const Y = 122, JH = 34, MX = 1050, MW = 44, col = '#ffc21a', dk = '#b98200';
-  // mât (visible entre la carte et la colonne) et tête de mât
+  // tête de mât
   c.save(); c.globalAlpha = .95;
-  fillR(MX - MW / 2, Y + JH, 6, H, col); fillR(MX + MW / 2 - 6, Y + JH, 6, H, col);
-  c.strokeStyle = dk; c.lineWidth = 3; c.beginPath(); for (let y = Y + JH; y < H; y += MW) { c.moveTo(MX - MW / 2 + 3, y); c.lineTo(MX + MW / 2 - 3, y + MW / 2); c.lineTo(MX - MW / 2 + 3, y + MW); } c.stroke();
+  // (pas de mât sous la flèche : seulement le haut de la grue)
   c.fillStyle = col; c.beginPath(); c.moveTo(MX - MW / 2, Y); c.lineTo(MX - 4, Y - 70); c.lineTo(MX + 4, Y - 70); c.lineTo(MX + MW / 2, Y); c.fill();
   c.fillStyle = 'rgba(11,16,32,.9)'; c.beginPath(); c.moveTo(MX - MW / 2 + 8, Y); c.lineTo(MX, Y - 52); c.lineTo(MX + MW / 2 - 8, Y); c.fill();
   // tirants
   c.strokeStyle = 'rgba(220,230,240,.55)'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(MX, Y - 70); c.lineTo(160, Y); c.moveTo(MX, Y - 70); c.lineTo(560, Y); c.moveTo(MX, Y - 70); c.lineTo(1880, Y); c.stroke();
   // flèche (vers la gauche) et contre-flèche (vers la droite)
-  truss(-40, MX - MW / 2, Y, JH, col, dk); truss(MX + MW / 2, 1900, Y, JH, col, dk);
+  truss(-40, 1900, Y, JH, col, dk); rr(MX - MW / 2 - 6, Y - 4, MW + 12, JH + 12, 6); c.fillStyle = dk; c.fill();
   // lest de contre-flèche
   for (let k = 0; k < 3; k++) { rr(1800 + k * 34 - 34, Y + JH + 2, 30, 66, 4); c.fillStyle = lg(0, Y + JH, 0, Y + JH + 66, [[0, '#9aa4b2'], [1, '#5d6676']]); c.fill(); }
   // cabine
