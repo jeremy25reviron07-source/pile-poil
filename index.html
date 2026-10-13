@@ -2263,7 +2263,7 @@ function drawLevel(lvl) {
   drawAccident(lvl);
   c.filter = 'none';
   // helpers: trajectory preview during apprenticeship
-  if (lvl.phase === 'hang' && (C.t === 0 || laserOn())) {
+  if (lvl.phase === 'hang' && C.t === 0) {
     let pts = predict(lvl); if (C.t !== 0) pts = pts.slice(0, Math.ceil(pts.length * .4)); c.save(); c.fillStyle = 'rgba(255,255,255,.9)'; pts.forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }); c.restore();
   }
   // weather
@@ -2330,7 +2330,7 @@ function hudPhone(lvl) {
   if (G.combo >= 2) { rr(516, 140, 250, 56, 28); c.fillStyle = 'rgba(43,214,123,.92)'; c.fill(); txt(`COMBO ×${Math.min(3, 1 + (G.combo - 1) * .5).toLocaleString('fr-FR')}`, 641, 179, '#06210f', 28, 900, 'center'); }
   drawLogo(960, 76, .36, false);
   // score
-  pill(1540, 24, 350, 104); txt('SCORE', 1584, 64, '#ffc21a', 24, 900); txt(G.score.toLocaleString('fr-FR'), 1584, 114, '#fff', 46, 900);
+  pill(1540, 24, 350, 104); txt('SCORE', 1584, 64, '#ffc21a', 24, 900); { const sv = G.score.toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' '); let fs = 48; c.font = `900 ${fs}px Inter`; while (c.measureText(sv).width > 280 && fs > 26) { fs -= 2; c.font = `900 ${fs}px Inter`; } txt(sv, 1584, 114, '#fff', fs, 900); }
   // conditions en pastilles
   const met = [];
   met.push(C.eg && !C.night ? (TOD[C.eg.tod].sand ? 'cloud' : 'sun') : C.night ? 'moon' : C.rain ? 'rain' : C.t === 2 || C.t === 4 ? 'cloud' : 'sun');
@@ -3407,7 +3407,7 @@ const SKINS = [
 ];
 const UPGRADES = [
   { id: 'casque', name: 'Casque de réserve', desc: '4 vies par checkpoint au lieu de 3', price: 2500, icon: 'worker' },
-  { id: 'laser', name: 'Viseur laser', desc: 'Trajectoire visible dès le niveau 11', price: 4000, icon: 'sun' },
+  { id: 'laser', name: 'Viseur laser', desc: 'Laser complet en carrière : zone d\'impact selon la météo, batterie de 6 s par chantier', price: 4000, icon: 'sun' },
 ];
 save.coins = save.coins || 0; save.skins = save.skins || ['jaune']; save.upg = save.upg || []; save.skin = save.skin || 'jaune';
 function craneSkin() { return SKINS.find(s => s.id === save.skin) || SKINS[0]; }
@@ -4788,7 +4788,7 @@ TBTN.pause = [-999, -999, 1, 1];
 drawTouch = (prev => function (lvl) {
   prev(lvl);
   if (G.screen !== 'play' || G.paused) return;
-  const live = G.mode === 'live', x = 1316, y = 40, w = 196, h = 56;
+  const live = G.mode === 'live', x = 1316, y = 40 + (window.CROP || 0), w = 196, h = 56;
   rr(x, y, w, h, 28); c.fillStyle = 'rgba(12,18,32,.78)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2; c.stroke();
   if (!live) { fillR(x + 26, y + 17, 7, 22, '#fff'); fillR(x + 39, y + 17, 7, 22, '#fff'); } else txt('✕', x + 36, y + 38, '#fff', 24, 900, 'center');
   txt(live ? 'QUITTER' : 'MENU', x + 118, y + 37, '#fff', 21, 900, 'center');
@@ -5919,7 +5919,7 @@ hud = (prev => function (lvl) {
   prev(lvl);
   if (!isCareer() || G.replay || !lvl || lvl.C.t === 5) return;
   const g = save.cpGain || 0; c.font = '900 30px Inter'; const w = c.measureText(String(g)).width;
-  if (TOUCH) { txt('GAINS', 1860, 64, '#ffc21a', 20, 900, 'right'); txt(String(g), 1860, 114, '#fff', 30, 900, 'right'); coinIcon(1860 - w - 22, 103, 13); return; }
+  if (TOUCH) { c.font = '900 26px Inter'; const gw = c.measureText(String(g)).width; txt(String(g), 1862, 66, '#ffd447', 26, 900, 'right'); coinIcon(1862 - gw - 20, 57, 12); return; }
   txt('GAINS DU CHANTIER', 1860, 66, '#ffc21a', 14, 900, 'right'); txt(String(g), 1860, 124, '#fff', 30, 900, 'right'); coinIcon(1860 - w - 22, 113, 13);
 })(hud);
 // ---------- déclenchement : premier passage aux checkpoints 11, 21, 31, 41 ----------
@@ -8844,7 +8844,7 @@ function drawTip() { // une seule astuce, au 2e chantier, puis plus rien
 function poseChip() {
   const P = G.pose; if (!P || G.screen !== 'play' || G.paused) return; const a = G.t - P.t;
   if (a > TUNE.poseShareSec + .4 || !P.shot) return;
-  const k = Math.min(1, (a - .45) * 4, (TUNE.poseShareSec + .4 - a) * 3), w = 420, h = 74, x = 960 - w / 2, y = TOUCH ? 952 : 902, pop = 1 + .04 * Math.sin(G.t * 7);
+  const k = Math.min(1, (a - .45) * 4, (TUNE.poseShareSec + .4 - a) * 3), w = 420, h = 74, x = 960 - w / 2, y = TOUCH ? 952 - (window.CROP || 0) : 902, pop = 1 + .04 * Math.sin(G.t * 7);
   c.save(); c.globalAlpha = Math.max(0, k); c.translate(960, y + h / 2); c.scale(pop, pop); c.translate(-960, -y - h / 2);
   withShadow('rgba(0,0,0,.45)', 20, 0, 6, () => { rr(x, y, w, h, h / 2); c.fillStyle = lg(0, y, 0, y + h, [[0, '#ffd36a'], [1, '#f2a20f']]); c.fill(); });
   txt('📸  Partager ce PILE POIL', 960, y + 48, '#2a1a00', 27, 900, 'center'); c.restore();
@@ -8888,6 +8888,35 @@ Object.assign(EN, {
   'Relâche !': 'Let go!', 'Plus tu maintiens, plus la charge part loin': 'The longer you hold, the further it flies', 'Presque !': 'Almost!', 'Aucune vie perdue, on recommence': 'No life lost, try again', "Les 49 chantiers suivants t'attendent": '49 more sites are waiting for you',
   '📸  Partager ce PILE POIL': '📸  Share this PILE POIL', '📤  PARTAGER MON RÉSULTAT': '📤  SHARE MY RESULT', 'Copié ! Colle-le dans ton groupe 📋': 'Copied! Paste it in your group chat 📋',
 });
+
+// =====================================================================
+//  PILE POIL — VISEUR LASER (amélioration à 4 000 pièces, carrière uniquement, dès le niveau 11)
+//  · faisceau complet jusqu'au sol, mais une ZONE d'impact, pas un point exact
+//  · la zone s'élargit avec le vent, le balancement, la pluie, le brouillard et la nuit
+//  · batterie de 6 s par chantier : le laser ne s'allume que pendant qu'on maintient le lancer
+// =====================================================================
+const LASER = { bat: 6, base: 18, wind: 3.2, swing: 260, night: 22, fog: 60, rain: 14 };   // réglages
+const laserLive = l => laserOn() && l && l.C && l.C.t > 0 && l.C.t !== 5;
+function laserZone(l) { const C = l.C; return LASER.base + Math.abs(C.wind || 0) * LASER.wind + Math.abs(l.th || 0) * LASER.swing + (C.night ? LASER.night : 0) + (C.fog || 0) * LASER.fog + (C.rain ? LASER.rain : 0); }
+startLevel = (prev => function (n) { prev(n); if (L) L.lzBat = LASER.bat; })(startLevel);
+updateCrane = (prev => function (lvl, dt) { prev(lvl, dt); if (laserLive(lvl) && lvl.phase === 'hang' && lvl.charging && lvl.lzBat > 0) { lvl.lzBat = Math.max(0, lvl.lzBat - dt); if (lvl.lzBat === 0) try { sfx.thud(.15); } catch (e) {} } })(updateCrane);
+drawLevel = (prev => function (lvl) {
+  prev(lvl); if (!laserLive(lvl) || lvl.phase !== 'hang' || !lvl.charging || !(lvl.lzBat > 0)) return;
+  const pts = predict(lvl); if (pts.length < 2) return; const t = lvl.target, lx = pts[pts.length - 1][0], z = laserZone(lvl), a = lx - z, b = lx + z;
+  const col = a >= t.x && b <= t.x + t.w ? '#3cf29b' : b > t.x && a < t.x + t.w ? '#ffb347' : '#ff4a5a', flick = lvl.lzBat < 1 && Math.sin(G.t * 40) > 0 ? .4 : 1;
+  c.save(); c.globalAlpha = flick; c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+  for (let i = 1; i < pts.length; i++) { const k = i / pts.length; c.globalAlpha = .55 * flick; c.strokeStyle = `rgba(255,60,80,${(1 - k * .55).toFixed(2)})`; c.lineWidth = 3 + k * 10; c.beginPath(); c.moveTo(pts[i - 1][0], pts[i - 1][1]); c.lineTo(pts[i][0], pts[i][1]); c.stroke(); c.globalAlpha = flick; c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 1.6; c.stroke(); }
+  const g = c.createLinearGradient(a, 0, b, 0); g.addColorStop(0, col + '00'); g.addColorStop(.5, col + 'aa'); g.addColorStop(1, col + '00'); c.fillStyle = g; c.beginPath(); c.ellipse(lx, GY + 2, z, 13, 0, 0, 7); c.fill(); c.restore();
+  c.save(); c.globalAlpha = flick; c.strokeStyle = col; c.lineWidth = 3; c.setLineDash([6, 6]); c.beginPath(); c.ellipse(lx, GY + 2, z, 13, 0, 0, 7); c.stroke(); c.setLineDash([]); ln(a, GY - 14, a, GY + 18, col, 3); ln(b, GY - 14, b, GY + 18, col, 3); c.restore();
+})(drawLevel);
+hud = (prev => function (lvl) {
+  prev(lvl); if (!laserLive(lvl) || G.screen !== 'play') return;
+  const bat = (lvl.lzBat ?? LASER.bat) / LASER.bat, x = TOUCH ? 30 : 36, y = TOUCH ? 140 : (lvl.C.t <= 1 ? 244 : 166), w = TOUCH ? 300 : 380;
+  rr(x, y, w, 64, 22); c.fillStyle = 'rgba(12,18,32,.78)'; c.fill(); c.strokeStyle = lvl.charging && bat > 0 ? 'rgba(255,74,90,.8)' : 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke();
+  txt('LASER', x + 22, y + 27, '#ff8a9a', 17, 900); txt(bat > 0 ? `${(bat * LASER.bat).toFixed(1).replace('.', ',')} s` : 'vide', x + w - 20, y + 27, bat > 0 ? '#fff' : '#ff8a6a', 17, 900, 'right');
+  rr(x + 22, y + 38, w - 44, 12, 6); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); if (bat > 0) { rr(x + 22, y + 38, (w - 44) * bat, 12, 6); c.fillStyle = bat > .3 ? '#ff4a5a' : '#ffb347'; c.fill(); }
+})(hud);
+Object.assign(EN, { 'LASER': 'LASER', 'vide': 'empty' });
 
 // =====================================================================
 //  PILE POIL — MON PROFIL : avatar personnalisable, grade de grutier, statistiques
@@ -9071,17 +9100,23 @@ input,textarea{-webkit-user-select:text;user-select:text;font-size:16px!importan
   window.ppAmb = amb;
   // 2. le jeu est dimensionné au pixel près dans la zone vraiment visible (barres de Safari, encoche, barre d'accueil)
   const probe = document.createElement('div'); probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)'; document.body.appendChild(probe);
+  // le navigateur cadre lui-même le jeu (CSS) : centré, 16:9, dans la zone visible ; le script ne fait que mesurer
+  const st2 = document.createElement('style');
+  st2.textContent = `#c{position:fixed!important;inset:0!important;margin:auto!important;aspect-ratio:16/9;height:auto!important;
+width:min(calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)),calc((100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) * 16 / 9))!important}
+@supports (height:100dvh){#c{width:min(calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)),calc((100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) * 16 / 9))!important}}
+html,body{width:100%;height:100%;margin:0;padding:0!important}`;
+  document.head.appendChild(st2);
   function fit() {
-    const vv = window.visualViewport, vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
-    const ps = getComputedStyle(probe), sl = parseFloat(ps.paddingLeft) || 0, sr = parseFloat(ps.paddingRight) || 0, stp = parseFloat(ps.paddingTop) || 0, sb = parseFloat(ps.paddingBottom) || 0;
-    const aw = Math.max(100, vw - sl - sr), ah = Math.max(60, vh - stp - sb), s = Math.min(aw / W, ah / H), w = Math.floor(W * s), h = Math.floor(H * s);
-    cv.style.width = w + 'px'; cv.style.height = h + 'px'; const L0 = Math.round(ox + sl + (aw - w) / 2), T0 = Math.round(oy + stp + (ah - h) / 2); cv.style.left = L0 + 'px'; cv.style.top = T0 + 'px';
-    window.GUT = { vw, vh, ox, oy, sl, sr, top: T0, h, l: L0, r: L0 + w, g: Math.min(L0 - ox - sl, ox + vw - sr - (L0 + w)) }; window.SIDEPAD = TOUCH && window.GUT.g >= 76; if (window.ppPadSize) ppPadSize();
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    const r = cv.getBoundingClientRect(), vw = document.documentElement.clientWidth || innerWidth, vh = document.documentElement.clientHeight || innerHeight;
+    window.GUT = { vw, vh, ox: 0, oy: 0, sl: 0, sr: 0, top: r.top, h: r.height, l: r.left, r: r.right, g: Math.min(r.left, vw - r.right) };
+    window.SIDEPAD = TOUCH && window.GUT.g >= 100; if (window.ppPadSize) ppPadSize();
   }
   window.ppFit = fit;
   const refit = () => { fit(); setTimeout(fit, 120); setTimeout(fit, 400); setTimeout(fit, 900); };
   addEventListener('resize', refit); addEventListener('orientationchange', refit); addEventListener('pageshow', refit);
-  if (window.visualViewport) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
+  if (window.visualViewport) visualViewport.addEventListener('resize', refit);
   document.fonts && document.fonts.ready.then(fit); fit();
   // 3. aucun zoom ni défilement parasite (pincement, double appui, glissé de la page)
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
@@ -9106,11 +9141,11 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
   const st = document.createElement('style'); st.textContent = '#pad{position:fixed;left:0;top:0;width:100%;height:100%;z-index:0;touch-action:none}'; document.head.appendChild(st);
   document.body.insertBefore(pad, cv); const px = pad.getContext('2d'); let dpr = 1, B = {};
   window.ppPadSize = () => { dpr = Math.min(2, window.devicePixelRatio || 1); pad.width = Math.round(innerWidth * dpr); pad.height = Math.round(innerHeight * dpr); layout(); };
-  function layout() { const g = window.GUT; if (!g) return; const gl = g.l - g.ox - g.sl, gr = g.ox + g.vw - g.sr - g.r, lx = g.ox + g.sl + gl / 2, rx = g.r + gr / 2, y = (k) => g.top + g.h * k;
-    const d = Math.max(44, Math.min(74, Math.min(gl, gr) * .42)), D = Math.max(60, Math.min(130, gr * .8));
-    const side = gl >= d * 2 + 18;
-    B = { left: side ? [lx - d / 2 - 6, y(.74), d / 2] : [lx, y(.58), d / 2], right: side ? [lx + d / 2 + 6, y(.74), d / 2] : [lx, y(.82), d / 2],
-      up: [rx, y(.2), d / 2 * .9], down: [rx, y(.4), d / 2 * .9], power: [rx, y(.72), D / 2] }; }
+  function layout() { // les boutons évitent le milieu des bords (encoche / Dynamic Island en paysage)
+    const g = window.GUT; if (!g) return; const gl = g.l - g.ox, gr = g.ox + g.vw - g.r, lx = g.ox + gl / 2, rx = g.r + gr / 2, y = (k) => g.top + g.h * k;
+    const side = gl >= 120, d = side ? Math.min(74, (gl - 12) / 2) : Math.max(40, Math.min(66, gl * .8)), D = Math.max(60, Math.min(130, gr * .84)), du = Math.max(40, Math.min(56, gr * .5));
+    B = { left: side ? [lx - d / 2 - 3, y(.8), d / 2] : [lx, y(.7), d / 2], right: side ? [lx + d / 2 + 3, y(.8), d / 2] : [lx, y(.88), d / 2],
+      up: [rx, y(.13), du / 2], down: [rx, y(.31), du / 2], power: [rx, y(.77), D / 2] }; }
   addEventListener('resize', () => setTimeout(window.ppPadSize, 50)); window.ppPadSize();
   const act2 = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }, held = {};
   const hit = (x, y) => { for (const k in B) { const [bx, by, r] = B[k]; if (Math.hypot(x - bx, y - by) <= r + 14) return k; } return null; };
@@ -9138,6 +9173,26 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
     if (G.tuto && G.tuto.step === 'now') { const p = Math.sin(performance.now() / 160) > 0; px.font = `${Math.round(r * .9)}px sans-serif`; px.fillText('👆', x + r * .25, y + r * (p ? 1.1 : 1.2)); }
   }
   requestAnimationFrame(draw);
+})();
+
+// =====================================================================
+//  IPHONE EN JEU : le chantier prend toute la largeur de l'écran
+//  (on rogne un peu de ciel en haut et de terre en bas ; compteurs et boutons sont recalés dans la zone visible)
+// =====================================================================
+(function () {
+  window.CROP = 0; const TB0 = JSON.parse(JSON.stringify(TBTN)); let mode = '';
+  function apply() {
+    const want = TOUCH && G.screen === 'play' ? 'fill' : 'fit';
+    const vw = document.documentElement.clientWidth || innerWidth, vh = document.documentElement.clientHeight || innerHeight, key = want + vw + 'x' + vh;
+    if (key === mode) return; mode = key;
+    if (want === 'fit' || vw / vh <= 16 / 9 + .02) { ['inset', 'left', 'top', 'width', 'height'].forEach(p => cv.style.removeProperty(p)); window.CROP = 0; }
+    else { let w = vw, h = vw * 9 / 16, crop = (h - vh) / 2 * 1080 / h; if (crop > 120) { crop = 120; h = vh * 1080 / 840; w = h * 16 / 9; }
+      const set = (p, v) => cv.style.setProperty(p, v, 'important'); set('inset', 'auto'); set('width', w + 'px'); set('height', h + 'px'); set('left', (vw - w) / 2 + 'px'); set('top', (vh - h) / 2 + 'px'); window.CROP = Math.round(crop); }
+    const k = window.CROP; for (const id in TB0) { const b = TB0[id].slice(); if (id !== 'pause') b[1] = b[1] - k; TBTN[id] = b; }
+    if (window.ppFit) setTimeout(window.ppFit, 0);
+  }
+  setInterval(apply, 150); addEventListener('resize', () => { mode = ''; setTimeout(apply, 60); });
+  hud = (prev => function (lvl) { const k = window.CROP || 0; if (!k) return prev(lvl); c.save(); c.translate(0, k); try { prev(lvl); } finally { c.restore(); } })(hud);
 })();
 
 // =====================================================================
