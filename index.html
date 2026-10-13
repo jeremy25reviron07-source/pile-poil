@@ -3494,17 +3494,30 @@ function drawModels(slot) {
   txt(slot === 'tower' ? 'Utilisée aux niveaux 1-20 et 31-49' : 'Utilisée aux niveaux 21-30 (conditions extrêmes)', X + 40, by - 22, 'rgba(255,255,255,.5)', 17, 700);
 }
 function wrapText(s, x, y, maxW, lh, col, size) { c.font = `700 ${size}px Inter`; let line = '', yy = y; s.split(' ').forEach(w => { const t = line ? line + ' ' + w : w; if (c.measureText(t).width > maxW) { txt(line, x, yy, col, size, 700); line = w; yy += lh; } else line = t; }); if (line) txt(line, x, yy, col, size, 700); }
+// catégories de peintures et de tenues (pour ne pas tout afficher d'un coup)
+const skCat = sk => sk.jp ? 'jp' : sk.eg ? 'eg' : (sk.crate || sk.shop) ? 'spe' : 'base';
+const ofCat = o => o.jp ? 'jp' : o.eg ? 'eg' : 'base';
+const SK_CATS = [['base', 'Classiques', '#9fd6ff'], ['spe', 'Spéciales', '#39ff9f'], ['jp', '🗾 Japon', '#ff7aa8'], ['eg', '🐫 Égypte', '#ffcf6a']];
+const OF_CATS = [['base', 'Classiques', '#9fd6ff'], ['jp', '🗾 Japon', '#ff7aa8'], ['eg', '🐫 Égypte', '#ffcf6a']];
+function catChips(pre, cats, cur, list, catOf, owned, x, y) {
+  cats.forEach(([id, label, col]) => { const items = list.filter(q => catOf(q) === id); if (!items.length) return; const n = items.filter(q => owned.includes(q.id)).length, on = cur === id, t = `${tr(label)}  ${n}/${items.length}`;
+    c.font = '900 17px Inter'; const w = c.measureText(t).width + 40; rr(x, y, w, 40, 20); c.fillStyle = on ? col : 'rgba(255,255,255,.08)'; c.fill(); if (!on && hov(x, y, w, 40)) { rr(x, y, w, 40, 20); c.strokeStyle = col; c.lineWidth = 2; c.stroke(); }
+    txt(t, x + w / 2, y + 27, on ? '#0b1020' : '#e6eef8', 17, 900, 'center'); G.buttons.push({ id: pre + id, x, y, w, h: 40 }); x += w + 12; });
+}
 function drawStyle() {
+  if (!GA.skCat) { const e = SKINS.find(q => q.id === save.skin); GA.skCat = e ? skCat(e) : 'base'; }
+  if (!GA.ofCat) { const e = OUTFITS.find(q => q.id === save.outfit); GA.ofCat = e ? ofCat(e) : 'base'; }
   txt('PEINTURE DES GRUES', 60, 234, '#ffc21a', 24, 900);
-  SKINS.forEach((sk, i) => {
-    const st = Math.floor(1800 / SKINS.length), x = 60 + i * st, y = 254, w = st - 14, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
+  catChips('skc_', SK_CATS, GA.skCat, SKINS, skCat, save.skins, 420, 207);
+  SKINS.filter(sk => skCat(sk) === GA.skCat).forEach((sk, i) => {
+    const st = 257, x = 60 + i * st, y = 262, w = st - 18, h = 150, own = save.skins.includes(sk.id), eq = save.skin === sk.id;
     rr(x, y, w, h, 18); c.fillStyle = eq ? 'rgba(60,242,155,.18)' : 'rgba(12,18,32,.84)'; c.fill();
-    rr(x, y, w, h, 18); c.strokeStyle = eq ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 4 : 2; c.stroke();
-    const sx = x + 22, sy = y + 22; fillR(sx, sy, w - 44, 9, sk.col); fillR(sx, sy + 32, w - 44, 9, sk.col);
-    c.strokeStyle = sk.dark; c.lineWidth = 3; c.beginPath(); for (let xx = sx; xx < sx + w - 54; xx += 24) { c.moveTo(xx, sy + 36); c.lineTo(xx + 12, sy + 5); c.lineTo(xx + 24, sy + 36); } c.stroke();
+    rr(x, y, w, h, 18); c.strokeStyle = eq ? '#3cf29b' : hov(x, y, w, h) ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 4 : 2; c.stroke();
+    const sx = x + 30, sy = y + 24; fillR(sx, sy, w - 60, 9, sk.col); fillR(sx, sy + 32, w - 60, 9, sk.col);
+    c.strokeStyle = sk.dark; c.lineWidth = 3; c.beginPath(); for (let xx = sx; xx < sx + w - 70; xx += 24) { c.moveTo(xx, sy + 36); c.lineTo(xx + 12, sy + 5); c.lineTo(xx + 24, sy + 36); } c.stroke();
     rr(x + w / 2 - 22, sy + 48, 44, 16, 4); c.fillStyle = sk.trolley; c.fill();
-    txt(sk.name, x + w / 2, y + 108, '#fff', st < 150 ? 15 : 19, 800, 'center');
-    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 136, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 136, '#9fd6ff', 17, 900, 'center'); else if (sk.eg) txt('🐫 ÉGYPTE', x + w / 2, y + 136, '#ffcf6a', st < 150 ? 14 : 17, 900, 'center'); else if (sk.jp) txt('🗾 JAPON', x + w / 2, y + 136, '#ff7aa8', st < 150 ? 14 : 17, 900, 'center'); else if (sk.crate) txt('🎁 CAISSE', x + w / 2, y + 136, '#39ff9f', st < 150 ? 14 : 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 136, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 138, sk.price, save.coins >= sk.price, 18);
+    txt(sk.name, x + w / 2, y + 110, '#fff', 20, 800, 'center');
+    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 138, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 138, '#9fd6ff', 17, 900, 'center'); else if (sk.eg) txt('Boss de zone', x + w / 2, y + 138, '#ffcf6a', 16, 900, 'center'); else if (sk.jp) txt('Boss de zone', x + w / 2, y + 138, '#ff7aa8', 16, 900, 'center'); else if (sk.crate) txt('🎁 CAISSE', x + w / 2, y + 138, '#39ff9f', 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 138, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 140, sk.price, save.coins >= sk.price, 18);
     G.buttons.push({ id: 'sk_' + sk.id, x, y, w, h });
   });
   // nom de l'entreprise
@@ -3516,12 +3529,13 @@ function drawStyle() {
   txt('TENUE DU GRUTIER', 1000, 494, '#ffc21a', 24, 900);
   const O = opLook(); c.save(); c.translate(1000, 530); c.scale(2.6, 2.6); rr(0, 0, 100, 70, 10); c.fillStyle = lg(0, 0, 0, 70, [[0, '#d9f2ff'], [1, '#3b6f96']]); c.fill(); operator(0, 0, 100, 70, 1, .3); c.restore();
   person2(1430, 760, 1.6, 1, { vest: O.vest, helm: O.helm, skin: '#e3ae86', pants: '#2b3a55', shirt: O.jacket }, {});
-  OUTFITS.forEach((o, i) => {
-    const x = 1000 + (i % 3) * 280, y = 762 + Math.floor(i / 3) * 86, w = 260, h = 78, own = save.outfits.includes(o.id), eq = save.outfit === o.id;
+  catChips('ofc_', OF_CATS, GA.ofCat, OUTFITS, ofCat, save.outfits, 1000, 740);
+  OUTFITS.filter(o => ofCat(o) === GA.ofCat).forEach((o, i) => {
+    const x = 1000 + (i % 3) * 280, y = 800 + Math.floor(i / 3) * 96, w = 260, h = 78, own = save.outfits.includes(o.id), eq = save.outfit === o.id;
     rr(x, y, w, h, 16); c.fillStyle = eq ? 'rgba(60,242,155,.18)' : 'rgba(255,255,255,.06)'; c.fill(); rr(x, y, w, h, 16); c.strokeStyle = eq ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = eq ? 3 : 1.5; c.stroke();
     ell(x + 38, y + 30, 18, 12, o.helm); fillR(x + 22, y + 42, 32, 26, o.jacket); fillR(x + 22, y + 52, 32, 5, o.stripe);
     txt(o.name, x + 72, y + 34, '#fff', 19, 800);
-    if (eq) txt('PORTÉE', x + 72, y + 62, '#3cf29b', 16, 900); else if (own) txt('PORTER', x + 72, y + 62, '#9fd6ff', 16, 900); else if (o.eg) txt('🐫 ÉGYPTE', x + 72, y + 62, '#ffcf6a', 16, 900); else if (o.jp) txt('🗾 JAPON', x + 72, y + 62, '#ff7aa8', 16, 900); else price(x + 72, y + 64, o.price, save.coins >= o.price, 17);
+    if (eq) txt('PORTÉE', x + 72, y + 62, '#3cf29b', 16, 900); else if (own) txt('PORTER', x + 72, y + 62, '#9fd6ff', 16, 900); else if (o.eg) txt('Boss de zone', x + 72, y + 62, '#ffcf6a', 16, 900); else if (o.jp) txt('Boss de zone', x + 72, y + 62, '#ff7aa8', 16, 900); else price(x + 72, y + 64, o.price, save.coins >= o.price, 17);
     G.buttons.push({ id: 'of_' + o.id, x, y, w, h });
   });
   // aperçu de la grue avec le nom de l'entreprise
@@ -3578,6 +3592,8 @@ drawTitle = (prev => function () { prev(); coinPill(40, 36); })(drawTitle);
 act = (prev => function (id) {
   if (id === 'garage') { sfx.click(); GA.view = { tower: null, mobile: null }; G.screen = 'garage'; return; }
   if (id.startsWith('tab_')) { sfx.click(); GA.tab = id.slice(4); return; }
+  if (id.startsWith('skc_')) { sfx.click(); GA.skCat = id.slice(4); return; }
+  if (id.startsWith('ofc_')) { sfx.click(); GA.ofCat = id.slice(4); return; }
   let mt;
   if ((mt = id.match(/^mv_(\w+)_(\w+)$/))) { sfx.click(); GA.view[mt[1]] = mt[2]; return; }
   if ((mt = id.match(/^buy_(\w+)_(\w+)$/))) {
