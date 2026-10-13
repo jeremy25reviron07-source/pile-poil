@@ -3876,5 +3876,222 @@ function superlift(tipX, lvl) {
   cabGlass(bx + 315, gy - 316, 72, 46, 1, clamp(lvl ? lvl.cr.v / 120 : 0, -1, 1)); beacon(bx + 352, gy - 336);
 }
 
+// =====================================================================
+//  PILE POIL — RÉALISME : charges variées, lumière, météo, usure des grues
+// =====================================================================
+
+// ---------- les charges ----------
+// r = hauteur / largeur · t = tonnage pour une charge de 150 px · sw = balancement · wd = prise au vent
+const LOADS = {
+  bloc:    { name: 'Bloc béton', r: .6, t: 3.2, sw: 1, wd: 1 },
+  palette: { name: 'Palette de parpaings', r: .72, t: 1.4, sw: 1, wd: 1 },
+  benne:   { name: 'Benne à béton pleine', r: .85, t: 2.6, sw: .85, wd: .85 },
+  prefa:   { name: 'Prédalle préfabriquée', r: .36, t: 2.4, sw: .95, wd: 1.15 },
+  ipn:     { name: 'Poutre IPN', r: .28, t: 1.1, sw: 1, wd: .8 },
+  banche:  { name: 'Banche métallique', r: .82, t: 1.3, sw: 1.05, wd: 1.6 },
+  cage:    { name: 'Cage d\'armatures', r: .38, t: 1.9, sw: .9, wd: .7 },
+  tube:    { name: 'Tube acier', r: .38, t: 3, sw: 1, wd: 1 },
+};
+const LOAD_SETS = [['bloc', 'palette', 'benne'], ['bloc', 'palette', 'benne', 'prefa', 'ipn'], ['tube', 'cage', 'ipn'], ['bloc', 'palette', 'benne', 'prefa', 'ipn', 'cage'], ['bloc', 'palette', 'benne', 'prefa', 'ipn', 'banche', 'cage']];
+const TOD_DAY = ['matin', 'midi', 'fin'];
+buildLevel = (prev => function (n) {
+  const lvl = prev(n), C = lvl.C; if (C.t === 5) return lvl;
+  const set = LOAD_SETS[C.t], h = hashStr('charge-' + n + '-' + (G.runSeed || 0));
+  const type = n === 1 ? 'bloc' : set[h % set.length], L0 = LOADS[type];
+  lvl.load = type; lvl.loadH = Math.round(lvl.loadW * L0.r);
+  lvl.tons = L0.t * (.7 + .3 * lvl.loadW / 150);
+  C.swing *= L0.sw; C.wind *= L0.wd; lvl.th = Math.sign(lvl.th || 1) * C.swing;
+  lvl.tod = C.night ? 'nuit' : C.t === 2 ? 'orage' : C.t === 4 ? 'gris' : TOD_DAY[(h >>> 4) % 3];
+  lvl.ripples = []; return lvl;
+})(buildLevel);
+
+drawLoad = function (lvl, x, y) {
+  const w = lvl.loadW, h = lvl.loadH;
+  switch (lvl.load || (lvl.C.crane === 'crawler' ? 'tube' : 'bloc')) {
+    case 'tube': return pipe(x, y, w, h);
+    case 'palette': return loadPalette(x, y, w, h);
+    case 'benne': return loadBenne(x, y, w, h);
+    case 'prefa': return loadPrefa(x, y, w, h);
+    case 'ipn': return loadIPN(x, y, w, h);
+    case 'banche': return loadBanche(x, y, w, h);
+    case 'cage': return loadCage(x, y, w, h);
+    default: return concreteBlock(x, y, w, h);
+  }
+};
+function loadPalette(cx, top, w, h) {
+  const ph = Math.max(6, h * .16), bh = h - ph, rows = 3, cols = 3, gw = (w - 8) / cols, gh = bh / rows;
+  withShadow('rgba(0,0,0,.35)', 12, 4, 7, () => { rr(cx - w / 2 + 2, top, w - 4, bh, 3); c.fillStyle = '#9aa1a8'; c.fill(); });
+  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+    const bx = cx - w / 2 + 4 + k * gw + (r % 2 ? gw * .5 : 0) * 0, by = top + r * gh;
+    rr(bx + 1, by + 1, gw - 2, gh - 2, 2); c.fillStyle = lg(0, by, 0, by + gh, [[0, '#d6d9dc'], [1, '#9ca3aa']]); c.fill();
+    fillR(bx + gw * .22, by + gh * .3, gw * .2, gh * .4, 'rgba(80,86,92,.45)'); fillR(bx + gw * .58, by + gh * .3, gw * .2, gh * .4, 'rgba(80,86,92,.45)');
+  }
+  // film plastique + feuillards
+  fillR(cx - w / 2 + 2, top, w - 4, bh, 'rgba(225,240,255,.16)'); ln(cx - w / 2 + 6, top + 2, cx - w / 2 + w * .35, top + bh - 2, 'rgba(255,255,255,.35)', 2);
+  [-w * .3, w * .3].forEach(dx => fillR(cx + dx - 1.5, top, 3, bh, 'rgba(40,40,40,.55)'));
+  // palette bois
+  fillR(cx - w / 2, top + bh, w, ph * .4, '#b48450'); [0, .45, .9].forEach(k => fillR(cx - w / 2 + k * (w - 12), top + bh + ph * .4, 12, ph * .6, '#7a5530'));
+}
+function loadBenne(cx, top, w, h) {
+  const bodyH = h * .8, bw = w * .34;
+  withShadow('rgba(0,0,0,.35)', 12, 4, 7, () => { c.beginPath(); c.moveTo(cx - w / 2, top + h * .12); c.lineTo(cx + w / 2, top + h * .12); c.lineTo(cx + bw / 2, top + bodyH); c.lineTo(cx - bw / 2, top + bodyH); c.closePath(); c.fillStyle = lg(cx - w / 2, 0, cx + w / 2, 0, [[0, '#f2b72e'], [.55, '#d99611'], [1, '#9a6a08']]); c.fill(); });
+  ell(cx, top + h * .12, w / 2, h * .07, '#6f747a'); ell(cx, top + h * .12, w / 2 - 4, h * .05, '#8d9298'); // béton frais
+  for (let i = 0; i < 5; i++) ell(cx - w * .3 + i * w * .15, top + h * .12, 4, 2, 'rgba(70,74,80,.6)');
+  fillR(cx - w / 2, top + h * .1, w, 4, '#6e4a05');
+  // anse de levage
+  c.strokeStyle = '#2b2f36'; c.lineWidth = 4; c.beginPath(); c.moveTo(cx - w / 2 + 3, top + h * .14); c.lineTo(cx - w / 2 + 3, top); c.lineTo(cx + w / 2 - 3, top); c.lineTo(cx + w / 2 - 3, top + h * .14); c.stroke();
+  // trappe et levier
+  rr(cx - bw / 2 - 2, top + bodyH, bw + 4, h * .16, 3); c.fillStyle = '#3a3f46'; c.fill(); ln(cx + bw / 2, top + bodyH + 4, cx + w * .42, top + bodyH - h * .2, '#2b2f36', 3);
+  c.save(); c.globalAlpha = .35; for (let i = 0; i < 4; i++) ln(cx - w * .3 + i * w * .17, top + h * .2, cx - bw * .3 + i * bw * .2, top + bodyH - 4, '#7a7f86', 2); c.restore();
+  // coulures de béton
+  [-.25, .1, .3].forEach(k => fillR(cx + w * k, top + h * .14, 3, h * .12 + (k + .5) * 8, 'rgba(120,124,130,.75)'));
+}
+function loadPrefa(cx, top, w, h) {
+  const ch = h * .55, lt = top + h - ch;
+  // treillis raidisseurs en saillie (prédalle)
+  [-w * .3, 0, w * .3].forEach(dx => { const x0 = cx + dx - w * .12, x1 = cx + dx + w * .12; c.strokeStyle = '#7a4326'; c.lineWidth = 2; c.beginPath(); for (let x = x0, up = true; x <= x1; x += w * .04, up = !up) c.lineTo(x, up ? top + 2 : lt); c.stroke(); ln(x0, top + 2, x1, top + 2, '#5e321c', 2.5); });
+  withShadow('rgba(0,0,0,.35)', 12, 4, 7, () => { rr(cx - w / 2, lt, w, ch, 2); c.fillStyle = lg(0, lt, 0, lt + ch, [[0, '#dfe3e6'], [1, '#a9b0b6']]); c.fill(); });
+  c.save(); rr(cx - w / 2, lt, w, ch, 2); c.clip(); speckle(cx - w / 2, lt, w, ch, ['rgba(80,90,100,.25)', 'rgba(255,255,255,.3)'], 60, .8, 2); fillR(cx - w / 2, lt + ch - 4, w, 4, 'rgba(0,0,0,.2)'); c.restore();
+  ln(cx - w / 2, lt, cx + w / 2, lt, 'rgba(255,255,255,.6)', 1.5);
+  [-w * .38, w * .38].forEach(dx => { c.strokeStyle = '#c9a227'; c.lineWidth = 3; c.beginPath(); c.arc(cx + dx, lt, 5, Math.PI, 0); c.stroke(); });
+}
+function loadIPN(cx, top, w, h) {
+  const f = Math.max(3, h * .22);
+  withShadow('rgba(0,0,0,.4)', 12, 4, 8, () => { fillR(cx - w / 2, top, w, f, lg(0, top, 0, top + f, [[0, '#d65a3c'], [1, '#97321f']])); fillR(cx - w / 2, top + h - f, w, f, lg(0, top + h - f, 0, top + h, [[0, '#c84b31'], [1, '#7a2414']])); });
+  fillR(cx - w / 2 + 2, top + f, w - 4, h - 2 * f, lg(0, top + f, 0, top + h - f, [[0, '#5e1a10'], [.5, '#8f2b1b'], [1, '#5e1a10']]));
+  for (let x = cx - w / 2 + w * .12; x < cx + w / 2 - 8; x += w * .2) ell(x, top + h / 2, Math.max(1.5, h * .08), Math.max(1.5, h * .08), '#2b0c06');
+  c.save(); c.globalAlpha = .3; speckle(cx - w / 2, top, w, h, ['rgba(120,60,20,.6)'], 40, .8, 2); c.restore();
+  ln(cx - w / 2, top + .5, cx + w / 2, top + .5, 'rgba(255,190,160,.6)', 1);
+}
+function loadBanche(cx, top, w, h) {
+  const pf = h * .14;
+  // passerelle et garde-corps en tête de banche
+  ln(cx - w / 2 + 2, top + pf, cx + w / 2 - 2, top + pf, '#3a3f46', 3);
+  for (let x = cx - w / 2 + 4; x <= cx + w / 2 - 4; x += (w - 8) / 4) ln(x, top + pf, x, top + 2, '#ffc21a', 2.5);
+  ln(cx - w / 2 + 4, top + 2, cx + w / 2 - 4, top + 2, '#ffc21a', 2.5); ln(cx - w / 2 + 4, top + pf * .55, cx + w / 2 - 4, top + pf * .55, '#ffc21a', 1.5);
+  withShadow('rgba(0,0,0,.35)', 14, 5, 8, () => { fillR(cx - w / 2, top + pf, w, h - pf, lg(cx - w / 2, 0, cx + w / 2, 0, [[0, '#8794a1'], [.5, '#a4b0bb'], [1, '#5f6b77']])); });
+  for (let k = 1; k < 5; k++) fillR(cx - w / 2, top + pf + (h - pf) * k / 5 - 2, w, 4, 'rgba(40,46,54,.55)');
+  fillR(cx - w / 2, top + pf, 4, h - pf, '#3a4048'); fillR(cx + w / 2 - 4, top + pf, 4, h - pf, '#3a4048');
+  [-w * .25, w * .25].forEach(dx => ell(cx + dx, top + pf + (h - pf) * .5, 3, 3, '#2b2f36'));
+  c.save(); c.globalAlpha = .25; speckle(cx - w / 2, top + pf, w, h - pf, ['rgba(200,200,190,.8)'], 50, 1, 3); c.restore(); // laitance de béton
+}
+function loadCage(cx, top, w, h) {
+  const x0 = cx - w / 2 + 3, x1 = cx + w / 2 - 3, rx = Math.max(3, h * .16);
+  c.save(); c.lineCap = 'round';
+  for (let k = 0; k <= 6; k++) { const y = top + h * (.08 + .84 * k / 6); ln(x0, y, x1, y, k % 2 ? 'rgba(96,52,26,.6)' : '#6b3a1e', k % 2 ? 1.6 : 2.4); }
+  c.strokeStyle = '#8a4a2a'; c.lineWidth = 1.6; for (let x = x0; x <= x1; x += Math.max(5, w * .06)) { c.beginPath(); c.ellipse(x, top + h / 2, rx, h / 2 - 1, 0, 0, Math.PI * 2); c.stroke(); }
+  c.strokeStyle = '#5a2e16'; c.lineWidth = 2.6; [x0, x1].forEach(x => { c.beginPath(); c.ellipse(x, top + h / 2, rx, h / 2 - 1, 0, 0, Math.PI * 2); c.stroke(); });
+  [x0 + w * .25, x0 + w * .7].forEach(x => ell(x, top + h - 2, 3, 3, '#9aa1a8')); // cales d'enrobage
+  c.restore();
+}
+
+// une charge métallique ne se brise pas : elle tombe, se tord, et le béton frais éclabousse
+shatter = (prev => function (lvl) {
+  const f = lvl.fly, type = lvl.load; if (!f || f.broken) return;
+  if (type === 'cage' || type === 'ipn' || type === 'banche' || type === 'benne') {
+    if (f.dented) { f.vy = Math.min(0, -f.vy * .2); return; }
+    f.dented = true; f.vy = -Math.abs(f.vy) * .2; f.vx *= .4; FX.shake = Math.max(FX.shake, 16);
+    if (!f.sunk && lvl.scars) lvl.scars.push({ x: f.x, w: lvl.loadW });
+    if (type === 'benne') { burst(f.x, f.y, 46, { a0: -Math.PI, spread: Math.PI, sp: 420, life: 1.3, r: 5, w: lvl.loadW * .6, col: 'rgba(118,122,128,', g: 1500, drag: .9 }); sfx.thud(1.1); }
+    else { burst(f.x, f.y + lvl.loadH / 2, 14, { a0: -Math.PI, spread: Math.PI, sp: 380, life: .45, r: 2, col: 'rgba(255,210,120,', g: 900, drag: 1 }); metal(220, .09, .9); metal(150, .07, 1.1, .05); burstN(.3, 'bandpass', 900, .8, .3); }
+    lvl.scare = { x: f.x, t: 1.4 }; return;
+  }
+  prev(lvl);
+})(shatter);
+
+// boue et gouttes à l'impact sous la pluie
+dust = (prev => function (x, y, w, k = 1) {
+  prev(x, y, w, k);
+  if (L && L.C && L.C.rain) { burst(x, y, Math.round(24 * k), { a0: -Math.PI * .95, spread: Math.PI * .9, sp: 520 * k, life: .9, r: 3.5, w, col: 'rgba(70,48,28,', g: 1700, drag: .5 }); burst(x, y, Math.round(16 * k), { a0: -Math.PI * .9, spread: Math.PI * .8, sp: 380 * k, life: .6, r: 2, w, col: 'rgba(190,210,230,', g: 1500, drag: .6 }); }
+})(dust);
+
+// ---------- usure des grues : lumière zénithale, coulures, rouille (précalculé une fois) ----------
+towerStatic = (prev => function (night) {
+  prev(night);
+  const s0 = seed; seed = 4242 + (save.crane.tower || '').length;
+  c.save(); c.globalCompositeOperation = 'source-atop';
+  fillR(0, 0, W, H, lg(0, TOWER.jt - 220, 0, GY, [[0, 'rgba(255,248,225,.12)'], [.45, 'rgba(0,0,0,0)'], [1, 'rgba(25,16,8,.28)']]));
+  for (let i = 0; i < 320; i++) { const x = 40 + rnd() * 1800, y = TOWER.jt - 210 + rnd() * (GY - TOWER.jt + 210); fillR(x, y, 1.6, 4 + rnd() * 26, `rgba(${90 + rnd() * 40 | 0},${50 + rnd() * 20 | 0},22,${(.05 + rnd() * .13).toFixed(3)})`); }
+  for (let i = 0; i < 700; i++) fillR(40 + rnd() * 1800, TOWER.jt - 210 + rnd() * (GY - TOWER.jt + 210), 2, 2, 'rgba(40,28,16,.16)');
+  c.restore(); seed = s0;
+})(towerStatic);
+
+// ---------- passe de lumière (chaque image, après la scène et avant l'interface) ----------
+const GRADE = {
+  matin: { op: 'soft-light', col: 'rgba(255,200,160,.3)', haze: 'rgba(255,214,170,.07)' },
+  midi: { op: 'soft-light', col: 'rgba(255,252,235,.22)' },
+  fin: { op: 'soft-light', col: 'rgba(255,150,70,.3)', haze: 'rgba(255,170,90,.08)' },
+  orage: { op: 'multiply', col: 'rgba(196,206,220,.45)' },
+  nuit: { op: 'multiply', col: 'rgba(150,165,225,.3)' },
+  gris: { op: 'multiply', col: 'rgba(214,220,230,.35)' },
+};
+function lightingPass(lvl) {
+  const C = lvl.C, tod = lvl.tod || 'midi', g = GRADE[tod];
+  // rayons de soleil dans la poussière du chantier
+  if (tod === 'matin' || tod === 'fin' || tod === 'midi') {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const sx = tod === 'matin' ? 1700 : tod === 'fin' ? 250 : 1350, sy = -160, warm = tod === 'midi' ? '255,250,225' : '255,210,150';
+    for (let i = 0; i < 5; i++) {
+      const a = (tod === 'fin' ? .55 : tod === 'matin' ? 2.55 : 1.95) + (i - 2) * .14 + Math.sin(G.t * .17 + i * 1.7) * .02, len = 1500, sp = .035 + (i % 2) * .02;
+      const al = (tod === 'midi' ? .028 : .05) * (.6 + .4 * Math.sin(G.t * .3 + i));
+      c.fillStyle = lg(sx, sy, sx + Math.cos(a) * len, sy + Math.sin(a) * len, [[0, `rgba(${warm},${al.toFixed(3)})`], [1, `rgba(${warm},0)`]]);
+      c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + Math.cos(a - sp) * len, sy + Math.sin(a - sp) * len); c.lineTo(sx + Math.cos(a + sp) * len, sy + Math.sin(a + sp) * len); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+  // projecteur fixé sous le chariot, la nuit
+  if (C.night && C.crane === 'tower' && lvl.cr) {
+    const x = lvl.cr.x, y = TOWER.jt + 70, spread = 210;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    c.fillStyle = lg(0, y, 0, GY, [[0, 'rgba(255,236,190,.16)'], [1, 'rgba(255,236,190,.03)']]);
+    c.beginPath(); c.moveTo(x - 18, y); c.lineTo(x + 18, y); c.lineTo(x + spread, GY + 10); c.lineTo(x - spread, GY + 10); c.closePath(); c.fill();
+    fillR(x - 260, GY - 60, 520, 120, rg(x, GY, 10, 250, [[0, 'rgba(255,236,190,.22)'], [1, 'rgba(255,236,190,0)']]));
+    c.restore(); fillR(x - 14, y - 6, 28, 6, '#fff3cf');
+  }
+  // sol mouillé : reflet du ciel, ronds dans les flaques, rebonds de gouttes
+  if (C.rain) {
+    c.save(); c.globalCompositeOperation = 'screen'; fillR(0, GY, W, 70, lg(0, GY, 0, GY + 70, [[0, 'rgba(170,190,215,.22)'], [1, 'rgba(170,190,215,0)']])); c.restore();
+    const rate = C.rain === 'forte' ? 7 : C.rain === 'pluie' ? 4 : 1.5;
+    for (let i = 0; i < rate; i++) if (Math.random() < .5) lvl.ripples.push({ x: Math.random() * W, y: GY + 4 + Math.random() * 200, t: 0, s: .6 + Math.random() * .8 });
+    lvl.ripples = lvl.ripples.filter(r => (r.t += G.dt || .016) < .7);
+    lvl.ripples.forEach(r => { const k = r.t / .7; c.strokeStyle = `rgba(205,220,240,${(.45 * (1 - k)).toFixed(3)})`; c.lineWidth = 1.2; c.beginPath(); c.ellipse(r.x, r.y, 3 + k * 16 * r.s, 1 + k * 4 * r.s, 0, 0, 7); c.stroke(); if (r.y < GY + 12 && k < .3) fillR(r.x - 1, r.y - 6 * (1 - k * 3), 2, 4, 'rgba(220,232,245,.6)'); });
+  }
+  // brume chaude en bas d'écran le matin et le soir
+  if (g && g.haze) fillR(0, 300, W, 560, lg(0, 300, 0, GY, [[0, 'rgba(0,0,0,0)'], [1, g.haze]]));
+  // étalonnage des couleurs + vignettage
+  if (g) { c.save(); c.globalCompositeOperation = g.op; fillR(0, 0, W, H, g.col); c.restore(); }
+  fillR(0, 0, W, H, rg(960, 520, 520, 1250, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.3)']]));
+}
+drawLevel = (prev => function (lvl) { prev(lvl); lightingPass(lvl); })(drawLevel);
+
+// ---------- étiquette de la charge en haut de l'écran ----------
+hud = (prev => function (lvl) {
+  prev(lvl);
+  if (!lvl.load) return;
+  const L0 = LOADS[lvl.load], t = lvl.tons.toFixed(1).replace('.', ','), wind = L0.wd >= 1.3 ? '  ·  prise au vent ↑' : L0.wd <= .75 ? '  ·  prise au vent ↓' : '';
+  const s = `${L0.name}  ·  ${t} t${wind}`; c.font = '800 18px Inter'; const tw = c.measureText(s).width + 120;
+  rr(960 - tw / 2, 134, tw, 32, 16); c.fillStyle = 'rgba(12,18,32,.74)'; c.fill();
+  txt('CHARGE', 960 - tw / 2 + 18, 156, '#ffc21a', 15, 900); txt(s, 960 - tw / 2 + 92, 156, '#e6eef8', 18, 800);
+})(hud);
+
+// ---------- fin de course basse : plus on avance, plus la charge reste haute ----------
+function minClearance(n) { return Math.round(lerp(110, 300, clamp((n - 1) / 48, 0, 1))); }
+function maxCable(lvl) { const py = pivotOf(lvl)[1]; return Math.max(60, GY - py - 84 - lvl.loadH - minClearance(lvl.C.n)); }
+buildLevel = (prev => function (n) { const lvl = prev(n); if (lvl.C.t !== 5) lvl.Lh = Math.min(lvl.Lh, maxCable(lvl)); return lvl; })(buildLevel);
+updateCrane = (prev => function (lvl, dt) {
+  prev(lvl, dt);
+  const mx = maxCable(lvl);
+  if (lvl.Lh >= mx) { if (keys.ArrowDown && lvl.phase === 'hang') lvl.limT = 1.2; lvl.Lh = mx; }
+  if (lvl.limT) lvl.limT = Math.max(0, lvl.limT - dt);
+})(updateCrane);
+drawLevel = (prev => function (lvl) {
+  prev(lvl);
+  if (lvl.limT > 0 && lvl.phase === 'hang') {
+    const s = loadState(lvl), a = Math.min(1, lvl.limT * 2.5);
+    c.save(); c.globalAlpha = a; c.font = '900 18px Inter'; const t = 'FIN DE COURSE BASSE', tw = c.measureText(t).width + 30, x = clamp(s.x, tw / 2 + 10, W - tw / 2 - 10), y = s.y + lvl.loadH / 2 + 34;
+    rr(x - tw / 2, y - 22, tw, 32, 16); c.fillStyle = 'rgba(232,72,59,.92)'; c.fill(); txt(t, x, y, '#fff', 18, 900, 'center'); c.restore();
+  }
+})(drawLevel);
+
 </script>
 </body></html>
