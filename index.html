@@ -3,7 +3,7 @@
 <title>Pile Poil</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Lilita+One&display=swap">
 <style>
 /* Single-look arcade screen: dark site at night around a 16:9 game canvas */
 :root{--bg:#0b1020;--fg:#e6eef8;color-scheme:dark}
@@ -2481,7 +2481,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -3482,7 +3482,7 @@ function drawStyle() {
     G.buttons.push({ id: 'sk_' + sk.id, x, y, w, h });
   });
   // nom de l'entreprise
-  rr(60, 440, 860, 250, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  rr(60, 440, 860, 255, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
   txt('TON ENTREPRISE', 100, 494, '#ffc21a', 24, 900); txt('Le nom affiché sur le panneau de la contre-flèche et sur les grues mobiles', 100, 528, '#cfe0ff', 18, 700);
   companySignBig(100, 600, 520);
   // tenue du grutier
@@ -3498,9 +3498,9 @@ function drawStyle() {
     if (eq) txt('PORTÉE', x + 72, y + 74, '#3cf29b', 16, 900); else if (own) txt('PORTER', x + 72, y + 74, '#9fd6ff', 16, 900); else price(x + 72, y + 76, o.price, save.coins >= o.price, 17);
     G.buttons.push({ id: 'of_' + o.id, x, y, w, h });
   });
-  rr(60, 720, 860, 300, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
-  txt('COMMENT GAGNER DES PIÈCES', 100, 774, '#ffc21a', 22, 900);
-  [['Chantier réussi en Carrière', '2 à 6'], ['Lancer parfait', '+2'], ['1er passage d\'un checkpoint', '+25'], ['Défi du jour terminé (1 fois/jour)', '+15']].forEach(([a, b], i) => { txt(a, 100, 822 + i * 48, '#e6eef8', 21, 700); coinIcon(720, 815 + i * 48, 11); txt(b, 880, 822 + i * 48, '#ffd447', 21, 900, 'right'); });
+  // aperçu de la grue avec le nom de l'entreprise
+  rr(60, 710, 860, 310, 22); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
+  c.save(); rr(60, 710, 860, 310, 22); c.clip(); c.drawImage(cranePreview('tower', save.crane.tower), 0, 140, 1300, 520, 70, 730, 1300 * .64, 520 * .64); c.restore();
 }
 function companySignBig(x, y, w) { rr(x, y - 50, w, 70, 8); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 4; c.stroke(); let fs = 44; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 40 && fs > 18) { fs--; c.font = `900 ${fs}px Inter`; } txt(companyName(), x + w / 2, y + 2, '#1a1300', fs, 900, 'center'); }
 function drawEquip() {
@@ -4231,7 +4231,7 @@ function overlayLoop() {
   requestAnimationFrame(overlayLoop);
   c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1;
   // la pastille de pièces ouvre la boutique
-  if (!MO && (G.screen === 'title' || G.screen === 'garage')) { const px = G.screen === 'title' ? 40 : 1380, py = G.screen === 'title' ? 36 : 34; c.font = '900 30px Inter'; const w = c.measureText(save.coins.toLocaleString('fr-FR')).width + 86; ell(px + w + 22, py + 30, 22, 22, '#c77dff'); txt('+', px + w + 22, py + 41, '#fff', 30, 900, 'center'); G.buttons.push({ id: 'shop', x: px, y: py, w: w + 46, h: 60 }); }
+  if (!MO && G.screen === 'garage') { const px = 1380, py = 34; c.font = '900 30px Inter'; const w = c.measureText(save.coins.toLocaleString('fr-FR')).width + 86; ell(px + w + 22, py + 30, 22, 22, '#c77dff'); txt('+', px + w + 22, py + 41, '#fff', 30, 900, 'center'); G.buttons.push({ id: 'shop', x: px, y: py, w: w + 46, h: 60 }); }
   if (MO) {
     G.buttons = [];
     const ca = performance.now() - CELEB.at;
@@ -4361,6 +4361,7 @@ function mergeSaves(local, remote, baseCoins) {
   ['skins', 'owned', 'outfits', 'upg', 'cpDone'].forEach(k => { m[k] = [...new Set([...(remote[k] || []), ...(local[k] || [])])]; });
   ['maxLevel', 'best', 'checkpoint'].forEach(k => { m[k] = Math.max(remote[k] || 0, local[k] || 0) || undefined; });
   m.clvl = Object.assign({}, remote.clvl || {}); Object.entries(local.clvl || {}).forEach(([k, v]) => { m.clvl[k] = Math.max(m.clvl[k] || 0, v); });
+  m.lvl = Object.assign({}, remote.lvl || {}); Object.entries(local.lvl || {}).forEach(([k, v]) => { const r = m.lvl[k] || { s: 0, p: 0 }; m.lvl[k] = { s: Math.max(r.s || 0, v.s || 0), p: Math.max(r.p || 0, v.p || 0) }; });
   m.coins = Math.max(0, (remote.coins || 0) + ((local.coins || 0) - (baseCoins || 0)));
   if ((local.cbest && local.cbest.score || 0) > (remote.cbest && remote.cbest.score || 0)) m.cbest = local.cbest;
   m.masterDone = remote.masterDone || local.masterDone; m.starterBought = remote.starterBought || local.starterBought;
@@ -4691,6 +4692,405 @@ Object.assign(EN, {
   'Déconnecté · ta progression reste sur ton compte': 'Signed out · your progress stays on your account', 'Session expirée : reconnecte-toi': 'Session expired: please sign in again',
 });
 EN_RX.push([/^Tu reprendras au checkpoint du niveau (\d+)\.$/, 'You will resume at the level $1 checkpoint.']);
+
+// =====================================================================
+//  PILE POIL — MENU v2 (choix de Jeremy) : Nuit chantier, titres « cartoon »,
+//  boutons en relief très ronds, verre dépoli façon Apple.
+//  Accueil = carte Carrière + colonne · Carrière = chemin de pastilles ·
+//  Défis et duels = 3 cartes pleines · ⓘ pièces dans Peinture & tenue
+// =====================================================================
+const PAL = {
+  bg: '#0b1020', panel: 'rgba(18,26,48,.66)', panel2: 'rgba(255,255,255,.07)', line: 'rgba(255,255,255,.12)', text: '#f2f6fb', sub: '#9db0c8',
+  play: ['#4ef0a8', '#17a764', '#052014'], gold: ['#ffd84f', '#f2a900', '#2a1a00'],
+  red: '#ff6b5b', orange: '#ffa14a', blue: '#6fb1ff', violet: '#b58bff', yellow: '#ffc21a', green: '#3cf29b',
+};
+const TRANCHE_COL = ['#3cf29b', '#6fb1ff', '#ffa14a', '#c38bff', '#ff6b5b', '#ffc21a'];
+const CARD = { green: ['#4ef0a8', '#16a463', '#0a6b3d'], violet: ['#b58bff', '#7a4ee0', '#4b2a9a'], orange: ['#ffb35a', '#f07a1a', '#a54a00'], red: ['#ff7a6b', '#e0392b', '#911c12'], blue: ['#7cbcff', '#2e7be0', '#164b94'], gold: ['#ffd84f', '#f2a900', '#9a6a00'], slate: ['#5a6d8e', '#3a4b68', '#1f2a3e'] };
+const TF = "'Lilita One', Inter, sans-serif";          // police des titres
+const RAD = 36;                                         // arrondis « très ronds »
+try { document.fonts && document.fonts.load("40px 'Lilita One'"); } catch (e) {}
+// tous les grands titres du jeu passent dans la police « cartoon »
+txt = (prev => function (s, x, y, col, size, weight = 800, align = 'left', font = 'Inter') { if (size >= 50 && weight >= 900 && font === 'Inter') { weight = 400; font = TF; } return prev(s, x, y, col, size, weight, align, font); })(txt);
+function T(s, x, y, col, size, align = 'left') { txt(s, x, y, col, size, 400, align, TF); }
+function shade(col, k) {               // assombrit une couleur #rrggbb (k<0) ; rgba → ombre neutre
+  if (!/^#[0-9a-f]{6}$/i.test(col)) return 'rgba(0,0,0,.38)';
+  const n = parseInt(col.slice(1), 16), f = v => Math.round(Math.max(0, Math.min(255, v * (1 + k))));
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+// survol (souris) pour un retour visuel discret
+const HOV = { x: -1, y: -1 };
+cv.addEventListener('pointermove', e => { const [x, y] = toGame(e); HOV.x = x; HOV.y = y; });
+cv.addEventListener('pointerleave', () => { HOV.x = HOV.y = -1; });
+const hov = (x, y, w, h) => HOV.x >= x && HOV.x <= x + w && HOV.y >= y && HOV.y <= y + h;
+
+// ---------- icônes vectorielles (viewBox 24) ----------
+const SVGI = {
+  build: ['M3 21V9l6-4v4l6-4v16H3zm3-3h2v-2H6v2zm0-4h2v-2H6v2zm4 4h2v-2h-2v2zm0-4h2v-2h-2v2zm6 7V3h5v18h-5z', 'f'],
+  swords: ['M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 17.5 21 6V3h-3L6.5 14.5M11 19l-6-6M8 16l-4 4M5 21l-2-2', 's', 2.4],
+  trophy: ['M7 3h10v2h4v3a5 5 0 0 1-5 5h-.3A5 5 0 0 1 13 15.9V18h3v3H8v-3h3v-2.1A5 5 0 0 1 8.3 13H8a5 5 0 0 1-5-5V5h4V3zm10 4v4a3 3 0 0 0 2-3V7h-2zM5 7v1a3 3 0 0 0 2 3V7H5z', 'f'],
+  crane: ['M6 21V4M3 21h7M6 4l15 2M6 4 2 6M6 8h15M18 8v5M16 13h4v3h-4z', 's', 2.2],
+  cart: ['M2 3h3l2.4 11h11l2.3-8H6.6L6.1 4H2zM9 20a2 2 0 1 0 0-.1zM17 20a2 2 0 1 0 0-.1z', 'f'],
+  gear: ['m12 1 2 3 3.5-.8.6 3.5L21 9l-1.7 3L21 15l-2.9 1.3-.6 3.5L14 19l-2 3-2-3-3.5.8-.6-3.5L3 15l1.7-3L3 9l2.9-1.3.6-3.5L10 4zm0 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'f'],
+  sound: ['M3 9h4l5-4v14l-5-4H3zM15 8a5 5 0 0 1 0 8l-1.3-1.5a3 3 0 0 0 0-5zM17.5 5a9 9 0 0 1 0 14l-1.3-1.5a7 7 0 0 0 0-11z', 'f'],
+  mute: ['M3 9h4l5-4v14l-5-4H3z', 'f'],
+  lock: ['M6 10V8a6 6 0 1 1 12 0v2h1v12H5V10zm3 0h6V8a3 3 0 0 0-6 0z', 'f'],
+  star: ['m12 2 3 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.7 21.4l1.5-7.1L1.8 9.4 9 8.6z', 'f'],
+  play: ['M7 4v16l13-8z', 'f'],
+  back: ['M15 5 8 12l7 7', 's', 3.2],
+  chev: ['m9 5 7 7-7 7', 's', 3.2],
+  redo: ['M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5', 's', 2.6],
+  clock: ['M21 12a9 9 0 1 1-18 0a9 9 0 1 1 18 0M12 7v5l3 2', 's', 2.6],
+  cal: ['M7 2h2v2h6V2h2v2h3v17H4V4h3zm-1 7v10h12V9z', 'f'],
+  bolt: ['M13 2 4 14h7l-1 8 9-12h-7z', 'f'],
+  hour: ['M6 2h12v5l-4 5 4 5v5H6v-5l4-5-4-5zm2 2v2.3l4 5 4-5V4z', 'f'],
+  user: ['M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm-9 10a9 7 0 0 1 18 0z', 'f'],
+};
+const P2D = {};
+function icon(name, x, y, size, col) {
+  const d = SVGI[name]; if (!d) return; const p = P2D[name] || (P2D[name] = new Path2D(d[0]));
+  c.save(); c.translate(x - size / 2, y - size / 2); c.scale(size / 24, size / 24);
+  if (d[1] === 'f') { c.fillStyle = col; c.fill(p, 'evenodd'); } else { c.strokeStyle = col; c.lineWidth = d[2]; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(p); }
+  c.restore();
+}
+
+// ---------- boutons en relief, très ronds, partout ----------
+function relief(x, y, w, h, colA, colB, r = Math.min(RAD, h / 2), lift = Math.min(10, Math.round(h * .09))) {
+  const hv = hov(x, y, w, h + lift), d = hv ? -2 : 0;
+  withShadow('rgba(0,0,0,.35)', 30, 0, 14, () => { rr(x, y + lift, w, h, r); c.fillStyle = shade(colB, -.42); c.fill(); });
+  rr(x, y + d, w, h, r); c.fillStyle = lg(0, y, 0, y + h, [[0, colA], [1, colB]]); c.fill();
+  c.save(); rr(x, y + d, w, h, r); c.clip();
+  fillR(x, y + d, w, h * .46, hv ? 'rgba(255,255,255,.17)' : 'rgba(255,255,255,.11)');
+  c.restore();
+  rr(x + 1, y + d + 1, w - 2, h - 2, r); c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 1.5; c.stroke();
+  return d;
+}
+function iconBtn(id, x, y, w, h, ic, label, colA, colB, textCol, size) {
+  const d = relief(x, y, w, h, colA, colB); size = size || Math.min(44, Math.round(h * .4));
+  c.font = `400 ${size}px ${TF}`; const tw = label ? c.measureText(tr(label)).width : 0, gap = ic && label ? size * .5 : 0, iw = ic ? size * 1.05 : 0;
+  let x0 = x + w / 2 - (tw + gap + iw) / 2;
+  if (ic) { icon(ic, x0 + iw / 2, y + h / 2 + d, iw, textCol); x0 += iw + gap; }
+  if (label) { if (textCol === '#fff') T(label, x0 + tw / 2, y + h / 2 + size * .36 + d + 2, 'rgba(0,0,0,.25)', size, 'center'); T(label, x0 + tw / 2, y + h / 2 + size * .36 + d, textCol, size, 'center'); }
+  G.buttons.push({ id, x, y, w, h: h + 10 });
+}
+button = function (id, x, y, w, h, label, colA, colB, textCol) {
+  let ic = null; const m = /^(◀|▶)\s*(.*)$/.exec(label || ''); if (m) { ic = m[1] === '◀' ? 'back' : 'play'; label = m[2]; }
+  iconBtn(id, x, y, w, h, ic, label, colA, colB, textCol === '#fff' || /rgba\(255,255,255/.test(colA) ? '#fff' : textCol, Math.min(38, Math.round(h * .4)));
+};
+smallBtn = function (id, x, y, w, h, label, kind) {
+  const cols = { go: PAL.play, buy: PAL.gold, off: ['rgba(255,255,255,.12)', 'rgba(255,255,255,.06)', 'rgba(255,255,255,.55)'], blue: ['#7cbcff', '#2e7be0', '#061a3a'] }[kind];
+  if (kind === 'off') { rr(x, y, w, h, Math.min(RAD, h / 2)); c.fillStyle = cols[0]; c.fill(); }
+  else relief(x, y, w, h, cols[0], cols[1], Math.min(RAD, h / 2), 6);
+  txt(label, x + w / 2, y + h / 2 + 8, kind === 'go' ? '#fff' : cols[2], Math.min(24, Math.round(h * .36)), 900, 'center'); if (kind !== 'off') G.buttons.push({ id, x, y, w, h });
+};
+// panneau en verre dépoli
+function uiPanel(x, y, w, h, r = RAD) {
+  withShadow('rgba(0,0,0,.35)', 40, 0, 16, () => { rr(x, y, w, h, r); c.fillStyle = PAL.panel; c.fill(); });
+  c.save(); rr(x, y, w, h, r); c.clip(); fillR(x, y, w, h, lg(0, y, 0, y + h, [[0, 'rgba(255,255,255,.07)'], [.5, 'rgba(255,255,255,0)']])); c.restore();
+  rr(x + .75, y + .75, w - 1.5, h - 1.5, r); c.strokeStyle = PAL.line; c.lineWidth = 1.5; c.stroke();
+}
+function chip(x, y, w, h) { uiPanel(x, y, w, h, h / 2); }
+function roundBtn(id, x, y, draw) { const on = hov(x - 36, y - 36, 72, 72); chip(x - 36, y - 36, 72, 72); if (on) ell(x, y, 35, 35, 'rgba(255,255,255,.08)'); draw(x, y); G.buttons.push({ id, x: x - 36, y: y - 36, w: 72, h: 72 }); }
+// icônes au trait (écran Niveaux)
+const ICN = {
+  play: (x, y, col, s = 1) => icon('play', x, y, 26 * s, col),
+  lock: (x, y, col, s = 1) => icon('lock', x, y, 24 * s, col),
+  check: (x, y, col, s = 1) => { c.strokeStyle = col; c.lineWidth = 3.5 * s; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 8 * s, y); c.lineTo(x - 2 * s, y + 6 * s); c.lineTo(x + 9 * s, y - 6 * s); c.stroke(); c.lineCap = 'butt'; },
+};
+
+// ---------- logo : crochet suspendu + O de POIL en cible ----------
+drawLogo = function (cx, cy, s = 1) {
+  c.save(); c.translate(cx, cy); c.scale(s, s);
+  c.font = `400 160px ${TF}`; c.textBaseline = 'alphabetic';
+  const wP = c.measureText('PILE').width, wP2 = c.measureText('P').width, wIL = c.measureText('IL').width, R = 60, gap = 34;
+  const total = wP + gap + wP2 + 8 + R * 2 + 8 + wIL, x0 = -total / 2, by = 58;
+  // câble et crochet au-dessus de l'espace entre les deux mots
+  const hx = x0 + wP + gap / 2;
+  ln(hx, -260, hx, -96, 'rgba(220,230,240,.85)', 4);
+  c.strokeStyle = '#ffc21a'; c.lineWidth = 10; c.lineCap = 'round'; c.beginPath(); c.moveTo(hx - 14, -96); c.lineTo(hx + 14, -96); c.moveTo(hx, -96); c.lineTo(hx, -70); c.arc(hx - 12, -70, 12, 0, Math.PI * .95); c.stroke(); c.lineCap = 'butt';
+  const word = (t, x, face, depth) => { c.textAlign = 'left';
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillText(t, x, by + 22);
+    c.fillStyle = depth; c.fillText(t, x, by + 9);
+    c.fillStyle = face; c.fillText(t, x, by); };
+  word('PILE', x0, '#ffc21a', '#9a6a00');
+  const px = x0 + wP + gap; word('P', px, '#ffffff', '#3a4b68');
+  // le O = cible verte
+  const ox = px + wP2 + 8 + R, oy = by - 58;
+  ell(ox, oy + 9, R, R, '#0b6b3d'); ell(ox, oy + 20, R, R, 'rgba(0,0,0,.25)'); ell(ox, oy + 9, R, R, '#0b6b3d');
+  ell(ox, oy, R, R, '#3cf29b'); ell(ox, oy, R * .67, R * .67, '#0b2a1b'); ell(ox, oy, R * .37, R * .37, '#3cf29b'); ell(ox, oy, R * .13, R * .13, '#0b2a1b');
+  word('IL', ox + R + 8, '#ffffff', '#3a4b68');
+  c.restore();
+};
+
+// ---------- barres du haut ----------
+function coinChip(x, y, alignRight) {   // pièces + « + » vers la boutique
+  c.font = '900 30px Inter'; const label = save.coins.toLocaleString('fr-FR'), w = c.measureText(label).width + 140, X = alignRight ? x - w : x;
+  chip(X, y, w, 72); coinIcon(X + 40, y + 36, 18); txt(label, X + 68, y + 47, PAL.text, 30, 900);
+  relief(X + w - 58, y + 14, 44, 44, PAL.play[0], PAL.play[1], 14, 4); ln(X + w - 36, y + 26, X + w - 36, y + 46, '#fff', 4); ln(X + w - 46, y + 36, X + w - 26, y + 36, '#fff', 4);
+  G.buttons.push({ id: 'shop', x: X, y, w, h: 72 }); return X;
+}
+function topBarUI() {
+  // compte (gauche)
+  const named = !!ACC.name, an = named ? ACC.name : (save.lang === 'en' ? 'Sign in' : 'Se connecter');
+  c.font = '900 28px Inter'; const nw = c.measureText(an).width; c.font = '800 26px Inter'; const lvTxt = named ? ` · ${tr('Niv.')} ${careerLevel()}` : '', lw = c.measureText(lvTxt).width, aw = nw + lw + 112;
+  chip(40, 40, aw, 72); ell(80, 76, 26, 26, named ? PAL.orange : 'rgba(255,255,255,.14)');
+  if (named) txt(an[0].toUpperCase(), 80, 86, '#2a1400', 28, 900, 'center'); else icon('user', 80, 76, 26, PAL.sub);
+  txt(an, 120, 86, PAL.text, 28, 900); if (named) txt(lvTxt, 120 + nw, 86, PAL.sub, 26, 800);
+  G.buttons.push({ id: 'account', x: 40, y: 40, w: aw, h: 72 });
+  // pièces, son, réglages (droite)
+  roundBtn('settings', 1844, 76, (x, y) => icon('gear', x, y, 36, '#fff'));
+  roundBtn('tgSound', 1760, 76, (x, y) => { icon(AU.sound ? 'sound' : 'mute', x, y, 36, AU.sound ? '#fff' : PAL.sub); if (!AU.sound) ln(x - 16, y - 16, x + 16, y + 16, PAL.red, 4); });
+  coinChip(1704, 40, true);
+}
+function navBar(backId, label) {   // écrans secondaires : ‹ TITRE à gauche, pièces à droite
+  c.font = `400 40px ${TF}`; const w = c.measureText(tr(label)).width + 130;
+  iconBtn(backId, 40, 34, w, 84, 'back', label, CARD.slate[0], CARD.slate[1], '#fff', 40);
+  coinChip(1880, 40, true);
+}
+
+// ---------- progression de carrière ----------
+save.lvl = save.lvl || {};   // { niveau: { s: étoiles, p: meilleur score } }
+const careerLevel = () => Math.max(1, Math.min(50, save.maxLevel || save.checkpoint || 1));
+function trancheName(t) { return ['Apprentissage', 'Mouvement', 'Conditions extrêmes', 'Travail de nuit', 'Chantier vivant', 'Master'][t]; }
+function totalStars() { return Object.values(save.lvl || {}).reduce((a, v) => a + (v.s || 0), 0); }
+function lvState(n) { const cur = careerLevel(); return n < cur || ((save.lvl || (save.lvl = {}))[n] && (save.lvl || (save.lvl = {}))[n].s) ? 'd' : n === cur ? 'c' : 'l'; }
+function untilMidnight() {   // temps restant avant le nouveau défi du jour (heure de Paris)
+  const p = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const h = +p.find(o => o.type === 'hour').value, m = +p.find(o => o.type === 'minute').value, left = 24 * 60 - (h * 60 + m);
+  return `${Math.floor(left / 60)} h ${String(left % 60).padStart(2, '0')}`;
+}
+function pastille(n, x, y, r, onCard) {  // une pastille du chemin : terminé / en cours / verrouillé
+  const st = lvState(n);
+  if (st === 'd') { ell(x, y + 5, r, r, onCard ? 'rgba(0,0,0,.18)' : '#0a6b3d'); ell(x, y, r, r, onCard ? '#fff' : lg(0, y - r, 0, y + r, [[0, '#4ef0a8'], [1, '#16a463']])); txt(String(n), x, y + r * .36, onCard ? '#0a6b3d' : '#fff', r * .9, 900, 'center'); }
+  else if (st === 'c') { ell(x, y, r + 12, r + 12, 'rgba(255,194,26,.25)'); ell(x, y + 5, r, r, '#9a6a00'); ell(x, y, r, r, lg(0, y - r, 0, y + r, [[0, '#ffd84f'], [1, '#f2a900']])); c.strokeStyle = '#fff'; c.lineWidth = 4; c.beginPath(); c.arc(x, y, r - 2, 0, 7); c.stroke(); txt(String(n), x, y + r * .36, onCard ? '#2a1a00' : '#fff', r * .9, 900, 'center'); }
+  else { ell(x, y, r, r, onCard ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.07)'); c.strokeStyle = onCard ? 'rgba(255,255,255,.12)' : PAL.line; c.lineWidth = 2; c.beginPath(); c.arc(x, y, r, 0, 7); c.stroke(); icon('lock', x, y, r * .8, onCard ? 'rgba(255,255,255,.55)' : PAL.sub); }
+  return st;
+}
+
+// ---------- ACCUEIL : carte Carrière + colonne ----------
+let titleBoardAsked = false;
+drawTitle = function () {
+  screenBg(); fillR(0, 0, W, H, rg(560, 640, 200, 1300, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.45)']]));
+  if (!titleBoardAsked && !DEMO && !WB.top) { titleBoardAsked = true; try { loadWorld(); } catch (e) {} }
+  topBarUI();
+  drawLogo(570, 300, .82);
+  // carte CARRIÈRE (CONTINUER est poussé en premier : il gagne le clic)
+  const cur = careerLevel(), t = trancheOf(cur), cp = save.checkpoint || 1, x = 120, y = 410, w = 900, h = 610;
+  const cy = y + h - 158;
+  relief(x, y, w, h, CARD.green[0], CARD.green[1], RAD + 4, 12);
+  iconBtn('play', x + 44, cy, w - 88, 116, 'play', cp > 1 ? `CONTINUER · NIV. ${cp}` : 'JOUER', PAL.gold[0], PAL.gold[1], '#2a1a00', 50);
+  G.buttons.push({ id: 'career', x, y, w, h });
+  icon('build', x + 84, y + 92, 76, '#fff');
+  T('CARRIÈRE', x + 140, y + 116, 'rgba(0,0,0,.2)', 78); T('CARRIÈRE', x + 140, y + 112, '#fff', 78);
+  txt(`${tr('Niveau')} ${cur} / 50 · ${tr(trancheName(t))}`, x + 142, y + 160, 'rgba(255,255,255,.92)', 30, 800);
+  icon('chev', x + w - 60, y + 104, 48, 'rgba(255,255,255,.85)');
+  // chemin de 6 pastilles autour du niveau en cours
+  const n0 = clamp(cur - 3, 1, 45), py = y + 286, step = (w - 176) / 5;
+  for (let i = 0; i < 5; i++) { const xa = x + 88 + i * step, done = lvState(n0 + i + 1) !== 'l'; fillR(xa, py - 6, step, 12, done ? '#fff' : 'rgba(0,0,0,.2)'); }
+  for (let i = 0; i < 6; i++) pastille(n0 + i, x + 88 + i * step, py, 46, true);
+  txt(`★ ${totalStars()}`, x + w - 44, y + 160, '#fff', 30, 900, 'right');
+  // barre des 5 étapes + prochain checkpoint
+  for (let k = 0; k < 5; k++) { const bx = x + 44 + k * ((w - 88 + 12) / 5), bw = (w - 88 + 12) / 5 - 12, f = clamp((cur - 1 - k * 10) / 10, 0, 1); rr(bx, y + 376, bw, 12, 6); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); if (f > 0) { rr(bx, y + 376, Math.max(12, bw * f), 12, 6); c.fillStyle = '#fff'; c.fill(); } }
+  const nextCp = CHECKPOINTS.find(k => k > cur) || 50;
+  txt(cur >= 50 ? 'Dernier niveau : le Master' : `Prochain checkpoint : niveau ${nextCp}`, x + 44, y + 424, 'rgba(255,255,255,.9)', 24, 800);
+  // colonne de droite
+  const done = save.dailyBonus === todayKey();
+  const rows = [
+    ['daily', 'orange', 'cal', 'DÉFI DU JOUR', done ? 'Bonus du jour gagné ✓' : `Même tirage pour tous · ${untilMidnight()}`, done ? null : 'NOUVEAU'],
+    ['catDefis', 'violet', 'swords', 'DUELS', 'En direct ou différé', null],
+    ['garage', 'blue', 'crane', 'GARAGE', 'Grues, peinture, équipement', null],
+    ['shop', 'gold', 'cart', 'BOUTIQUE', 'Packs de pièces', save.starterBought ? null : 'PROMO'],
+    ['board', 'slate', 'trophy', 'CLASSEMENTS', WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour', null],
+  ];
+  rows.forEach(([id, col, ic, title, sub, badge], i) => {
+    const rx = 1080, ry = 172 + i * 172, rw = 720, rh = 146, d = relief(rx, ry, rw, rh, CARD[col][0], CARD[col][1], RAD, 10), tc = col === 'gold' ? '#2a1a00' : '#fff';
+    ell(rx + 82, ry + rh / 2 + d, 46, 46, 'rgba(255,255,255,.2)'); icon(ic, rx + 82, ry + rh / 2 + d, 50, tc);
+    if (tc === '#fff') T(title, rx + 152, ry + 72 + d + 3, 'rgba(0,0,0,.2)', 50); T(title, rx + 152, ry + 72 + d, tc, 50);
+    txt(sub, rx + 154, ry + 112 + d, col === 'gold' ? 'rgba(42,26,0,.8)' : 'rgba(255,255,255,.88)', 26, 800);
+    icon('chev', rx + rw - 50, ry + rh / 2 + d, 40, col === 'gold' ? 'rgba(42,26,0,.7)' : 'rgba(255,255,255,.8)');
+    if (badge) { c.font = '900 20px Inter'; const bw = c.measureText(tr(badge)).width + 30; rr(rx + rw - 96 - bw, ry + 20 + d, bw, 36, 18); c.fillStyle = col === 'gold' ? '#e0392b' : '#fff'; c.fill(); txt(badge, rx + rw - 96 - bw / 2, ry + 45 + d, col === 'gold' ? '#fff' : CARD[col][2], 20, 900, 'center'); }
+    G.buttons.push({ id, x: rx, y: ry, w: rw, h: rh + 10 });
+  });
+  if (DEMO) txt('Mode démo : scores et duels restent sur cet appareil', 1440, 1064, '#ffb36b', 18, 700, 'center');
+};
+
+// ---------- écran CARRIÈRE : chemin de pastilles ----------
+const CV = { start: null };
+function drawCareer() {
+  screenBg(); navBar('carBack', 'CARRIÈRE');
+  const cur = careerLevel(), cp = save.checkpoint || 1, t = trancheOf(cur);
+  if (CV.start === null) CV.start = clamp(cur - 4, 1, 42);
+  txt('PROGRESSION', 960, 208, PAL.sub, 26, 900, 'center');
+  c.font = `400 76px ${TF}`; const head = `${tr('NIVEAU')} ${cur} / 50`, hw = c.measureText(head).width; c.font = `400 76px ${TF}`; const sw = c.measureText(`  ·  ${totalStars()}`).width;
+  const hx = 960 - (hw + sw + 64) / 2;
+  T(head, hx, 292, PAL.text, 76); T(`  ·  ${totalStars()}`, hx + hw, 292, PAL.yellow, 76); icon('star', hx + hw + sw + 36, 266, 60, PAL.yellow);
+  // étapes (cliquables : saute à l'étape)
+  const names = [0, 1, 2, 3, 4].map(k => tr(trancheName(k))); c.font = '800 22px Inter';
+  const ws = names.map(s => c.measureText(s).width + 40), tot = ws.reduce((a, b) => a + b, 0) + 14 * 4; let cx = 960 - tot / 2;
+  const tSel = trancheOf(CV.start + 4);
+  names.forEach((s, k) => { const on = k === Math.min(4, tSel), open = cur > k * 10;
+    rr(cx, 330, ws[k], 44, 22); c.fillStyle = on ? TRANCHE_COL[k] : PAL.panel; c.fill(); c.strokeStyle = open ? TRANCHE_COL[k] : PAL.line; c.lineWidth = 2; c.stroke();
+    txt(s, cx + ws[k] / 2, 359, on ? '#081626' : open ? PAL.text : PAL.sub, 22, 800, 'center'); G.buttons.push({ id: 'cvT:' + k, x: cx, y: 330, w: ws[k], h: 44 }); cx += ws[k] + 14; });
+  // chemin en zigzag
+  const N = 9, x0 = 230, dx = 182, yA = 500, yB = 580, P = i => [x0 + i * dx, i % 2 ? yB : yA];
+  for (let i = 1; i < N; i++) { const [ax, ay] = P(i - 1), [bx, by] = P(i), n = CV.start + i, ok = lvState(n) !== 'l';
+    c.save(); c.setLineDash(ok ? [] : [4, 22]); c.lineCap = 'round'; ln(ax, ay, bx, by, ok ? PAL.green : 'rgba(255,255,255,.2)', 14); c.restore(); }
+  for (let i = 0; i < N; i++) { const n = CV.start + i, [px, py] = P(i), st = pastille(n, px, py, 58, false);
+    if (st === 'd') { const s = (save.lvl || (save.lvl = {}))[n] ? (save.lvl || (save.lvl = {}))[n].s : 1; for (let k = 0; k < 3; k++) icon('star', px - 30 + k * 30, py + 90, 28, k < s ? PAL.yellow : 'rgba(255,255,255,.2)'); G.buttons.push({ id: 'lvP:' + n, x: px - 58, y: py - 58, w: 116, h: 116 }); }
+    if (st === 'c') { rr(px - 80, py - 122, 160, 44, 22); c.fillStyle = '#fff'; c.fill(); txt('En cours', px, py - 91, '#2a1a00', 22, 900, 'center'); G.buttons.push({ id: 'play', x: px - 58, y: py - 58, w: 116, h: 116 }); }
+  }
+  // flèches pour faire défiler le chemin
+  if (CV.start > 1) roundBtn('cvL', 100, 540, (x, y) => icon('back', x, y, 34, '#fff'));
+  if (CV.start < 42) roundBtn('cvR', 1820, 540, (x, y) => icon('chev', x, y, 34, '#fff'));
+  iconBtn('play', 640, 716, 640, 132, 'play', cp > 1 ? `CONTINUER · NIV. ${cp}` : 'JOUER', PAL.gold[0], PAL.gold[1], '#2a1a00', 58);
+  iconBtn('levels', 560, 900, 390, 96, null, 'Choisir un niveau', CARD.slate[0], CARD.slate[1], '#fff', 34);
+  iconBtn('resetCareer', 970, 900, 390, 96, 'redo', 'Recommencer', CARD.slate[0], CARD.slate[1], '#fff', 34);
+  if (cp < cur) txt(`Reprise au checkpoint ${cp} (les niveaux suivants se rejouent depuis là)`, 960, 1050, PAL.sub, 20, 700, 'center');
+}
+
+// ---------- écran DÉFIS ET DUELS : 3 cartes pleines ----------
+function drawDefis() {
+  screenBg(); navBar('defBack', 'DÉFIS ET DUELS');
+  const done = save.dailyBonus === todayKey();
+  const cards = [
+    ['daily', 'orange', 'cal', 'DÉFI DU JOUR', 'Même tirage pour tous', done ? 'Bonus du jour gagné ✓' : `+15 pièces · ${untilMidnight()}`, done ? 'REJOUER' : 'JOUER'],
+    ['live', 'red', 'bolt', 'DUEL EN DIRECT', 'Contre un ami connecté', 'Salon avec un code', 'JOUER'],
+    ['duel', 'blue', 'hour', 'DUEL DIFFÉRÉ', 'Chacun à son rythme', 'Envoie le lien', 'JOUER'],
+  ];
+  cards.forEach(([id, col, ic, title, sub, pill, cta], i) => {
+    const x = 130 + i * 570, y = 170, w = 520, h = 680, d = relief(x, y, w, h, CARD[col][0], CARD[col][1], RAD + 4, 12);
+    iconBtn(id, x + 40, y + h - 150, w - 80, 110, 'play', cta, '#ffffff', '#e8eef6', CARD[col][2], 50);
+    G.buttons.push({ id, x, y, w, h });
+    ell(x + w / 2, y + 160 + d, 96, 96, 'rgba(255,255,255,.2)'); icon(ic, x + w / 2, y + 160 + d, 110, '#fff');
+    T(title, x + w / 2, y + 340 + d + 4, 'rgba(0,0,0,.2)', 54, 'center'); T(title, x + w / 2, y + 340 + d, '#fff', 54, 'center');
+    txt(sub, x + w / 2, y + 392 + d, 'rgba(255,255,255,.95)', 30, 800, 'center');
+    c.font = '900 26px Inter'; const pw = c.measureText(tr(pill)).width + 44; rr(x + w / 2 - pw / 2, y + 420 + d, pw, 48, 24); c.fillStyle = 'rgba(0,0,0,.2)'; c.fill(); txt(pill, x + w / 2, y + 453 + d, '#fff', 26, 900, 'center');
+  });
+  chip(660, 924, 600, 84); txt('5 chantiers  ·  3 vies  ·  même tirage', 960, 976, PAL.sub, 28, 800, 'center');
+}
+
+// ---------- écran NIVEAUX : 5 immeubles (1 étage = 1 niveau) + cartes ----------
+const LVS = { t: null };
+function drawLevels() {
+  screenBg(); navBar('lvBack', 'NIVEAUX');
+  const cur = careerLevel(); if (LVS.t === null) LVS.t = Math.min(4, trancheOf(cur));
+  txt(`★ ${totalStars()} / 150 étoiles`, 960, 180, PAL.sub, 24, 800, 'center');
+  // panorama des 5 chantiers
+  const gy = 420;
+  ln(150, gy, 1770, gy, 'rgba(255,255,255,.14)', 2);
+  for (let k = 0; k < 5; k++) {
+    const cx = 270 + k * 345, col = TRANCHE_COL[k], sel = LVS.t === k, lock = cur <= k * 10, isCur = cur > k * 10 && cur <= k * 10 + 10;
+    if (sel) { rr(cx - 150, 214, 300, 250, 20); c.fillStyle = col + '18'; c.fill(); rr(cx - 150, 214, 300, 250, 20); c.strokeStyle = col + 'aa'; c.lineWidth = 2; c.stroke(); }
+    for (let f = 0; f < 10; f++) { const lv = k * 10 + f + 1, y = gy - 4 - f * 17, w = 120 - f * 2.4, st = lv < cur ? 'd' : lv === cur ? 'c' : 'l';
+      if (st === 'd') { rr(cx - w / 2, y - 14, w, 14, 2); c.fillStyle = col + (sel ? 'ee' : 'a0'); c.fill(); }
+      else if (st === 'c') { withShadow(col, 18, 0, 0, () => { rr(cx - w / 2, y - 14, w, 14, 2); c.fillStyle = '#fff'; c.fill(); }); }
+      else { c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 1; c.strokeRect(cx - w / 2, y - 14, w, 14); } }
+    if (isCur) { const top = gy - 4 - 10 * 17 - 22; ln(cx + 70, top, cx + 70, gy, PAL.yellow, 2.5); ln(cx - 60, top, cx + 96, top, PAL.yellow, 2.5); ln(cx, top, cx, gy - 4 - (cur - 1 - k * 10) * 17 - 30, 'rgba(255,255,255,.7)', 1.5); }
+    txt(trancheName(k), cx, gy + 30, lock ? PAL.sub : col, 17, 800, 'center');
+    const st = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].reduce((a, i) => a + (((save.lvl || (save.lvl = {}))[k * 10 + i] || {}).s || 0), 0);
+    if (lock) { ICN.lock(cx - 46, gy + 50, PAL.sub, .7); txt('Verrouillé', cx + 8, gy + 56, PAL.sub, 14, 700, 'center'); } else txt(`${k * 10 + 1}–${k * 10 + 10} · ★ ${st}/30`, cx, gy + 56, PAL.sub, 14, 700, 'center');
+    G.buttons.push({ id: 'lvT:' + k, x: cx - 150, y: 214, w: 300, h: 270 });
+  }
+  // cartes des 10 niveaux de la tranche choisie
+  const k = LVS.t, col = TRANCHE_COL[k];
+  for (let i = 0; i < 10; i++) {
+    const n = k * 10 + i + 1, x = 150 + (i % 5) * 330, y = 520 + Math.floor(i / 5) * 270, w = 300, h = 248, st = n < cur ? 'd' : n === cur ? 'c' : 'l', rec = (save.lvl || (save.lvl = {}))[n];
+    uiPanel(x, y, w, h, 20);
+    if (st === 'c') { rr(x, y, w, h, 20); c.strokeStyle = PAL.yellow; c.lineWidth = 3; c.stroke(); } else if (st === 'd') { rr(x, y, w, h, 20); c.strokeStyle = col + '88'; c.lineWidth = 2; c.stroke(); }
+    // vignette du chantier
+    c.save(); rr(x + 12, y + 12, w - 24, 104, 14); c.clip();
+    fillR(x + 12, y + 12, w - 24, 104, lg(0, y + 12, 0, y + 116, k === 3 ? [[0, '#0b1530'], [1, '#1d2a4a']] : k === 2 ? [[0, '#56606e'], [1, '#8a96a3']] : [[0, '#5aa9e6'], [1, '#bfe0f7']]));
+    fillR(x + 12, y + 92, w - 24, 24, '#6b4a2b'); const hw = 30 + (10 - i) * 4; fillR(x + w / 2 - hw / 2, y + 92, hw, 24, '#140a04');
+    ln(x + 40, y + 34, x + w - 40, y + 34, PAL.yellow, 3); ln(x + w / 2, y + 34, x + w / 2, y + 66, '#e6eef8', 1.5); fillR(x + w / 2 - 14, y + 66, 28, 16, '#c9d0d6');
+    if (st === 'l') fillR(x + 12, y + 12, w - 24, 104, 'rgba(8,12,24,.68)'); c.restore();
+    txt(`Niveau ${n}`, x + 22, y + 156, st === 'l' ? PAL.sub : PAL.text, 24, 900);
+    if (st === 'd') { ICN.check(x + w - 34, y + 148, PAL.green, 1); for (let s = 0; s < 3; s++) txt('★', x + 24 + s * 28, y + 196, s < (rec ? rec.s : 1) ? PAL.yellow : 'rgba(255,255,255,.16)', 24, 900, 'left', 'sans-serif'); txt(rec && rec.p ? `Record ${rec.p.toLocaleString('fr-FR')}` : 'Terminé', x + w - 22, y + 194, PAL.sub, 15, 700, 'right'); smallBtn('lvP:' + n, x + 22, y + 206, w - 44, 32, 'REJOUER', 'off'); G.buttons.push({ id: 'lvP:' + n, x: x + 22, y: y + 206, w: w - 44, h: 32 }); }
+    else if (st === 'c') smallBtn('play', x + 22, y + 178, w - 44, 54, '▶  JOUER', 'go');
+    else { ICN.lock(x + w - 34, y + 150, PAL.sub, .9); txt('Termine le niveau précédent', x + 22, y + 196, PAL.sub, 15, 700); }
+  }
+}
+drawOnline = (prev => function () { if (G.screen === 'defis') drawDefis(); else if (G.screen === 'levels') drawLevels(); else if (G.screen === 'career') drawCareer(); else prev(); })(drawOnline);
+// ⓘ « comment gagner des pièces » : bulle en haut à droite de l'onglet Peinture & tenue
+GA.info = false;
+drawGarage = (prev => function () {
+  prev();
+  if (GA.tab !== 'style' || MO) { GA.info = false; return; }
+  const x = 1846, y = 147, on = GA.info || hov(x - 32, y - 32, 64, 64);
+  ell(x, y, 30, 30, on ? PAL.yellow : 'rgba(255,194,26,.18)'); c.strokeStyle = PAL.yellow; c.lineWidth = 2.5; c.beginPath(); c.arc(x, y, 30, 0, 7); c.stroke();
+  txt('i', x, y + 11, on ? '#2a1a00' : PAL.yellow, 32, 900, 'center', 'Georgia, serif');
+  if (!GA.info) { G.buttons.unshift({ id: 'coinInfo', x: x - 34, y: y - 34, w: 68, h: 68 }); return; }
+  const L = ['Chantier réussi en Carrière : 2 à 6 pièces', 'Lancer parfait : +2 pièces', "1er passage d'un checkpoint : +25 pièces", 'Défi du jour terminé (1 fois par jour) : +15', 'Premier Master Niveau réussi : +150'];
+  const bw = 640, bx = 1880 - bw, by = 196, bh = 132 + L.length * 44 + 76;
+  withShadow('rgba(0,0,0,.45)', 50, 0, 20, () => { rr(bx, by, bw, bh, 30); c.fillStyle = '#ffffff'; c.fill(); });
+  c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(x - 18, by + 1); c.lineTo(x, by - 18); c.lineTo(x + 18, by + 1); c.fill();
+  coinIcon(bx + 52, by + 58, 20); T('Comment gagner des pièces', bx + 86, by + 72, '#18202e', 38);
+  L.forEach((s, k) => { ell(bx + 50, by + 124 + k * 44, 6, 6, PAL.play[1]); txt(s, bx + 72, by + 132 + k * 44, '#2b3445', 24, 800); });
+  const sy = by + bh - 92; smallBtn('coinInfoShop', bx + 36, sy, 300, 60, 'VOIR LA BOUTIQUE', 'buy');
+  rr(bx + 352, sy, bw - 388, 60, 30); c.fillStyle = '#eef2f7'; c.fill(); txt('FERMER', bx + 352 + (bw - 388) / 2, sy + 39, '#3a4b68', 22, 900, 'center');
+  // la bulle capte tous les clics : boutique, sinon fermeture
+  const shopBtn = G.buttons.pop();
+  G.buttons.unshift(shopBtn, { id: 'coinInfo', x: 0, y: 0, w: W, h: H });
+})(drawGarage);
+
+// ---------- étoiles et records par niveau (Carrière et rejouer) ----------
+finish = (prev => function (lvl, res) {
+  const before = G.score; prev(lvl, res);
+  if ((G.mode || 'career') !== 'career' || lvl.C.t === 5 && !(res === 'in' || res === 'perfect')) return;
+  if (res === 'in' || res === 'perfect') {
+    const n = lvl.C.n, stars = res === 'perfect' ? 3 : (lvl.tries || 0) === 0 ? 2 : 1, rec = (save.lvl || (save.lvl = {}))[n] || { s: 0, p: 0 }, gained = G.score - before;
+    (save.lvl || (save.lvl = {}))[n] = { s: Math.max(rec.s, stars), p: Math.max(rec.p, gained) }; writeSave(save);
+    if (stars > rec.s) FX.pops.push({ text: '★'.repeat(stars), x: lvl.target ? lvl.target.x + lvl.target.w / 2 : 960, y: GY - 180, t: -.4, col: PAL.yellow });
+  }
+})(finish);
+// nombre d'essais sur un niveau (pour les étoiles « réussi du premier coup »)
+startLevel = (prev => function (n) { const again = L && L.C && L.C.n === n && G.screen === 'play'; const tries = again ? (L.tries || 0) + 1 : 0; prev(n); if (L) L.tries = tries; })(startLevel);
+
+// ---------- rejouer un niveau terminé ----------
+afterResult = (prev => function () {
+  if (!G.replay) return prev();
+  const r = L.result, ok = r === 'in' || r === 'perfect';
+  if (ok || G.lives <= 0) { G.replay = false; CV.start = null; G.screen = 'career'; toast(ok ? (save.lang === 'en' ? `Level ${L.C.n} cleared!` : `Niveau ${L.C.n} réussi !`) : (save.lang === 'en' ? 'Out of lives' : 'Plus de vies'), ok ? PAL.green : PAL.red); return; }
+  startLevel(G.level);
+})(afterResult);
+
+// ---------- actions ----------
+act = (prev => function (id) {
+  let mt;
+  if (id === 'levels') { sfx.click(); LVS.t = null; G.screen = 'levels'; return; }
+  if (id === 'coinInfo') { sfx.click(); GA.info = !GA.info; return; }
+  if (id === 'coinInfoShop') { GA.info = false; return act('shop'); }
+  if (id === 'career') { sfx.click(); CV.start = null; G.screen = 'career'; return; }
+  if (id === 'lvBack') { sfx.click(); CV.start = null; G.screen = 'career'; return; }
+  if (id === 'carBack' || id === 'defBack') { sfx.click(); G.screen = 'title'; return; }
+  if (id === 'cvL' || id === 'cvR') { sfx.click(); CV.start = clamp(CV.start + (id === 'cvL' ? -9 : 9), 1, 42); return; }
+  if ((mt = id.match(/^cvT:(\d)$/))) { sfx.click(); CV.start = clamp(+mt[1] * 10 + 1, 1, 42); return; }
+  if (id === 'catDefis') { sfx.click(); G.screen = 'defis'; return; }
+  if (id === 'catGarage') return act('garage');
+  if (id === 'catBoard') return act('board');
+  if (id === 'catShop') return act('shop');
+  if ((mt = id.match(/^gar:(\w+)$/))) { act('garage'); GA.tab = mt[1]; return; }
+  if ((mt = id.match(/^brd:(\w+)$/))) { act('board'); if (mt[1] === 'day') act('tabDay'); return; }
+  if ((mt = id.match(/^lvT:(\d)$/))) { sfx.click(); LVS.t = +mt[1]; return; }
+  if ((mt = id.match(/^lvP:(\d+)$/))) { sfx.click(); const n = +mt[1]; G.mode = 'career'; G.runSeed = 0; G.replay = true; G.lives = 3; G.score = 0; G.checkpoint = n; startLevel(n); return; }
+  if (id === 'menu' && G.replay) G.replay = false;
+  return prev(id);
+})(act);
+// retour avec Échap
+addEventListener('keydown', e => { if (e.key !== 'Escape' || MO || (ACCO && !ACCO.hidden)) return; if (G.screen === 'levels') act('lvBack'); else if (G.screen === 'defis') act('defBack'); else if (G.screen === 'career') act('carBack'); });
+// le jeu en « rejouer » ne touche pas au checkpoint de la carrière
+gotoCheckpointScreen = (prev => function (n) { if (G.replay) { G.replay = false; CV.start = null; G.screen = 'career'; return; } prev(n); })(gotoCheckpointScreen);
+
+Object.assign(EN, {
+  'CARRIÈRE': 'CAREER', 'PROGRESSION': 'PROGRESS', 'NIVEAU': 'LEVEL', 'Niveau': 'Level', 'Niv.': 'Lvl', 'En cours': 'Current', 'Choisir un niveau': 'Pick a level', 'Recommencer': 'Restart', 'DUELS': 'DUELS', 'En direct ou différé': 'Live or async', 'GARAGE': 'GARAGE', 'Grues, peinture, équipement': 'Cranes, paint, equipment', 'BOUTIQUE': 'SHOP', 'CLASSEMENTS': 'LEADERBOARDS', 'Mondial et du jour': 'World and daily', 'PROMO': 'DEAL', 'Bonus du jour gagné ✓': "Today's bonus earned ✓",
+  'DÉFIS ET DUELS': 'CHALLENGES & DUELS', 'Même tirage pour tous': 'Same draw for everyone', 'Contre un ami connecté': 'Against an online friend', 'Salon avec un code': 'Room with a code', 'Chacun à son rythme': 'Each at their own pace', 'Envoie le lien': 'Send the link', '5 chantiers  ·  3 vies  ·  même tirage': '5 sites  ·  3 lives  ·  same draw', 'Comment gagner des pièces': 'How to earn coins', 'VOIR LA BOUTIQUE': 'SEE THE SHOP', 'Se connecter': 'Sign in', 'Dernier niveau : le Master': 'Last level: the Master',
+  'Gagner des pièces': 'Earn coins', 'FERMER': 'CLOSE', 'Chantier réussi en Carrière : 2 à 6 pièces': 'Site cleared in Career: 2 to 6 coins', 'Lancer parfait : +2 pièces': 'Perfect drop: +2 coins', "1er passage d'un checkpoint : +25 pièces": 'First time at a checkpoint: +25 coins', 'Défi du jour terminé (1 fois par jour) : +15': 'Daily challenge done (once a day): +15', 'Premier Master Niveau réussi : +150': 'First Master Level cleared: +150', 'Ou en un instant dans la boutique': 'Or instantly in the shop',
+  'DÉFIS': 'CHALLENGES', 'NIVEAUX': 'LEVELS', '▶  JOUER': '▶  PLAY', 'Défi du jour': 'Daily challenge', 'Duel en direct': 'Live duel', 'Duel différé': 'Async duel', 'Grues': 'Cranes', 'Peinture & tenue': 'Paint & outfit', 'Équipement': 'Equipment', 'Mondial': 'World',
+  'Packs de pièces': 'Coin packs', 'Pack Démarrage': 'Starter pack', 'NOUVEAU': 'NEW', 'Mode démo : scores et duels restent sur cet appareil': 'Demo mode: scores and duels stay on this device', '5 chantiers · 3 vies · le même tirage pour chaque joueur': '5 sites · 3 lives · the same draw for every player',
+  'DÉFI DU JOUR': 'DAILY CHALLENGE', 'Un nouveau tirage chaque jour à minuit': 'A new draw every day at midnight', 'Classement du jour': "Today's leaderboard", 'Bonus du jour déjà gagné ✓': "Today's bonus already earned ✓", 'Bonus : +15 pièces': 'Bonus: +15 coins', 'REJOUER': 'PLAY AGAIN', 'JOUER': 'PLAY',
+  'Affronte un ami en même temps': 'Face a friend at the same time', 'Salon avec un code à partager': 'Room with a code to share', 'Tu vois sa grue en direct': "You see their crane live", 'CRÉER / REJOINDRE': 'CREATE / JOIN',
+  'Joue maintenant, envoie le lien': 'Play now, send the link', 'Ton ami relève le défi plus tard': 'Your friend takes it on later', 'Mêmes chantiers, même météo': 'Same sites, same weather', 'LANCER': 'START', 'Verrouillé': 'Locked', 'Terminé': 'Completed', 'Termine le niveau précédent': 'Finish the previous level',
+  'Apprentissage': 'Apprenticeship', 'Mouvement': 'Motion', 'Conditions extrêmes': 'Extreme conditions', 'Travail de nuit': 'Night shift', 'Chantier vivant': 'Live site', 'Master': 'Master',
+});
+EN_RX.push([/^Niveau (\d+)$/, 'Level $1'], [/^(.*) · checkpoint (\d+)$/, (m, a, b) => `${tr(a)} · checkpoint ${b}`], [/^★ (\d+) \/ 150 étoiles$/, '★ $1 / 150 stars'], [/^Record (.*)$/, 'Best $1'], [/^(\d+)–(\d+) · ★ (.*)$/, '$1–$2 · ★ $3'], [/^CONTINUER · NIV\. (\d+)$/, 'CONTINUE · LVL $1'], [/^Même tirage pour tous · (.*)$/, 'Same draw for everyone · $1'], [/^\+15 pièces · (.*)$/, '+15 coins · $1'], [/^N°1 : (.*)$/, 'No. 1: $1'], [/^Prochain checkpoint : niveau (\d+)$/, 'Next checkpoint: level $1'], [/^Reprise au checkpoint (\d+) .*$/, 'Restarts at checkpoint $1 (later levels are replayed from there)']);
 
 // =====================================================================
 //  PILE POIL — REMISE À ZÉRO DE SAISON (une seule fois par appareil)
