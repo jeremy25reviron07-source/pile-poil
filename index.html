@@ -3286,6 +3286,8 @@ async function loadWorld() { const reg = WB.reg; try { const l = await DB.career
 async function sendCareer(force, reg) {
   reg = reg || window.REGION || 'fr'; const b = regData(reg).cbest, name = playerName();
   if (!b || !b.score || name.length < 2 || WB.sending || (b.sent3 && !force)) return;
+  if (b.reg && b.reg !== reg) return;                                         // record d'un autre pays : jamais envoyé ici
+  const mx = regData(reg).maxLevel || 1; if (b.level > mx + 1) return;      // record plus loin que la progression du pays : incohérent
   WB.sending = true;
   try {
     const r = await DB.submitCareer({ name, score: Math.min(b.score, CAREER_MAX(b.level)), level: b.level, region: reg });
@@ -3299,12 +3301,15 @@ async function sendCareer(force, reg) {
 // suivi du record de carrière (uniquement en mode Carrière) et envoi automatique aux étapes clés
 let wbPrevScreen = G.screen;
 setInterval(() => {
-  if ((G.mode || 'career') === 'career' && G.score > 0) {
+  // le record ne suit que la partie en cours, dans son propre pays (sinon, en revenant au menu
+  // après le Japon, le score du Japon était recopié dans le record de France)
+  if (G.screen === 'play' && L && !G.replay) G.runRegion = window.REGION || 'fr';
+  if ((G.mode || 'career') === 'career' && G.score > 0 && G.screen === 'play' && G.runRegion === (window.REGION || 'fr')) {
     const b = save.cbest || { score: 0, level: 1 };
-    if (G.score > b.score) { save.cbest = { score: G.score, level: G.level, sent: false }; writeSave(save); }
+    if (G.score > b.score) { save.cbest = { score: G.score, level: G.level, sent: false, reg: G.runRegion }; writeSave(save); }
   }
   if (G.screen !== wbPrevScreen) {
-    if (wbPrevScreen === 'play' && ['checkpoint', 'gameover', 'victory', 'title'].includes(G.screen) && (G.mode || 'career') === 'career') sendCareer();
+    if (wbPrevScreen === 'play' && ['checkpoint', 'gameover', 'victory', 'title'].includes(G.screen) && (G.mode || 'career') === 'career') sendCareer(false, G.runRegion);
     wbPrevScreen = G.screen;
   }
 }, 400);
@@ -3329,11 +3334,11 @@ function boardOverlayEl() {
   BDO.querySelector('#bdSend').onclick = () => {
     const v = n.value.replace(/[^\p{L}\p{N} _\-.]/gu, '').slice(0, 16);
     if (v.length < 2) { WB.msg = 'Entre un pseudo (2 à 16 caractères)'; return; }
-    save.name = v; writeSave(save); sendCareer(true);
+    save.name = v; writeSave(save); sendCareer(true, WB.reg);
   };
   return BDO;
 }
-function needPseudoPanel() { return G.screen === 'board' && WB.tab === 'world' && save.cbest && save.cbest.score > 0 && (!save.cbest.sent || playerName().length < 2); }
+function needPseudoPanel() { const b = regData(WB.reg).cbest; return G.screen === 'board' && WB.tab === 'world' && b && b.score > 0 && (!b.sent || playerName().length < 2); }
 setInterval(() => {
   const show = needPseudoPanel();
   if (show) { const o = boardOverlayEl(); if (o.hidden || !o.dataset.init) { o.hidden = false; o.dataset.init = 1; const n = o.querySelector('#bdName'); if (!n.value) n.value = playerName(); } }
