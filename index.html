@@ -4225,12 +4225,15 @@ drawLevel = (prev => function (lvl) {
 //  PILE POIL — BOUTIQUE (Stripe) + validation de tous les achats + bonus de progression
 // =====================================================================
 const SHOP_LINKS = (window.PP_CONFIG && window.PP_CONFIG.shop) || {};
+// boutique fermée tant que config.js n'a pas shopOpen: true (paiements pas encore activés)
+const SHOP_OPEN = !!(window.PP_CONFIG && window.PP_CONFIG.shopOpen);
+const shopBientot = () => modal({ title: 'BOUTIQUE BIENTÔT OUVERTE', lines: ['Les achats seront disponibles très prochainement.', 'En attendant, gagne des pièces en jouant :', 'missions du jour, caisse du chantier et roue des paliers.'], yes: 'OK', no: null });
 const OFFERS = [
   { id: 'starter', name: 'Pack Démarrage', coins: 2500, euros: '2,99 €', once: true, item: 'chrome', tag: 'UNE SEULE FOIS', desc: '2 500 pièces + peinture Chrome exclusive' },
   { id: 'p1', name: 'Poignée de pièces', coins: 1000, euros: '1,99 €' },
-  { id: 'p2', name: 'Sac de pièces', coins: 3000, euros: '4,99 €', bonus: '+20 %' },
-  { id: 'p3', name: 'Coffre de chantier', coins: 6500, euros: '9,99 €', bonus: '+30 %', tag: 'POPULAIRE' },
-  { id: 'p4', name: 'Benne de pièces', coins: 14000, euros: '19,99 €', bonus: '+40 %', tag: 'MEILLEURE OFFRE' },
+  { id: 'p2', name: 'Sac de pièces', coins: 3000, ancien: '5,90 €', euros: '4,99 €', bonus: '−15 %' },
+  { id: 'p3', name: 'Coffre de chantier', coins: 6500, ancien: '12,90 €', euros: '9,99 €', bonus: '−22 %', tag: 'POPULAIRE' },
+  { id: 'p4', name: 'Benne de pièces', coins: 14000, ancien: '27,80 €', euros: '19,99 €', bonus: '−28 %', tag: 'MEILLEURE OFFRE' },
 ];
 if (!save.pid) { save.pid = (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16))); writeSave(save); }
 save.cpDone = save.cpDone || [];
@@ -4273,7 +4276,7 @@ act = (prev => function (id) {
   if (MO) return;
   if (id === 'shop') { sfx.click(); SH.from = G.screen === 'shop' ? SH.from : G.screen; G.screen = 'shop'; claimPurchases(false); return; }
   if (id === 'shopBack') { sfx.click(); G.screen = SH.from === 'garage' ? 'garage' : 'title'; return; }
-  if (id === 'restore') { sfx.click(); claimPurchases(true); return; }
+  if (id === 'restore') { sfx.click(); if (!SHOP_OPEN) return shopBientot(); claimPurchases(true); return; }
   if (id.startsWith('of_buy_')) return askPay(OFFERS.find(o => o.id === id.slice(7)));
   const info = purchaseInfo(id);
   if (info && !SH.confirmed) {
@@ -4292,7 +4295,7 @@ function askPay(o) {
   if (!o) return;
   if (o.once && save.starterBought) return modal({ title: 'DÉJÀ ACHETÉ', lines: ['Le Pack Démarrage ne s\'achète qu\'une fois.'], yes: 'OK', no: null });
   const link = SHOP_LINKS[o.id];
-  if (!link || DEMO) return modal({ title: 'BOUTIQUE EN PRÉPARATION', lines: ['Les paiements ne sont pas encore activés.', 'Reviens bientôt !'], yes: 'OK', no: null });
+  if (!SHOP_OPEN || !link || DEMO) return shopBientot();
   modal({ title: `${o.name.toUpperCase()} · ${o.euros}`, lines: [`${o.coins.toLocaleString('fr-FR')} pièces${o.item ? ' + peinture Chrome exclusive' : ''}`, 'Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay).', 'Contenu numérique livré tout de suite : tu renonces au délai', 'de rétractation de 14 jours. Mineur ? Demande l\'accord d\'un parent.'], yes: `PAYER ${o.euros}`, no: 'ANNULER',
     onYes: () => { const u = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(save.pid); location.href = u; } });
 }
@@ -4326,7 +4329,8 @@ function drawShop() {
   txt('BOUTIQUE', 960, 92, '#c77dff', 64, 900, 'center');
   button('shopBack', 40, 30, 220, 64, '◀ RETOUR', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
   coinPill(1380, 34);
-  txt('Fais avancer ton parc de grues plus vite · les pièces achetées sont créditées sur cet appareil', 960, 150, '#cfe0ff', 21, 700, 'center');
+  if (SHOP_OPEN) txt('Fais avancer ton parc de grues plus vite · les pièces achetées sont créditées sur cet appareil', 960, 150, '#cfe0ff', 21, 700, 'center');
+  else { rr(560, 124, 800, 44, 22); c.fillStyle = '#ffd447'; c.fill(); txt('BIENTÔT DISPONIBLE · les achats ouvrent très prochainement', 960, 154, '#2a1a00', 20, 900, 'center'); }
   // pack démarrage
   const st = OFFERS[0], owned = !!save.starterBought;
   rr(110, 190, 1700, 230, 26); c.fillStyle = lg(110, 0, 1810, 0, [[0, 'rgba(199,125,255,.32)'], [1, 'rgba(255,212,71,.22)']]); c.fill(); rr(110, 190, 1700, 230, 26); c.strokeStyle = '#ffd447'; c.lineWidth = 3; c.stroke();
@@ -4345,9 +4349,20 @@ function drawShop() {
     txt(o.name, x + w / 2, y + 268, '#fff', 26, 900, 'center');
     coinIcon(x + w / 2 - 92, y + 314, 20); txt(o.coins.toLocaleString('fr-FR'), x + w / 2 + 12, y + 328, '#ffd447', 44, 900, 'center');
     if (o.bonus) { rr(x + w - 104, y + 40, 84, 34, 17); c.fillStyle = '#3cf29b'; c.fill(); txt(o.bonus, x + w - 62, y + 64, '#06210f', 17, 900, 'center'); }
-    smallBtn('of_buy_' + o.id, x + 45, y + 356, w - 90, 64, o.euros, hot ? 'go' : 'buy');
+    const bx = x + 45, by = y + 356, bw = w - 90, bh = 64;
+    smallBtn('of_buy_' + o.id, bx, by, bw, bh, o.ancien ? '' : o.euros, hot ? 'go' : 'buy');
+    if (o.ancien) {
+      // ancien prix barré à gauche, nouveau prix à droite, sur le bouton
+      const ink = hot ? '#06210f' : '#2a1a00';
+      c.font = '800 20px Inter'; const wa = c.measureText(o.ancien).width; c.font = '900 26px Inter'; const wn = c.measureText(o.euros).width;
+      const gap = 18, x0 = bx + bw / 2 - (wa + gap + wn) / 2, ty = by + bh / 2 + 9;
+      c.globalAlpha = .55; txt(o.ancien, x0, ty - 1, ink, 20, 800); c.globalAlpha = 1;
+      c.strokeStyle = '#d6202f'; c.lineWidth = 3; c.beginPath(); c.moveTo(x0 - 3, ty - 8); c.lineTo(x0 + wa + 3, ty - 8); c.stroke();
+      txt(o.euros, x0 + wa + gap, ty + 1, ink, 26, 900);
+    }
   });
-  txt('Paiement sécurisé par Stripe · aucune donnée bancaire ne passe par le jeu · achat définitif', 960, 940, 'rgba(255,255,255,.6)', 18, 700, 'center');
+  txt('Prix barrés : la même quantité de pièces au tarif de la Poignée (1,99 € les 1 000 pièces)', 960, 918, 'rgba(255,255,255,.5)', 16, 700, 'center');
+  txt('Paiement sécurisé par Stripe · aucune donnée bancaire ne passe par le jeu · achat définitif', 960, 946, 'rgba(255,255,255,.6)', 18, 700, 'center');
   smallBtn('restore', 760, 965, 400, 56, 'RESTAURER MES ACHATS', 'blue');
   if (SH.msg) txt(SH.msg, 960, 1060, '#ffd447', 20, 800, 'center');
 }
@@ -5172,7 +5187,7 @@ drawTitle = function () {
     ['catEpreuves', 'orange', 'helmet', 'ÉPREUVES', typeof epreuvesRowSub === 'function' ? epreuvesRowSub() : '', done ? null : 'NOUVEAU'],
     ['catDefis', 'violet', 'swords', 'DUELS', 'En direct ou chacun son tour', (typeof tdPendingCount === 'function' && tdPendingCount()) ? `${tdPendingCount()} À TOI` : null],
     ['garage', 'blue', 'crane', 'GARAGE', 'Grues, peinture, équipement', null],
-    ['shop', 'gold', 'cart', 'BOUTIQUE', 'Packs de pièces', save.starterBought ? null : 'PROMO'],
+    ['shop', 'gold', 'cart', 'BOUTIQUE', 'Packs de pièces', typeof SHOP_OPEN !== 'undefined' && !SHOP_OPEN ? 'BIENTÔT' : save.starterBought ? null : 'PROMO'],
     ['board', 'slate', 'trophy', 'CLASSEMENTS', (typeof crateNews === 'function' && crateNews()) || (WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour'), null],
   ];
   rows.forEach(([id, col, ic, title, sub, badge], i) => {
@@ -5356,7 +5371,7 @@ addEventListener('keydown', e => { if (e.key !== 'Escape' || MO || (ACCO && !ACC
 gotoCheckpointScreen = (prev => function (n) { if (G.replay) { G.replay = false; CV.start = null; G.screen = 'career'; return; } prev(n); })(gotoCheckpointScreen);
 
 Object.assign(EN, {
-  'CARRIÈRE': 'CAREER', 'PROGRESSION': 'PROGRESS', 'NIVEAU': 'LEVEL', 'Niveau': 'Level', 'Niv.': 'Lvl', 'En cours': 'Current', 'Choisir un niveau': 'Pick a level', 'Recommencer': 'Restart', 'DUELS': 'DUELS', 'En direct ou différé': 'Live or async', 'GARAGE': 'GARAGE', 'Grues, peinture, équipement': 'Cranes, paint, equipment', 'BOUTIQUE': 'SHOP', 'CLASSEMENTS': 'LEADERBOARDS', 'Mondial et du jour': 'World and daily', 'PROMO': 'DEAL', 'Bonus du jour gagné ✓': "Today's bonus earned ✓",
+  'CARRIÈRE': 'CAREER', 'PROGRESSION': 'PROGRESS', 'NIVEAU': 'LEVEL', 'Niveau': 'Level', 'Niv.': 'Lvl', 'En cours': 'Current', 'Choisir un niveau': 'Pick a level', 'Recommencer': 'Restart', 'DUELS': 'DUELS', 'En direct ou différé': 'Live or async', 'GARAGE': 'GARAGE', 'Grues, peinture, équipement': 'Cranes, paint, equipment', 'BOUTIQUE': 'SHOP', 'CLASSEMENTS': 'LEADERBOARDS', 'Mondial et du jour': 'World and daily', 'PROMO': 'DEAL', 'BIENTÔT': 'SOON', 'BOUTIQUE BIENTÔT OUVERTE': 'SHOP OPENING SOON', 'BIENTÔT DISPONIBLE · les achats ouvrent très prochainement': 'COMING SOON · purchases open very soon', 'Bonus du jour gagné ✓': "Today's bonus earned ✓",
   'DÉFIS ET DUELS': 'CHALLENGES & DUELS', 'Même tirage pour tous': 'Same draw for everyone', 'Contre un ami connecté': 'Against an online friend', 'Salon avec un code': 'Room with a code', 'Chacun à son rythme': 'Each at their own pace', 'Envoie le lien': 'Send the link', '5 chantiers  ·  3 vies  ·  même tirage': '5 sites  ·  3 lives  ·  same draw', 'Comment gagner des pièces': 'How to earn coins', 'VOIR LA BOUTIQUE': 'SEE THE SHOP', 'Se connecter': 'Sign in', 'Dernier niveau : le Master': 'Last level: the Master',
   'Gagner des pièces': 'Earn coins', 'FERMER': 'CLOSE', 'Chantier réussi en Carrière : 2 à 6 pièces': 'Site cleared in Career: 2 to 6 coins', 'Lancer parfait : +2 pièces': 'Perfect drop: +2 coins', "1er passage d'un checkpoint : +25 pièces": 'First time at a checkpoint: +25 coins', 'Défi du jour terminé (1 fois par jour) : +15': 'Daily challenge done (once a day): +15', 'Premier Master Niveau réussi : +150': 'First Master Level cleared: +150', 'Ou en un instant dans la boutique': 'Or instantly in the shop',
   'DÉFIS': 'CHALLENGES', 'NIVEAUX': 'LEVELS', '▶  JOUER': '▶  PLAY', 'Défi du jour': 'Daily challenge', 'Duel en direct': 'Live duel', 'Duel différé': 'Async duel', 'Grues': 'Cranes', 'Peinture & tenue': 'Paint & outfit', 'Équipement': 'Equipment', 'Mondial': 'World',

@@ -1,6 +1,8 @@
 window.PP_CONFIG = {
   url: 'https://bcysxilkhnpayvfhlkju.supabase.co',
   key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjeXN4aWxraG5wYXl2Zmhsa2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MjU4NTAsImV4cCI6MjEwNzQwMTg1MH0.M0huMkiTDPDfpCL8-w2p_u0lmGcqIwlj6SFhjm3ZhVU',
+  // Boutique : passer à true quand le SIRET et le compte Stripe réel sont prêts
+  shopOpen: false,
   // Liens de paiement Stripe (Payment Links) : colle chaque lien entre les guillemets
   shop: {
     starter: 'https://buy.stripe.com/test_aFadR8ard7sTb4p4K54Vy00',   // Pack Démarrage · 2,99 €
