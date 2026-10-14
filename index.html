@@ -3263,29 +3263,34 @@ act = (prev => function (id) {
 //  PILE POIL — CLASSEMENT MONDIAL (meilleur score de carrière de chaque joueur)
 //  + classement du jour, dans un même écran à onglets
 // =====================================================================
-const WB = { list: null, msg: '', tab: 'world', page: 0, rank: null, total: null, top: null, sending: false };
+const WB = { list: null, msg: '', tab: 'world', page: 0, rank: null, total: null, top: null, sending: false, reg: 'fr', ranks: {} };
+const WB_REG = [['fr', 'France'], ['jp', 'Japon'], ['eg', 'Égypte']];
 const CAREER_MAX = lvl => 225 * lvl * (lvl + 1);   // plafond théorique (tout parfait, combo ×3)
 
 if (SB) {
-  DB.career = async () => { const { data, error } = await SB.from('career').select('name,score,level').order('score', { ascending: false }).limit(100); if (error) throw new Error('Classement mondial indisponible : ' + (error.message || error.code || '').slice(0, 90)); return data; };
+  DB.career = async (reg = 'fr') => {
+    if (!DB.noRegTable) { const { data, error } = await SB.from('career_reg').select('name,score,level').eq('region', reg).order('score', { ascending: false }).limit(100); if (!error) return data; DB.noRegTable = true; }
+    if (reg !== 'fr') throw new Error('Classement de ce pays bientôt disponible');
+    const { data, error } = await SB.from('career').select('name,score,level').order('score', { ascending: false }).limit(100); if (error) throw new Error('Classement mondial indisponible : ' + (error.message || error.code || '').slice(0, 90)); return data; };
   DB.submitCareer = async b => { const { data, error } = await SB.rpc('submit_career', { p_name: b.name, p_score: b.score, p_level: b.level }); err(error); return data; };
 } else {
-  DB.career = async () => (DB._r('career') || []).slice(0, 100);
-  DB.submitCareer = async b => { const l = DB._r('career') || [], i = l.findIndex(s => s.name.toLowerCase() === b.name.toLowerCase()), row = { name: b.name, score: b.score, level: b.level };
-    if (i < 0) l.push(row); else if (b.score > l[i].score) l[i] = row; l.sort((a, c2) => c2.score - a.score); DB._w('career', l); const me = l.find(s => s.name.toLowerCase() === b.name.toLowerCase());
+  DB.career = async (reg = 'fr') => (DB._r('career_' + reg) || []).slice(0, 100);
+  DB.submitCareer = async b => { const key = 'career_' + (b.region || 'fr'), l = DB._r(key) || [], i = l.findIndex(s => s.name.toLowerCase() === b.name.toLowerCase()), row = { name: b.name, score: b.score, level: b.level };
+    if (i < 0) l.push(row); else if (b.score > l[i].score) l[i] = row; l.sort((a, c2) => c2.score - a.score); DB._w(key, l); const me = l.find(s => s.name.toLowerCase() === b.name.toLowerCase());
     return { rank: l.indexOf(me) + 1, total: l.length, best: me.score }; };
 }
 
-async function loadWorld() { try { WB.list = await DB.career(); WB.top = WB.list[0] || null; WB.msg = '';
-  const i = playerName() ? WB.list.findIndex(s => s.name === playerName()) : -1; if (i >= 0) { WB.rank = i + 1; WB.total = Math.max(WB.total || 0, WB.list.length); } } catch (e) { WB.list = []; WB.msg = e.message; } }
-async function sendCareer(force) {
-  const b = save.cbest, name = playerName();
-  if (!b || !b.score || name.length < 2 || WB.sending || (b.sent && !force)) return;
+async function loadWorld() { const reg = WB.reg; try { const l = await DB.career(reg); if (reg !== WB.reg) return; WB.list = l; if (reg === 'fr' || !WB.top) WB.top = reg === 'fr' ? l[0] || null : WB.top; WB.msg = '';
+  const i = playerName() ? l.findIndex(s => s.name === playerName()) : -1; if (i >= 0) WB.ranks[reg] = { rank: i + 1, total: Math.max((WB.ranks[reg] || {}).total || 0, l.length) }; } catch (e) { if (reg === WB.reg) { WB.list = []; WB.msg = e.message; } } }
+async function sendCareer(force, reg) {
+  reg = reg || window.REGION || 'fr'; const b = regData(reg).cbest, name = playerName();
+  if (!b || !b.score || name.length < 2 || WB.sending || (b.sent3 && !force)) return;
   WB.sending = true;
   try {
-    const r = await DB.submitCareer({ name, score: Math.min(b.score, CAREER_MAX(b.level)), level: b.level });
-    b.sent = true; writeSave(save); WB.rank = r.rank; WB.total = r.total; WB.msg = `Record envoyé · tu es ${r.rank}e sur ${r.total} au classement mondial`;
-    loadWorld();
+    const r = await DB.submitCareer({ name, score: Math.min(b.score, CAREER_MAX(b.level)), level: b.level, region: reg });
+    if (r.region || !SB) b.sent3 = true;
+    if (r.rank) { b.sent = true; WB.ranks[reg] = { rank: r.rank, total: r.total }; if (reg === 'fr') { WB.rank = r.rank; WB.total = r.total; } WB.msg = `Record envoyé · tu es ${r.rank}e sur ${r.total} au classement mondial`; }
+    writeSave(save); if (reg === WB.reg) loadWorld();
   } catch (e) { WB.msg = e.message; }
   WB.sending = false;
 }
@@ -3302,7 +3307,7 @@ setInterval(() => {
     wbPrevScreen = G.screen;
   }
 }, 400);
-loadWorld().then(() => sendCareer());
+loadWorld().then(async () => { for (const r of ['fr', 'jp', 'eg']) { try { await sendCareer(false, r); } catch (e) {} } });
 
 // ---------- panneau HTML : pseudo pour le classement mondial ----------
 let BDO = null;
@@ -3340,13 +3345,15 @@ drawBoard = function () {
   txt('CLASSEMENTS', 960, 110, '#ffc21a', 60, 900, 'center');
   const tab = (id, x, label, on) => { rr(x, 140, 300, 60, 30); c.fillStyle = on ? '#ffc21a' : 'rgba(255,255,255,.12)'; c.fill(); txt(label, x + 150, 180, on ? '#1a1300' : '#fff', 22, 900, 'center'); G.buttons.push({ id, x, y: 140, w: 300, h: 60 }); };
   tab('tabWorld', 640, '🌍  MONDIAL', WB.tab === 'world'); tab('tabDay', 980, '📅  DÉFI DU JOUR', WB.tab === 'day');
-  const x = 400, y = 230, w = 1120;
+  let x = 400, y = 230; const w = 1120;
+  if (WB.tab === 'world') { let cx = 960 - (3 * 230 + 2 * 16) / 2; WB_REG.forEach(([r, n]) => { const on = WB.reg === r, hv = hov(cx, 222, 230, 58); rr(cx, 222, 230, 58, 29); c.fillStyle = on ? 'rgba(255,194,26,.22)' : hv ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.07)'; c.fill(); if (on) { c.strokeStyle = '#ffc21a'; c.lineWidth = 2; c.stroke(); }
+      flag(r, cx + 18, 232); txt(n, cx + 90, 261, on ? '#ffc21a' : '#fff', 22, 900); G.buttons.push({ id: 'wbReg:' + r, x: cx, y: 222, w: 230, h: 58 }); cx += 246; }); y = 300; }
   if (WB.tab === 'day') { drawBoardList(x, y, w, (ON.board || []).slice(0, 15)); if (ON.msg) txt(ON.msg, 960, 960, '#ffd447', 22, 800, 'center'); }
   else {
-    const rows = WB.list || [], per = 11, pages = Math.max(1, Math.ceil(rows.length / per)); WB.page = clamp(WB.page, 0, pages - 1);
+    const rows = WB.list || [], per = 10, pages = Math.max(1, Math.ceil(rows.length / per)); WB.page = clamp(WB.page, 0, pages - 1);
     const vis = rows.slice(WB.page * per, WB.page * per + per);
     rr(x, y, w, 110 + per * 44, 22); c.fillStyle = 'rgba(12,18,32,.82)'; c.fill();
-    txt('MEILLEUR SCORE EN CARRIÈRE', x + 30, y + 44, '#ffc21a', 24, 900); txt('NIVEAU', x + w - 260, y + 44, '#9fb7cf', 18, 900, 'right'); txt('SCORE', x + w - 30, y + 44, '#9fb7cf', 18, 900, 'right');
+    txt(`MEILLEUR SCORE EN CARRIÈRE · ${(WB_REG.find(q => q[0] === WB.reg) || WB_REG[0])[1].toUpperCase()}`, x + 30, y + 44, '#ffc21a', 24, 900); txt('NIVEAU', x + w - 260, y + 44, '#9fb7cf', 18, 900, 'right'); txt('SCORE', x + w - 30, y + 44, '#9fb7cf', 18, 900, 'right');
     if (!rows.length) txt(WB.list === null ? 'Chargement…' : 'Aucun record pour l\'instant : sois le premier grutier classé !', x + 30, y + 100, '#cfe0ff', 22, 700);
     vis.forEach((s, i) => {
       const rank = WB.page * per + i + 1, yy = y + 96 + i * 44, me = s.name === playerName();
@@ -3363,11 +3370,11 @@ drawBoard = function () {
       if (WB.page > 0) button('pgPrev', 660, y + 110 + per * 44 + 14, 140, 56, '◀', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
       if (WB.page < pages - 1) button('pgNext', 1120, y + 110 + per * 44 + 14, 140, 56, '▶', 'rgba(255,255,255,.2)', 'rgba(255,255,255,.1)', '#fff');
     }
-    const b = save.cbest;
+    const b = regData(WB.reg).cbest, rk = WB.ranks[WB.reg] || {};
     const info = !b || !b.score ? 'Joue en Carrière : ton meilleur score y sera publié automatiquement'
       : needPseudoPanel() ? `Ton record : ${b.score.toLocaleString('fr-FR')} pts (niveau ${b.level}) · choisis un pseudo pour le publier`
-      : WB.rank ? `Ton record : ${b.score.toLocaleString('fr-FR')} pts · ${WB.rank === 1 ? '1er' : WB.rank + 'e'} sur ${WB.total} grutier${WB.total > 1 ? 's' : ''}` : `Ton record : ${b.score.toLocaleString('fr-FR')} pts (niveau ${b.level})`;
-    txt(WB.msg && !WB.msg.startsWith('Record') ? WB.msg : info, 960, 945, WB.msg && !WB.msg.startsWith('Record') ? '#ffd447' : '#cfe0ff', 22, 800, 'center');
+      : rk.rank ? `Ton record : ${b.score.toLocaleString('fr-FR')} pts · ${rk.rank === 1 ? '1er' : rk.rank + 'e'} sur ${rk.total} grutier${rk.total > 1 ? 's' : ''}` : `Ton record : ${b.score.toLocaleString('fr-FR')} pts (niveau ${b.level})`;
+    txt(WB.msg && !WB.msg.startsWith('Record') ? WB.msg : info, 960, 975, WB.msg && !WB.msg.startsWith('Record') ? '#ffd447' : '#cfe0ff', 22, 800, 'center');
   }
 };
 
@@ -3387,7 +3394,8 @@ act = (prev => function (id) {
   if (id === 'tabDay') { WB.tab = 'day'; sfx.click(); ON.board = null; ON.msg = ''; loadBoard(); return; }
   if (id === 'pgPrev') { WB.page--; sfx.click(); return; }
   if (id === 'pgNext') { WB.page++; sfx.click(); return; }
-  if (id === 'board') { WB.tab = 'world'; WB.page = 0; WB.list = null; loadWorld(); }
+  if (id.startsWith('wbReg:')) { sfx.click(); WB.reg = id.slice(6); WB.page = 0; WB.list = null; WB.msg = ''; loadWorld(); return; }
+  if (id === 'board') { WB.tab = 'world'; WB.page = 0; WB.list = null; WB.reg = ['fr', 'jp', 'eg'].includes(save.lastRegion) ? save.lastRegion : 'fr'; loadWorld(); }
   return prev(id);
 })(act);
 
@@ -4593,7 +4601,11 @@ setInterval(() => { if (ACC.token && document.visibilityState === 'visible') acc
 // classements : un pseudo de compte ne peut être utilisé que par son propriétaire
 if (SB) {
   DB.submit = async b => { const { data, error } = await SB.rpc('submit_score2', { p_day: b.day, p_name: b.name, p_score: b.score, p_passed: b.passed, p_perfects: Math.min(5, b.perfects), p_token: ACC.token || null }); if (error) throw new Error(error.message); return data; };
-  DB.submitCareer = async b => { const { data, error } = await SB.rpc('submit_career2', { p_name: b.name, p_score: b.score, p_level: b.level, p_token: ACC.token || null }); if (error) throw new Error(error.message); return data; };
+  DB.submitCareer = async b => {
+    const reg = b.region || 'fr';
+    if (!DB.noReg) { const { data, error } = await SB.rpc('submit_career3', { p_name: b.name, p_score: b.score, p_level: b.level, p_token: ACC.token || null, p_region: reg }); if (!error) return data; if (!/submit_career3|schema cache|function/i.test(error.message || '')) throw new Error(error.message); DB.noReg = true; }
+    if (reg !== 'fr') return { rank: null, total: null };   // classement par pays pas encore installé : on garde le record pour plus tard
+    const { data, error } = await SB.rpc('submit_career2', { p_name: b.name, p_score: b.score, p_level: b.level, p_token: ACC.token || null }); if (error) throw new Error(error.message); return data; };
 }
 // les champs « pseudo » des écrans en ligne reprennent le nom du compte
 setInterval(() => { if (!ACC.name) return; ['ovName', 'lvName', 'bdName'].forEach(id => { const el = document.getElementById(id); if (el && el.value !== ACC.name) { el.value = ACC.name; el.readOnly = true; } }); }, 400);
@@ -6137,11 +6149,16 @@ function survLevel(k) {   // le k-ième chantier : difficulté croissante, tirag
   const t = Math.min(4, Math.floor((k - 1) / 5)), lo = k > 25 ? 31 : t * 10 + 1, span = k > 25 ? 19 : t === 4 ? 9 : 10;
   return lo + Math.floor(SV.rng() * span);
 }
-function helmetCracked(x, y, s, col = '#fff', crack = '#a3122a') {
-  c.save(); c.translate(x, y); c.scale(s, s);
-  c.fillStyle = col; c.beginPath(); c.moveTo(-40, 10); c.bezierCurveTo(-40, -40, 40, -40, 40, 10); c.closePath(); c.fill();
-  rr(-50, 6, 100, 12, 6); c.fill(); fillR(-6, -34, 12, 30, 'rgba(0,0,0,.12)');
-  c.strokeStyle = crack; c.lineWidth = 5; c.lineJoin = 'round'; c.beginPath(); c.moveTo(-6, -32); c.lineTo(4, -18); c.lineTo(-8, -6); c.lineTo(6, 8); c.stroke();
+// icône du mode Survie : une charge au crochet et un seul cœur (une erreur et c'est fini)
+function helmetCracked(x, y, s, col = '#fff', heart = '#a3122a') {
+  c.save(); c.translate(x, y - 6); c.scale(s, s); c.lineCap = 'round'; c.lineJoin = 'round';
+  rr(-16, -52, 32, 18, 5); c.fillStyle = col; c.fill(); ell(0, -43, 4, 4, heart === 'rgba(0,0,0,0)' ? col : heart);
+  c.strokeStyle = col; c.lineWidth = 5; c.beginPath(); c.moveTo(0, -34); c.lineTo(0, -16); c.stroke();
+  c.lineWidth = 7; c.beginPath(); c.moveTo(0, -18); c.lineTo(0, -6); c.arc(-7, -4, 7, 0, Math.PI * 1.05); c.stroke();
+  c.lineWidth = 4; c.beginPath(); c.moveTo(0, -6); c.lineTo(-28, 16); c.moveTo(0, -6); c.lineTo(28, 16); c.stroke();
+  rr(-38, 16, 76, 40, 7); c.fillStyle = col; c.fill(); fillR(-26, 28, 22, 4, 'rgba(0,0,0,.14)'); fillR(6, 40, 20, 4, 'rgba(0,0,0,.14)');
+  if (heart !== 'rgba(0,0,0,0)') { const hx = 34, hy = -30, r = 13; c.fillStyle = heart; c.strokeStyle = col; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(hx, hy + r * 1.1); c.bezierCurveTo(hx - r * 1.6, hy, hx - r * .9, hy - r * 1.2, hx, hy - r * .35); c.bezierCurveTo(hx + r * .9, hy - r * 1.2, hx + r * 1.6, hy, hx, hy + r * 1.1); c.closePath(); c.stroke(); c.fill(); }
   c.restore();
 }
 
@@ -8672,6 +8689,348 @@ drawRegions = (prev => function () { prev(); const y = 1000, p = .5 + .5 * Math.
 Object.assign(EN, { 'De nouveaux pays arrivent au fil des saisons': 'New countries are on the way, season after season' });
 
 // =====================================================================
+//  PILE POIL — CLIN D'ŒIL À ROUEN : les 10 premiers chantiers de France
+//  Colombages, Gros-Horloge, cathédrale et sa flèche, Vieux-Marché, quais de Seine,
+//  pont Flaubert, Armada, côte Sainte-Catherine, abbatiale Saint-Ouen
+// =====================================================================
+const ROUEN = [
+  { name: 'Réhabilitation de maisons à colombages', place: 'Rue du Gros-Horloge · Rouen (76)', moa: 'Ville de Rouen', sc: 'horloge', tod: 'matin', g: 'terre', L: 'excavator', R: 'dump', st: ['pallets', 'cones', 'wc'] },
+  { name: 'Fondations du parvis de la cathédrale', place: 'Place de la Cathédrale · Rouen (76)', moa: 'Métropole Rouen Normandie', sc: 'cathedrale', tod: 'midi', g: 'gravier', L: 'mixer', R: 'tele', st: ['pallets', 'rebar'] },
+  { name: 'Réaménagement de la place', place: 'Place du Vieux-Marché · Rouen (76)', moa: 'Ville de Rouen', sc: 'vieuxmarche', tod: 'aprem', g: 'gravier', L: 'excavator', R: 'base', st: ['cones', 'skip'] },
+  { name: 'Abords de l\'abbatiale Saint-Ouen', place: 'Jardin de l\'Hôtel de Ville · Rouen (76)', moa: 'Ville de Rouen', sc: 'stouen', tod: 'matin', g: 'terre', L: 'drill', R: 'dump', st: ['rebar', 'gba'] },
+  { name: 'Restauration de l\'Aître Saint-Maclou', place: 'Rue Martainville · Rouen (76)', moa: 'Métropole Rouen Normandie', sc: 'maclou', tod: 'midi', g: 'terre', L: 'tele', R: 'base', st: ['pallets', 'cones'] },
+  { name: 'Extension du Palais de Justice', place: 'Rue aux Juifs · Rouen (76)', moa: 'Ministère de la Justice', sc: 'palais', tod: 'aprem', g: 'gravier', L: 'mixer', R: 'dump', st: ['rebar', 'skip'] },
+  { name: 'Halles de l\'église Sainte-Jeanne-d\'Arc', place: 'Place du Vieux-Marché · Rouen (76)', moa: 'Ville de Rouen', sc: 'jeanne', tod: 'soir', g: 'gravier', L: 'drill', R: 'tele', st: ['rebar', 'gba'] },
+  { name: 'Confortement des quais bas', place: 'Quai de Boisguilbert · Rouen (76)', moa: 'Grand port maritime', sc: 'quais', tod: 'matin', g: 'sable', L: 'excavator', R: 'base', st: ['pallets', 'wc'] },
+  { name: 'Culée du pont Flaubert', place: 'Pont Gustave-Flaubert · Rouen (76)', moa: 'État · Direction des routes', sc: 'armada', tod: 'midi', g: 'gravier', L: 'mixer', R: 'dump', st: ['cones', 'rebar'] },
+  { name: 'Belvédère du panorama de Rouen', place: 'Côte Sainte-Catherine · Rouen (76)', moa: 'Métropole Rouen Normandie', sc: 'panorama', tod: 'coucher', g: 'argile', L: 'drill', R: 'base', st: ['pallets', 'skip'] },
+];
+ROUEN.forEach((r, i) => { THEMES[i] = Object.assign({}, THEMES[i], r, { bd: 'rouen', rouen: r.sc }); });
+
+// ---------- palette ----------
+const RW = ['#f1e4c6', '#e9c98a', '#d7714f', '#a8bdcc', '#b9cba8', '#f3d9a0', '#e3b3a0', '#efe7d8'];   // enduits des colombages
+const RT = '#4a2e1c';                                                                                   // pans de bois
+const hz = (col, P, k) => hazeCol(col, P, k);
+
+// ---------- maison à colombages (encorbellement, pans de bois, croix de Saint-André, toit d'ardoise) ----------
+function colo(x, base, w, nf, P, k, o = {}) {
+  const fh = o.fh || 44, wall = o.wall || RW[Math.floor(rnd() * RW.length)], tim = hz(o.tim || RT, P, k), night = P.night;
+  let y = base, top = base, xs = x, ws = w;
+  // rez-de-chaussée : pierre + boutique
+  fillR(x, base - fh * 1.15, w, fh * 1.15, hz('#d6c7a9', P, k)); top = base - fh * 1.15;
+  if (!o.noShop) { const sw = w * .7, sx = x + (w - sw) / 2; fillR(sx, base - fh * .95, sw, fh * .95, hz(night ? '#3a2a1a' : '#2c3644', P, k)); if (night) fillR(sx + 4, base - fh * .9, sw - 8, fh * .6, 'rgba(255,200,120,.75)');
+    const aw = ['#b8322a', '#2f5d8a', '#2f7a4a', '#c08a1a'][Math.floor(rnd() * 4)]; for (let s = 0; s < sw; s += 10) fillR(sx + s, base - fh * 1.05, 10, 10, hz(s / 10 % 2 ? '#f2ede2' : aw, P, k)); }
+  // étages en encorbellement
+  for (let f = 1; f < nf; f++) {
+    const ov = f * 5, fx = x - ov, fw = w + ov * 2, fy = top - fh;
+    fillR(fx, fy, fw, fh, hz(wall, P, k));
+    fillR(fx, top - 4, fw, 5, tim); fillR(fx, fy, fw, 4, tim); fillR(fx, fy, 4, fh, tim); fillR(fx + fw - 4, fy, 4, fh, tim);
+    const n = Math.max(3, Math.round(fw / 18)), st = fw / n;
+    for (let s = 1; s < n; s++) fillR(fx + s * st - 1.5, fy, 3, fh, tim);
+    for (let s = 0; s < n; s++) { const px = fx + s * st; if ((s + f) % 3 === 0) { ln(px, fy + fh, px + st, fy, tim, 2.4); ln(px, fy, px + st, fy + fh, tim, 2.4); } else if ((s + f) % 3 === 1 && s % 2) ln(px, fy + fh, px + st, fy + fh * .45, tim, 2.4); }
+    // fenêtres à petits carreaux
+    const nw = Math.max(1, Math.floor(fw / 46)); for (let q = 0; q < nw; q++) { const wx = fx + fw * (q + .5) / nw - 9, wy = fy + 9; fillR(wx - 2, wy - 2, 22, fh - 16, hz('#efeae0', P, k)); fillR(wx, wy, 18, fh - 20, night ? (rnd() < .55 ? 'rgba(255,206,130,.95)' : '#1b2335') : hz('#6f8ea8', P, k + .05)); fillR(wx + 8, wy, 2, fh - 20, hz('#efeae0', P, k)); fillR(wx, wy + (fh - 20) / 2, 18, 2, hz('#efeae0', P, k)); }
+    top = fy; xs = fx; ws = fw;
+  }
+  // toit : pignon sur rue (triangle à pans de bois) ou long pan d'ardoise avec lucarne
+  const rc = hz(night ? '#2a3140' : '#56616f', P, k);
+  if (o.gable) {
+    const gh = ws * .62; c.fillStyle = hz(wall, P, k); c.beginPath(); c.moveTo(xs, top); c.lineTo(xs + ws / 2, top - gh); c.lineTo(xs + ws, top); c.fill();
+    c.strokeStyle = tim; c.lineWidth = 3; c.beginPath(); c.moveTo(xs, top); c.lineTo(xs + ws / 2, top - gh); c.lineTo(xs + ws, top); c.moveTo(xs + ws / 2, top - gh); c.lineTo(xs + ws / 2, top); c.moveTo(xs + ws * .25, top - gh * .5); c.lineTo(xs + ws * .75, top - gh * .5); c.stroke();
+    c.fillStyle = rc; c.beginPath(); c.moveTo(xs - 8, top + 2); c.lineTo(xs + ws / 2, top - gh - 8); c.lineTo(xs + ws + 8, top + 2); c.lineTo(xs + ws + 2, top + 2); c.lineTo(xs + ws / 2, top - gh + 2); c.lineTo(xs - 2, top + 2); c.fill();
+  } else {
+    const rh = Math.min(70, ws * .5); c.fillStyle = rc; c.beginPath(); c.moveTo(xs - 6, top); c.lineTo(xs + ws * .2, top - rh); c.lineTo(xs + ws * .8, top - rh); c.lineTo(xs + ws + 6, top); c.fill();
+    for (let r = 1; r < 5; r++) ln(xs + r * 3, top - r * rh / 5, xs + ws - r * 3, top - r * rh / 5, 'rgba(0,0,0,.12)', 1);
+    const dx = xs + ws * .38; fillR(dx, top - rh * .7, 20, rh * .5, hz('#e6dfd2', P, k)); fillR(dx + 4, top - rh * .62, 12, rh * .34, night ? 'rgba(255,206,130,.9)' : hz('#6f8ea8', P, k)); c.fillStyle = rc; c.beginPath(); c.moveTo(dx - 4, top - rh * .7); c.lineTo(dx + 10, top - rh * .92); c.lineTo(dx + 24, top - rh * .7); c.fill();
+    fillR(xs + ws * .72, top - rh - 18, 12, 24, hz('#9a4a32', P, k));
+  }
+  return top;
+}
+function coloRow(x0, x1, base, P, k, o = {}) { let x = x0; while (x < x1) { const w = (o.wMin || 70) + rnd() * ((o.wMax || 110) - (o.wMin || 70)); colo(x, base, w, (o.fMin || 3) + Math.floor(rnd() * ((o.fMax || 5) - (o.fMin || 3) + 1)), P, k, { fh: o.fh, gable: rnd() < (o.gable ?? .45), noShop: o.noShop }); x += w + (o.gap ?? 14); } }
+
+// ---------- Gros-Horloge (arche Renaissance + cadran doré) et beffroi ----------
+function grosHorloge(cx, base, P, k) {
+  const st = hz('#e3d6bb', P, k), sd = hz('#c4b493', P, k), rc = hz(P.night ? '#2a3140' : '#4e5866', P, k), gold = P.night ? '#d9b04a' : '#e7b62c';
+  // beffroi gothique à gauche
+  const bx = cx - 210; fillR(bx, base - 360, 120, 360, st); fillR(bx + 90, base - 360, 30, 360, sd);
+  for (let r = 0; r < 3; r++) { const y = base - 330 + r * 96; c.fillStyle = hz('#3b4250', P, k); c.beginPath(); c.moveTo(bx + 34, y + 60); c.lineTo(bx + 34, y + 16); c.quadraticCurveTo(bx + 60, y - 12, bx + 86, y + 16); c.lineTo(bx + 86, y + 60); c.fill(); }
+  fillR(bx - 8, base - 368, 136, 12, sd); for (let i = 0; i < 9; i++) fillR(bx - 6 + i * 16, base - 380, 8, 12, sd);
+  fillR(bx + 30, base - 430, 60, 62, st); for (let i = 0; i < 3; i++) fillR(bx + 36 + i * 18, base - 420, 10, 34, hz('#3b4250', P, k));
+  c.fillStyle = rc; c.beginPath(); c.moveTo(bx + 22, base - 430); c.quadraticCurveTo(bx + 60, base - 500, bx + 98, base - 430); c.fill(); ln(bx + 60, base - 468, bx + 60, base - 500, rc, 3); ell(bx + 60, base - 502, 5, 5, gold);
+  // arche sur la rue
+  const w = 260, x = cx - w / 2, top = base - 300;
+  fillR(x, top, w, 300, st); fillR(x, top, w, 14, sd); fillR(x, base - 130, w, 10, sd);
+  c.fillStyle = hz(P.night ? '#0d1220' : '#2a2f3a', P, k); c.beginPath(); c.moveTo(x + 50, base); c.lineTo(x + 50, base - 70); c.quadraticCurveTo(cx, base - 140, x + w - 50, base - 70); c.lineTo(x + w - 50, base); c.fill();
+  c.strokeStyle = sd; c.lineWidth = 6; c.beginPath(); c.moveTo(x + 44, base); c.lineTo(x + 44, base - 72); c.quadraticCurveTo(cx, base - 148, x + w - 44, base - 72); c.lineTo(x + w - 44, base); c.stroke();
+  for (let i = 0; i < 5; i++) fillR(x + 16 + i * (w - 32) / 4 - 4, top + 18, 8, 150, sd);   // pilastres
+  // cadran : fond bleu étoilé, rayons d'or, une seule aiguille
+  const cy = base - 210, r = 62;
+  rr(cx - r - 16, cy - r - 16, r * 2 + 32, r * 2 + 32, 10); c.fillStyle = gold; c.fill(); rr(cx - r - 10, cy - r - 10, r * 2 + 20, r * 2 + 20, 8); c.fillStyle = hz('#8a6a1e', P, k * .5); c.fill();
+  ell(cx, cy, r, r, '#20448e'); for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; ln(cx + Math.cos(a) * 12, cy + Math.sin(a) * 12, cx + Math.cos(a) * (i % 2 ? 38 : 50), cy + Math.sin(a) * (i % 2 ? 38 : 50), gold, i % 2 ? 2 : 3.5); }
+  c.strokeStyle = gold; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, r - 4, 0, 7); c.stroke(); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ell(cx + Math.cos(a) * (r - 10), cy + Math.sin(a) * (r - 10), 3, 3, gold); }
+  ell(cx, cy, 13, 13, gold); c.save(); c.translate(cx, cy); c.rotate(-.9); c.fillStyle = gold; c.beginPath(); c.moveTo(-4, 6); c.lineTo(0, -r + 12); c.lineTo(4, 6); c.fill(); c.restore();
+  // toit d'ardoise + lanternon
+  c.fillStyle = rc; c.beginPath(); c.moveTo(x - 12, top + 2); c.lineTo(x + 30, top - 58); c.lineTo(x + w - 30, top - 58); c.lineTo(x + w + 12, top + 2); c.fill();
+  fillR(cx - 22, top - 96, 44, 40, st); c.fillStyle = rc; c.beginPath(); c.moveTo(cx - 30, top - 94); c.quadraticCurveTo(cx, top - 150, cx + 30, top - 94); c.fill(); ln(cx, top - 130, cx, top - 160, rc, 3); ell(cx, top - 162, 5, 5, gold);
+  return [x, x + w];
+}
+
+// ---------- cathédrale Notre-Dame : tour Saint-Romain, tour de Beurre, rosace, flèche en fonte ----------
+function cathedrale(cx, base, P, k, s = 1) {
+  const st = hz('#ddd2bb', P, k), sd = hz('#bfb091', P, k), dk = hz('#3d4452', P, k), rc = hz(P.night ? '#2a3140' : '#56616f', P, k), fer = hz(P.night ? '#1d2532' : '#3f4c56', P, k * .7);
+  c.save(); c.translate(cx, base); c.scale(s, s); c.translate(-cx, -base);
+  // flèche en fonte (151 m) derrière, au-dessus de la croisée
+  const fx = cx + 10, fb = base - 360, ft = base - 720;
+  fillR(fx - 46, fb, 92, 70, st); for (let i = 0; i < 4; i++) fillR(fx - 38 + i * 22, fb + 12, 10, 48, dk);
+  [-1, 1].forEach(sg => { c.fillStyle = fer; c.beginPath(); c.moveTo(fx + sg * 46, fb); c.lineTo(fx + sg * 40, fb - 70); c.lineTo(fx + sg * 34, fb); c.fill(); });
+  c.fillStyle = fer; c.beginPath(); c.moveTo(fx - 34, fb); c.lineTo(fx, ft); c.lineTo(fx + 34, fb); c.fill();
+  c.save(); c.beginPath(); c.moveTo(fx - 34, fb); c.lineTo(fx, ft); c.lineTo(fx + 34, fb); c.clip();
+  for (let y = fb; y > ft; y -= 16) { const hw = 34 * (y - ft) / (fb - ft); ln(fx - hw, y, fx + hw, y, P.night ? 'rgba(120,140,170,.35)' : hz('#c9d2d8', P, k), 1.3); }
+  for (let i = -3; i <= 3; i++) ln(fx + i * 10, fb, fx, ft, P.night ? 'rgba(120,140,170,.3)' : hz('#c9d2d8', P, k), 1); c.restore();
+  ln(fx, ft, fx, ft - 26, fer, 3); ln(fx - 9, ft - 16, fx + 9, ft - 16, fer, 3);
+  // nef derrière la façade
+  fillR(cx - 220, base - 300, 440, 300, sd); c.fillStyle = rc; c.beginPath(); c.moveTo(cx - 230, base - 300); c.lineTo(cx, base - 372); c.lineTo(cx + 230, base - 300); c.fill();
+  // façade centrale : portails, galerie, rosace, pinacles
+  const fw = 300, x0 = cx - fw / 2;
+  fillR(x0, base - 380, fw, 380, st);
+  c.fillStyle = st; c.beginPath(); c.moveTo(x0 + 40, base - 380); c.lineTo(cx, base - 470); c.lineTo(x0 + fw - 40, base - 380); c.fill();
+  for (let i = 0; i < 7; i++) { const px = x0 + 10 + i * (fw - 20) / 6; c.fillStyle = sd; c.beginPath(); c.moveTo(px - 6, base - 380); c.lineTo(px, base - 440 + (i % 2) * 20); c.lineTo(px + 6, base - 380); c.fill(); }
+  ell(cx, base - 290, 54, 54, sd); ell(cx, base - 290, 46, 46, P.night ? '#2a3550' : hz('#4a5e86', P, k));
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ln(cx, base - 290, cx + Math.cos(a) * 46, base - 290 + Math.sin(a) * 46, sd, 3); } ell(cx, base - 290, 12, 12, sd);
+  [[cx, 120, 160], [x0 + 52, 70, 120], [x0 + fw - 52, 70, 120]].forEach(([px, pw, ph]) => { c.fillStyle = sd; c.beginPath(); c.moveTo(px - pw / 2 - 8, base); c.lineTo(px - pw / 2 - 8, base - ph + 20); c.lineTo(px, base - ph - 40); c.lineTo(px + pw / 2 + 8, base - ph + 20); c.lineTo(px + pw / 2 + 8, base); c.fill();
+    c.fillStyle = dk; c.beginPath(); c.moveTo(px - pw / 2, base); c.lineTo(px - pw / 2, base - ph + 30); c.quadraticCurveTo(px, base - ph - 20, px + pw / 2, base - ph + 30); c.lineTo(px + pw / 2, base); c.fill(); });
+  for (let i = 0; i < 9; i++) fillR(x0 + 20 + i * 30, base - 210, 14, 40, dk);
+  // tour Saint-Romain (gauche) : massive, toit d'ardoise pentu
+  const tl = x0 - 130; fillR(tl, base - 470, 130, 470, st); fillR(tl + 100, base - 470, 30, 470, sd);
+  for (let r = 0; r < 4; r++) { const y = base - 440 + r * 100; fillR(tl + 30, y, 22, 64, dk); fillR(tl + 74, y, 22, 64, dk); }
+  c.fillStyle = rc; c.beginPath(); c.moveTo(tl - 6, base - 470); c.lineTo(tl + 65, base - 560); c.lineTo(tl + 136, base - 470); c.fill(); ln(tl + 65, base - 560, tl + 65, base - 586, rc, 3);
+  // tour de Beurre (droite) : couronne octogonale flamboyante
+  const tr2 = x0 + fw; fillR(tr2, base - 450, 140, 450, st); fillR(tr2, base - 450, 28, 450, sd);
+  for (let r = 0; r < 3; r++) { const y = base - 420 + r * 120; fillR(tr2 + 34, y, 26, 80, dk); fillR(tr2 + 80, y, 26, 80, dk); }
+  fillR(tr2 + 18, base - 540, 104, 90, st); for (let i = 0; i < 4; i++) fillR(tr2 + 28 + i * 24, base - 528, 12, 60, dk);
+  for (let i = 0; i < 6; i++) { const px = tr2 + 18 + i * 20.8; c.fillStyle = sd; c.beginPath(); c.moveTo(px - 5, base - 540); c.lineTo(px, base - 590 - (i % 2) * 14); c.lineTo(px + 5, base - 540); c.fill(); }
+  c.restore();
+}
+
+// ---------- église Sainte-Jeanne-d'Arc (toit en écailles d'ardoise, en vague) + croix ----------
+function jeanneDarc(x, base, P, k) {
+  const rc = hz(P.night ? '#26303f' : '#4f6070', P, k), sc = hz(P.night ? '#334055' : '#6e8294', P, k), w = 520;
+  fillR(x + 20, base - 70, w - 40, 70, hz(P.night ? '#1b2335' : '#8ba2b3', P, k)); for (let i = 0; i < 12; i++) fillR(x + 34 + i * 40, base - 64, 30, 58, P.night ? 'rgba(255,200,120,.55)' : hz('#c8dbe6', P, k));
+  c.fillStyle = rc; c.beginPath(); c.moveTo(x, base - 60); c.quadraticCurveTo(x + w * .35, base - 70, x + w * .62, base - 150); c.quadraticCurveTo(x + w * .78, base - 210, x + w * .86, base - 330); c.quadraticCurveTo(x + w * .9, base - 200, x + w, base - 60); c.closePath(); c.fill();
+  c.save(); c.clip(); for (let y = base - 330; y < base; y += 9) for (let xx = x + ((y / 9) % 2) * 9; xx < x + w; xx += 18) { c.strokeStyle = sc; c.lineWidth = 1.2; c.beginPath(); c.arc(xx, y, 8, 0, Math.PI); c.stroke(); } c.restore();
+  ln(x + w * .86, base - 330, x + w * .86, base - 370, rc, 3);
+  // la grande croix du Vieux-Marché
+  const cxx = x - 70; fillR(cxx - 5, base - 300, 10, 300, hz('#d7d2c6', P, k)); fillR(cxx - 40, base - 240, 80, 10, hz('#d7d2c6', P, k));
+}
+
+// ---------- pont Gustave-Flaubert (pont levant) ----------
+function pontFlaubert(cx, deckY, P, k) {
+  const col = hz(P.night ? '#2a3348' : '#e8ecef', P, k), sh = hz(P.night ? '#1d2436' : '#b9c3cc', P, k), cab = P.night ? 'rgba(140,160,200,.5)' : hz('#9aa6b0', P, k);
+  const span = 300; [cx - span / 2, cx + span / 2].forEach((px, i) => {
+    // pylône en « aile » : deux mâts fins qui s'écartent
+    c.fillStyle = col; c.beginPath(); c.moveTo(px - 26, deckY + 140); c.lineTo(px - 10, deckY - 250); c.lineTo(px + 10, deckY - 250); c.lineTo(px + 26, deckY + 140); c.lineTo(px + 10, deckY + 140); c.lineTo(px, deckY - 120); c.lineTo(px - 10, deckY + 140); c.fill();
+    fillR(px - 10, deckY - 250, 20, 10, sh); ell(px, deckY - 254, 6, 6, P.night ? '#ff4a3a' : sh);
+    for (let q = 1; q < 6; q++) { ln(px, deckY - 240 + q * 8, px + (i ? -1 : 1) * q * 26, deckY - 70, cab, 1); }
+  });
+  // tablier levé entre les pylônes + viaducs d'accès
+  fillR(cx - span / 2, deckY - 70, span, 16, col); fillR(cx - span / 2, deckY - 54, span, 4, sh);
+  fillR(0, deckY, cx - span / 2, 14, col); fillR(cx + span / 2, deckY, W - cx - span / 2, 14, col);
+  for (let x = 40; x < cx - span / 2; x += 110) fillR(x, deckY + 14, 14, 140, sh); for (let x = cx + span / 2 + 60; x < W; x += 110) fillR(x, deckY + 14, 14, 140, sh);
+}
+
+// ---------- trois-mâts de l'Armada ----------
+function voilier(x, wl, P, k, s = 1) {
+  const hull = hz(P.night ? '#141a26' : '#2b2f36', P, k), sail = hz(P.night ? '#9aa6bb' : '#f6f2e6', P, k), mast = hz('#5a3e28', P, k);
+  c.save(); c.translate(x, wl); c.scale(s, s);
+  c.fillStyle = hull; c.beginPath(); c.moveTo(-170, -36); c.lineTo(190, -36); c.lineTo(230, -60); c.lineTo(160, 0); c.lineTo(-150, 0); c.closePath(); c.fill(); fillR(-160, -32, 340, 6, hz('#c8a24a', P, k));
+  for (let i = 0; i < 9; i++) ell(-120 + i * 34, -20, 3.5, 3.5, hz('#e8dcc0', P, k));
+  ln(190, -40, 280, -110, mast, 3);
+  [-110, 10, 120].forEach((mx, m) => { const mh = m === 1 ? 300 : 260; ln(mx, -36, mx, -36 - mh, mast, 5);
+    for (let r = 0; r < 4; r++) { const y = -60 - r * (mh / 4.4), w2 = 70 - r * 10; c.fillStyle = sail; c.beginPath(); c.moveTo(mx - w2, y - 46); c.lineTo(mx + w2, y - 46); c.quadraticCurveTo(mx + w2 + 6, y - 20, mx + w2 - 4, y); c.lineTo(mx - w2 + 4, y); c.quadraticCurveTo(mx - w2 - 6, y - 20, mx - w2, y - 46); c.fill(); ln(mx - w2 - 4, y - 46, mx + w2 + 4, y - 46, mast, 2); }
+    c.fillStyle = m === 1 ? '#1f4fbf' : '#e8402a'; c.fillRect(mx, -36 - mh - 4, 26, 14); });
+  c.strokeStyle = hz('#3a2a1c', P, k); c.lineWidth = 1; for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(-170 + i * 8, -36); c.lineTo(-110, -330); c.stroke(); }
+  c.restore();
+}
+
+// ---------- abbatiale Saint-Ouen (tour-lanterne « couronne normande ») ----------
+function saintOuen(cx, base, P, k) {
+  const st = hz('#dcd0b8', P, k), sd = hz('#bdae8e', P, k), dk = hz('#3d4452', P, k), rc = hz(P.night ? '#2a3140' : '#56616f', P, k);
+  fillR(cx - 380, base - 230, 760, 230, st); c.fillStyle = rc; c.beginPath(); c.moveTo(cx - 390, base - 230); c.lineTo(cx, base - 300); c.lineTo(cx + 390, base - 230); c.fill();
+  for (let i = 0; i < 12; i++) { const px = cx - 360 + i * 66; fillR(px + 18, base - 200, 22, 110, dk); c.fillStyle = sd; c.beginPath(); c.moveTo(px - 4, base - 120); c.lineTo(px + 4, base - 240); c.lineTo(px + 10, base - 120); c.fill(); }
+  fillR(cx - 80, base - 470, 160, 240, st); fillR(cx + 50, base - 470, 30, 240, sd); for (let i = 0; i < 3; i++) fillR(cx - 60 + i * 44, base - 450, 26, 140, dk);
+  // couronne octogonale ajourée
+  fillR(cx - 64, base - 560, 128, 90, st); for (let i = 0; i < 5; i++) fillR(cx - 54 + i * 24, base - 548, 12, 66, dk);
+  for (let i = 0; i < 8; i++) { const px = cx - 64 + i * 18.3; c.fillStyle = sd; c.beginPath(); c.moveTo(px - 4, base - 560); c.lineTo(px + 1, base - 610 - (i % 2) * 18); c.lineTo(px + 6, base - 560); c.fill(); }
+}
+
+// ---------- côte Sainte-Catherine (colline et falaise de craie) ----------
+function coteCatherine(P, y0, k) {
+  c.fillStyle = hz(P.night ? '#18241e' : '#6f9a5c', P, k); c.beginPath(); c.moveTo(1100, y0 + 80); c.quadraticCurveTo(1450, y0 - 230, 1920, y0 - 250); c.lineTo(1920, y0 + 80); c.fill();
+  c.fillStyle = hz(P.night ? '#3a4150' : '#e8e2d2', P, k); c.beginPath(); c.moveTo(1430, y0 - 150); c.quadraticCurveTo(1520, y0 - 120, 1560, y0 - 20); c.lineTo(1660, y0 + 10); c.quadraticCurveTo(1620, y0 - 110, 1700, y0 - 226); c.quadraticCurveTo(1560, y0 - 214, 1430, y0 - 150); c.fill();
+  for (let i = 0; i < 20; i++) ell(1150 + rnd() * 760, y0 - 60 - rnd() * 140, 18 + rnd() * 20, 12, hz(P.night ? '#13201a' : '#557d45', P, k));
+}
+
+// ---------- silhouette lointaine : flèche + clochers + toits ----------
+function rouenSkyline(P, base, k, withSpire = true, x = 1300) {
+  cityLayer(P, base, k, 60, 120, 50, 90, 0);
+  if (withSpire) { const fx = x, fb = base - 150, ft = base - 360, col = hz(P.night ? '#1d2532' : '#5b6670', P, k); fillR(fx - 40, base - 150, 80, 150, hz('#cfc4ad', P, k)); fillR(fx - 120, base - 210, 60, 210, hz('#cfc4ad', P, k)); fillR(fx + 60, base - 200, 60, 200, hz('#cfc4ad', P, k));
+    c.fillStyle = col; c.beginPath(); c.moveTo(fx - 22, fb); c.lineTo(fx, ft); c.lineTo(fx + 22, fb); c.fill(); }
+}
+
+// ---------- quais de Seine ----------
+function seine(P, y0, y1) { water(y0, y1, P); fillR(0, y1 - 4, W, 30, hz(P.night ? '#232a3c' : '#b7ab95', P, .2)); for (let x = 0; x < W; x += 60) fillR(x, y1 - 4, 2, 30, 'rgba(0,0,0,.15)'); fillR(0, y1 - 8, W, 6, hz('#d9cfbb', P, .2)); }
+
+// ---------- église Saint-Maclou (gothique flamboyant, porche à cinq gâbles, flèche) ----------
+function saintMaclou(cx, base, P, k) {
+  const st = hz('#dcd0b8', P, k), sd = hz('#bdae8e', P, k), dk = hz('#3d4452', P, k), rc = hz(P.night ? '#2a3140' : '#56616f', P, k);
+  fillR(cx - 150, base - 240, 300, 240, st); c.fillStyle = rc; c.beginPath(); c.moveTo(cx - 160, base - 240); c.lineTo(cx, base - 300); c.lineTo(cx + 160, base - 240); c.fill();
+  fillR(cx - 40, base - 380, 80, 140, st); for (let i = 0; i < 2; i++) fillR(cx - 26 + i * 32, base - 366, 18, 90, dk);
+  c.fillStyle = hz(P.night ? '#1d2532' : '#5b6670', P, k); c.beginPath(); c.moveTo(cx - 34, base - 380); c.lineTo(cx, base - 560); c.lineTo(cx + 34, base - 380); c.fill();
+  for (let y = base - 390; y > base - 550; y -= 18) { const hw = 34 * (y - (base - 560)) / 180; ln(cx - hw, y, cx + hw, y, hz('#c9d2d8', P, k), 1.2); }
+  for (let i = 0; i < 5; i++) { const gx = cx - 140 + i * 70; c.fillStyle = sd; c.beginPath(); c.moveTo(gx - 4, base - 130); c.lineTo(gx + 31, base - 220); c.lineTo(gx + 66, base - 130); c.fill(); c.fillStyle = dk; c.beginPath(); c.moveTo(gx + 10, base); c.lineTo(gx + 10, base - 100); c.quadraticCurveTo(gx + 31, base - 150, gx + 52, base - 100); c.lineTo(gx + 52, base); c.fill(); }
+}
+// ---------- Aître Saint-Maclou : galeries de bois sculptées (danse macabre), cour arborée ----------
+function aitre(x0, base, w, P, k) {
+  const wood = hz('#6b4428', P, k), wall = hz('#efe2c4', P, k), rc = hz(P.night ? '#2a3140' : '#56616f', P, k), bone = hz('#efe7d6', P, k);
+  // étage à pans de bois (croix de Saint-André serrées)
+  fillR(x0, base - 210, w, 100, wall); for (let x = x0; x < x0 + w; x += 26) { fillR(x, base - 210, 4, 100, wood); ln(x, base - 110, x + 26, base - 210, wood, 2.5); ln(x, base - 210, x + 26, base - 110, wood, 2.5); }
+  fillR(x0, base - 214, w, 8, wood); fillR(x0, base - 114, w, 8, wood);
+  // frise sculptée : crânes et os croisés
+  fillR(x0, base - 112, w, 22, hz('#5a3a22', P, k)); for (let x = x0 + 18; x < x0 + w - 10; x += 40) { ell(x, base - 101, 6, 6, bone); fillR(x - 3, base - 98, 6, 4, bone); ln(x + 12, base - 108, x + 26, base - 94, bone, 2); ln(x + 26, base - 108, x + 12, base - 94, bone, 2); }
+  // galerie basse ouverte : colonnes de bois sur muret de pierre
+  fillR(x0, base - 90, w, 90, hz(P.night ? '#141a26' : '#3a3026', P, k)); fillR(x0, base - 22, w, 22, hz('#d6c7a9', P, k));
+  for (let x = x0; x <= x0 + w; x += 52) { fillR(x - 5, base - 90, 10, 70, wood); ell(x, base - 52, 7, 5, hz('#7a5032', P, k)); }
+  // toit d'ardoise et lucarnes
+  c.fillStyle = rc; c.beginPath(); c.moveTo(x0 - 10, base - 210); c.lineTo(x0 + 30, base - 290); c.lineTo(x0 + w - 30, base - 290); c.lineTo(x0 + w + 10, base - 210); c.fill();
+  for (let x = x0 + 60; x < x0 + w - 60; x += 120) { fillR(x, base - 270, 26, 40, wall); fillR(x + 6, base - 262, 14, 24, P.night ? 'rgba(255,206,130,.9)' : hz('#6f8ea8', P, k)); c.fillStyle = rc; c.beginPath(); c.moveTo(x - 6, base - 270); c.lineTo(x + 13, base - 292); c.lineTo(x + 32, base - 270); c.fill(); }
+}
+// ---------- Palais de Justice (gothique flamboyant, lucarnes ciselées) ----------
+function palais(cx, base, P, k) {
+  const st = hz('#e4d9c2', P, k), sd = hz('#c3b393', P, k), dk = hz('#3d4452', P, k), rc = hz(P.night ? '#2a3140' : '#4f5a68', P, k), w = 900, x0 = cx - w / 2;
+  fillR(x0, base - 230, w, 230, st); fillR(x0, base - 236, w, 10, sd); fillR(x0, base - 120, w, 6, sd);
+  for (let i = 0; i < 14; i++) { const px = x0 + 30 + i * 62; fillR(px, base - 210, 26, 70, dk); fillR(px, base - 100, 26, 74, dk); fillR(px + 12, base - 210, 2, 70, sd); }
+  for (let i = 0; i <= 14; i++) { const px = x0 + 8 + i * 62; fillR(px, base - 236, 8, 236, sd); c.fillStyle = sd; c.beginPath(); c.moveTo(px - 2, base - 236); c.lineTo(px + 4, base - 270); c.lineTo(px + 10, base - 236); c.fill(); }
+  // grand toit d'ardoise
+  c.fillStyle = rc; c.beginPath(); c.moveTo(x0 - 10, base - 236); c.lineTo(x0 + 60, base - 360); c.lineTo(x0 + w - 60, base - 360); c.lineTo(x0 + w + 10, base - 236); c.fill();
+  fillR(x0 + 60, base - 368, w - 120, 8, hz('#c9a24a', P, k));   // crête dorée
+  // lucarnes ciselées : gâbles à crochets et pinacles
+  for (let i = 0; i < 7; i++) { const lx = x0 + 70 + i * 126; fillR(lx, base - 300, 50, 64, st); fillR(lx + 12, base - 290, 26, 44, dk);
+    c.fillStyle = st; c.beginPath(); c.moveTo(lx - 6, base - 300); c.lineTo(lx + 25, base - 380); c.lineTo(lx + 56, base - 300); c.fill();
+    c.strokeStyle = sd; c.lineWidth = 2; c.beginPath(); c.moveTo(lx - 6, base - 300); c.lineTo(lx + 25, base - 380); c.lineTo(lx + 56, base - 300); c.stroke();
+    [lx - 10, lx + 58].forEach(px => { fillR(px, base - 330, 6, 34, sd); c.fillStyle = sd; c.beginPath(); c.moveTo(px - 3, base - 330); c.lineTo(px + 3, base - 356); c.lineTo(px + 9, base - 330); c.fill(); }); }
+  // tourelle d'angle
+  fillR(x0 + w - 30, base - 330, 60, 330, st); c.fillStyle = rc; c.beginPath(); c.moveTo(x0 + w - 36, base - 330); c.lineTo(x0 + w, base - 430); c.lineTo(x0 + w + 36, base - 330); c.fill();
+}
+// ---------- grues portuaires ----------
+function portCrane(x, base, P, k, flip) {
+  const col = hz(P.night ? '#1d2640' : '#d6452f', P, k); fillR(x - 30, base - 150, 8, 150, col); fillR(x + 22, base - 150, 8, 150, col); fillR(x - 34, base - 160, 68, 16, col);
+  fillR(x - 18, base - 200, 36, 40, col); const d = flip ? -1 : 1; ln(x, base - 190, x + d * 170, base - 260, col, 7); ln(x, base - 230, x + d * 170, base - 260, col, 2); ln(x, base - 200, x, base - 236, col, 4); ln(x + d * 160, base - 256, x + d * 160, base - 200, hz('#2b2f36', P, k), 1.5);
+}
+// ---------- les scènes ----------
+// ---------- les scènes ----------
+const ROUEN_SCENES = {
+  horloge(P, B, anim) {
+    rouenSkyline(P, B - 150, .55, true, 1560);
+    coloRow(-40, 760, B, P, .12, { fMin: 3, fMax: 5 });
+    grosHorloge(1000, B, P, .08);
+    coloRow(1150, 1960, B, P, .12, { fMin: 3, fMax: 5 });
+  },
+  cathedrale(P, B, anim) {
+    cityLayer(P, B - 60, .5, 80, 150, 60, 110, 0);
+    cathedrale(1180, B, P, .1);
+    coloRow(-40, 760, B, P, .14, { fMin: 3, fMax: 4 });
+    colo(1560, B, 120, 4, P, .12, { gable: true, wall: '#f3d9a0' }); colo(1700, B, 110, 4, P, .12, { wall: '#efe7d8' }); colo(1830, B, 110, 3, P, .12, { gable: true });
+  },
+  vieuxmarche(P, B, anim) {
+    // la place ouverte : façades colorées basses, terrasses et parasols
+    rouenSkyline(P, B - 130, .5, true, 1500);
+    coloRow(-40, 1960, B, P, .1, { fMin: 2, fMax: 3, gable: .75, wMin: 90, wMax: 130, gap: 6 });
+    for (let x = 120; x < W; x += 150) { const col = ['#b8322a', '#2f5d8a', '#f2ede2', '#2f7a4a'][Math.floor(x / 150) % 4]; fillR(x - 2, B - 70, 4, 70, hz('#3a3f46', P, .1)); c.fillStyle = hz(col, P, .1); c.beginPath(); c.moveTo(x - 46, B - 64); c.quadraticCurveTo(x, B - 96, x + 46, B - 64); c.fill(); fillR(x - 22, B - 26, 44, 4, hz('#6b4428', P, .1)); }
+    for (let x = 60; x < W; x += 210) { fillR(x, B - 40, 50, 30, hz('#7a5a3a', P, .1)); for (let f = 0; f < 4; f++) ell(x + 8 + f * 12, B - 44, 7, 6, hz(['#e8402a', '#ffc21a', '#e86aa0', '#ffffff'][f], P, .1)); }
+  },
+  jeanne(P, B, anim) {
+    rouenSkyline(P, B - 120, .5, true, 300);
+    coloRow(-40, 620, B, P, .13, { fMin: 3, fMax: 4, gable: .7 });
+    jeanneDarc(820, B, P, .08);
+    coloRow(1420, 1960, B, P, .13, { fMin: 3, fMax: 4, gable: .7 });
+  },
+  maclou(P, B, anim) {
+    cityLayer(P, B - 90, .5, 70, 130, 60, 100, 0);
+    saintMaclou(1480, B - 40, P, .2);
+    aitre(160, B, 1060, P, .06);
+    coloRow(1260, 1960, B, P, .12, { fMin: 3, fMax: 4 });
+  },
+  palais(P, B, anim) {
+    rouenSkyline(P, B - 140, .55, true, 1700);
+    coloRow(-40, 420, B, P, .12, { fMin: 3, fMax: 5 });
+    palais(1000, B, P, .08);
+  },
+  quais(P, B, anim) {
+    coteCatherine(P, 640, .35); rouenSkyline(P, 600, .45, true, 1300);
+    for (let x = 80; x < 1000; x += 230) portCrane(x, 600, P, .35, x > 500);
+    const dk = hz(P.night ? '#1d2436' : '#c7ccd2', P, .4); for (let i = 0; i < 4; i++) fillR(1000 + i * 44, 470, 38, 130, dk);
+    seine(P, 600, B - 10); anim.water = [612, B - 30]; anim.boats.push({ x: 300, y: B - 40, sp: 22, kind: 'peniche', dir: 1 }, { x: 1200, y: 640, sp: 8, kind: 'cargo', dir: -1, k: .5 });
+    // pont Boieldieu et lampadaires des quais
+    fillR(0, 588, W, 12, hz('#d8cfbb', P, .3)); for (let x = 60; x < W; x += 240) { c.fillStyle = hz('#d8cfbb', P, .3); c.beginPath(); c.moveTo(x - 100, 600); c.quadraticCurveTo(x + 20, 680, x + 140, 600); c.lineTo(x + 140, 640); c.lineTo(x - 100, 640); c.globalAlpha = 0; c.fill(); c.globalAlpha = 1; fillR(x + 120, 600, 24, 80, hz('#d8cfbb', P, .3)); }
+  },
+  flaubert(P, B, anim) { ROUEN_SCENES.armada(P, B, anim); },
+  armada(P, B, anim) {
+    coteCatherine(P, 620, .4); rouenSkyline(P, 590, .5, true, 1480);
+    // docks rive gauche : silos, Panorama XXL, hangars
+    const dk = hz(P.night ? '#1d2436' : '#c7ccd2', P, .4); for (let i = 0; i < 5; i++) fillR(140 + i * 46, 430, 40, 160, dk); fillR(130, 420, 240, 14, dk);
+    fillR(420, 480, 120, 110, hz(P.night ? '#1d2436' : '#dcdfe3', P, .4)); ell(480, 480, 60, 14, hz('#b9c0c7', P, .4));
+    pontFlaubert(1240, 560, P, .3);
+    seine(P, 590, B - 10); anim.water = [602, B - 30];
+    voilier(640, B - 26, P, .05, 1.05);
+    anim.boats.push({ x: 200, y: B - 40, sp: 18, kind: 'vedette', dir: 1, k: .8 });
+  },
+  robec(P, B, anim) {
+    coloRow(-40, 1960, B, P, .1, { fMin: 3, fMax: 5, gable: .55, wMin: 80, wMax: 120 });
+    // petit canal de l'Eau-de-Robec et passerelles
+    fillR(0, B - 18, W, 12, hz('#5d7d91', P, .1)); for (let x = 80; x < W; x += 260) { fillR(x, B - 26, 46, 8, hz('#7a5a3a', P, .1)); }
+  },
+  stouen(P, B, anim) {
+    cityLayer(P, B - 80, .5, 70, 140, 60, 100, 0);
+    // jardin de l'Hôtel de Ville
+    for (let x = 60; x < 700; x += 120) tree(x, B, .9);
+    saintOuen(1150, B, P, .1);
+    for (let x = 1600; x < 1960; x += 130) tree(x, B, .85);
+  },
+  catherine(P, B, anim) {
+    // vue depuis la côte : la ville et la Seine en contrebas
+    blurred(2, () => hills(560, 20, hz('#9db48a', P, .5), .004, 1));
+    seine(P, 560, 610); rouenSkyline(P, 700, .35, true, 980); cityLayer(P, 740, .25, 60, 130, 50, 90, 0);
+    coteCatherine(P, B - 20, .05);
+  },
+  panorama(P, B, anim) {
+    // la vue depuis la côte : toits, flèches et la Seine qui serpente
+    const sc = (x, b, k2, fn) => { c.save(); c.translate(x, b); c.scale(k2, k2); c.translate(-x, -b); fn(); c.restore(); };
+    blurred(2, () => hills(470, 22, hz('#7d8f9a', P, .55), .003, 2));
+    seine(P, 500, 548); anim.water = null;
+    cityLayer(P, 600, .45, 30, 70, 30, 60, 0);
+    sc(560, 610, .42, () => saintMaclou(560, 610, P, .4)); sc(1420, 612, .42, () => saintOuen(1420, 612, P, .4)); cathedrale(990, 616, P, .36, .5);
+    cityLayer(P, 690, .28, 40, 90, 40, 80, 0);
+    for (let x = -20; x < W; x += 64) tree(x, B, .5 + rnd() * .25);
+  },
+  coucher(P, B, anim) {
+    rouenSkyline(P, 610, .4, true, 760); seine(P, 610, B - 10); anim.water = [622, B - 30];
+    cathedrale(760, 610, P, .35, .45);
+    anim.boats.push({ x: 900, y: B - 40, sp: 20, kind: 'peniche', dir: -1 });
+    for (let x = 1300; x < 1960; x += 110) tree(x, B, .8);
+  },
+};
+drawBackdrop = (prev => function (th, C) {
+  if (!th.rouen || window.REGION && window.REGION !== 'fr') return prev(th, C);
+  const sf = streetFurniture; let anim0 = null;
+  const P = TOD[th.tod], B = GY - 40;
+  streetFurniture = function (P2) { streetFurniture = sf; anim0 = { boats: [], water: null }; (ROUEN_SCENES[th.rouen] || ROUEN_SCENES.horloge)(P2, B, anim0);
+    fillR(0, 360, W, B - 360, lg(0, 360, 0, B, [[0, 'rgba(0,0,0,0)'], [1, P2.night ? 'rgba(10,16,34,.18)' : mixc(P2.haze, '#ffffff', .2) + '30']])); sf(P2); };
+  let anim; try { anim = prev(th, C); } finally { streetFurniture = sf; }
+  if (anim0) { anim.boats.push(...anim0.boats); if (anim0.water) anim.water = anim0.water; }
+  return anim;
+})(drawBackdrop);
+
+// =====================================================================
 //  PILE POIL — COMMANDES : petite bulle en bas à gauche, le menu des touches s'ouvre au clic
 // =====================================================================
 const KEYS = { open: false, autoUntil: 0 };
@@ -9785,8 +10144,13 @@ function amisChip() {
   [[-8, 0, '#ffc21a'], [8, 3, '#6fb1ff']].forEach(([dx, dy, col]) => { ell(x + 38 + dx, y + 30 + dy, 6.5, 6.5, col); c.fillStyle = col; c.beginPath(); c.ellipse(x + 38 + dx, y + 47 + dy, 10, 7, 0, Math.PI, 0); c.fill(); });
   txt('Amis', x + 72, y + 34, PAL.text, 22, 900);
   const on = d ? d.friends.filter(frOnline).length : 0;
-  if (d && on) { ell(x + 79, y + 52, 5, 5, '#3cf29b'); txt(`${on} en ligne`, x + 90, y + 58, '#3cf29b', 16, 800); } else txt(d ? `${d.friends.length} ami${d.friends.length > 1 ? 's' : ''}` : 'Défie tes potes', x + 72, y + 58, PAL.sub, 16, 800);
-  const n = frTotalBadge(); if (n) { const pu = 1 + Math.max(0, Math.sin(G.t * 5)) * .12; c.save(); c.translate(x + w - 18, y + 14); c.scale(pu, pu); ell(0, 0, 16, 16, '#e0392b'); txt(String(Math.min(9, n)), 0, 7, '#fff', 18, 900, 'center'); c.restore(); }
+  const nb = frTotalBadge(), alt = nb && Math.floor(G.t / 4) % 2 === 0;
+  if (!alt) { if (d && on) { ell(x + 79, y + 52, 5, 5, '#3cf29b'); txt(`${on} en ligne`, x + 90, y + 58, '#3cf29b', 16, 800); } else txt(d ? `${d.friends.length} ami${d.friends.length > 1 ? 's' : ''}` : 'Défie tes potes', x + 72, y + 58, PAL.sub, 16, 800); }
+  const n = frTotalBadge(); if (n) {   // pastille « +N » au-dessus de la case Amis
+    const lab = `+${Math.min(99, n)}`, pu = 1 + Math.max(0, Math.sin(G.t * 5)) * .1; c.font = '900 22px Inter'; const bw = Math.max(46, c.measureText(lab).width + 26);
+    c.save(); c.translate(x + w - 22, y + 2); c.scale(pu, pu); withShadow('rgba(224,57,43,.6)', 14, 0, 3, () => { rr(-bw / 2, -18, bw, 36, 18); c.fillStyle = '#e0392b'; c.fill(); }); rr(-bw / 2, -18, bw, 36, 18); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke(); txt(lab, 0, 8, '#fff', 22, 900, 'center'); c.restore();
+    const d = FR.data, why = d.invites.length ? 'Invitation en duel' : d.req_in.length ? `${d.req_in.length > 1 ? d.req_in.length + ' demandes' : 'Demande'} d'ami` : 'Nouveau message'; c.font = '800 16px Inter';
+    if (Math.floor(G.t / 4) % 2 === 0) { txt(why, x + 72, y + 58, '#ff8f80', 16, 800); } }
   G.buttons.unshift({ id: 'friends', x, y, w, h });
 }
 drawTitle = (prev => function () { prev(); amisChip(); })(drawTitle);
@@ -10052,7 +10416,7 @@ liveCountdown = (prev => function (seed) { if (LV.opp && LV.opp.name) { save.rec
 })();
 
 Object.assign(EN, {
-  'MES AMIS': 'MY FRIENDS', 'Amis': 'Friends', 'Défie tes potes': 'Play with your mates', 'Ajouter +': 'Add +', 'CLASSEMENT ENTRE AMIS': 'FRIENDS LEADERBOARD', 'Défi du jour · aujourd\'hui': 'Daily challenge · today', 'Toi': 'You',
+  'Invitation en duel': 'Duel invite', "Demande d'ami": 'Friend request', 'Nouveau message': 'New message', 'MES AMIS': 'MY FRIENDS', 'Amis': 'Friends', 'Défie tes potes': 'Play with your mates', 'Ajouter +': 'Add +', 'CLASSEMENT ENTRE AMIS': 'FRIENDS LEADERBOARD', 'Défi du jour · aujourd\'hui': 'Daily challenge · today', 'Toi': 'You',
   'INVITATION REÇUE': 'INVITE RECEIVED', 'te défie en duel en direct': 'challenges you to a live duel', 'te défie · chacun son tour': 'challenges you · turn by turn', '✓ ACCEPTER': '✓ ACCEPT', 'Plus tard': 'Later',
   'TON CODE AMI': 'YOUR FRIEND CODE', '📤 PARTAGER': '📤 SHARE', '📋 Copier': '📋 Copy', '📤 PARTAGER MON LIEN': '📤 SHARE MY LINK', 'Seuls tes amis peuvent t\'écrire ou te défier.': 'Only your friends can message or challenge you.',
   '⚔ DUEL': '⚔ DUEL', '⚔ DÉFIER': '⚔ CHALLENGE', '▶ JOUER MON TOUR': '▶ PLAY MY TURN', 'À ton tour dans votre duel': 'Your turn in your duel', 'Pas encore d\'amis': 'No friends yet', 'AJOUTER UN AMI': 'ADD A FRIEND',
@@ -10069,7 +10433,7 @@ Object.assign(EN, {
   'Chargement de tes amis…': 'Loading your friends…', 'RÉESSAYER': 'RETRY', 'Les amis arrivent très bientôt !': 'Friends are coming very soon!', 'Personne n\'a encore joué le défi du jour.': 'Nobody has played the daily challenge yet.', 'en ligne': 'online', 'vu hier': 'seen yesterday', 'vu la semaine dernière': 'seen last week', 'vu il y a longtemps': 'seen a long time ago',
   'Accepté ✓': 'Accepted ✓', 'Refusé': 'Declined', 'Expirée': 'Expired', 'En attente…': 'Waiting…', 'BLOQUER': 'BLOCK', 'RETIRER': 'REMOVE', 'Retirer : vous ne serez plus amis.': 'Remove: you will no longer be friends.', 'Bloquer : il ne pourra plus t\'ajouter ni t\'écrire.': 'Block: they can no longer add or message you.',
 });
-EN_RX.push([/^(\d+) en ligne$/, '$1 online'], [/^(\d+) amis?$/, '$1 friend(s)'], [/^Amis · (\d+)$/, 'Friends · $1'], [/^Demandes · (\d+)$/, 'Requests · $1'], [/^En ligne · (.*)$/, 'Online · $1'], [/^vu il y a (\d+) min$/, 'seen $1 min ago'], [/^vu il y a (\d+) h$/, 'seen $1 h ago'], [/^vu il y a (\d+) jours$/, 'seen $1 days ago'],
+EN_RX.push([/^(\d+) demandes d'ami$/, '$1 friend requests'], [/^(\d+) en ligne$/, '$1 online'], [/^(\d+) amis?$/, '$1 friend(s)'], [/^Amis · (\d+)$/, 'Friends · $1'], [/^Demandes · (\d+)$/, 'Requests · $1'], [/^En ligne · (.*)$/, 'Online · $1'], [/^vu il y a (\d+) min$/, 'seen $1 min ago'], [/^vu il y a (\d+) h$/, 'seen $1 h ago'], [/^vu il y a (\d+) jours$/, 'seen $1 days ago'],
   [/^Dis bonjour à (.*) 👋$/, 'Say hi to $1 👋'], [/^Niveau (\d+) en carrière$/, 'Career level $1'], [/^📸 Partager ma dernière pose parfaite \(niv\. (\d+)\)$/, '📸 Share my last perfect shot (lvl $1)']);
 
 // =====================================================================
