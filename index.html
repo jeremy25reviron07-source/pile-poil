@@ -10848,6 +10848,47 @@ EN_RX.push([/^(\d+) demandes d'ami$/, '$1 friend requests'], [/^(\d+) en ligne$/
   [/^Dis bonjour à (.*) 👋$/, 'Say hi to $1 👋'], [/^Niveau (\d+) en carrière$/, 'Career level $1'], [/^📸 Partager ma dernière pose parfaite \(niv\. (\d+)\)$/, '📸 Share my last perfect shot (lvl $1)']);
 
 // =====================================================================
+//  PILE POIL — compteurs réels pour le site vitrine
+//  parties lancées, chantiers joués, tonnes levées, joueurs en ligne, installations
+// =====================================================================
+const STX = { pa: 0, ch: 0, t: 0, inst: false, busy: false, dev: null };
+(function () {
+  try { STX.dev = localStorage.getItem('pp_dev'); if (!STX.dev) { STX.dev = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); localStorage.setItem('pp_dev', STX.dev); } } catch (e) { STX.dev = 'd' + Math.random().toString(36).slice(2, 14); }
+  const instOk = () => { try { return localStorage.getItem('pp_inst') === '1'; } catch (e) { return false; } };
+  const markInst = () => { if (!instOk()) STX.inst = true; };
+  try { if (typeof STANDALONE === 'function' && STANDALONE()) markInst(); } catch (e) {}
+  window.addEventListener('appinstalled', markInst);
+})();
+async function statFlush() {
+  if (typeof SB === 'undefined' || !SB || STX.busy || document.hidden) return;
+  const b = { pa: STX.pa, ch: STX.ch, t: STX.t, inst: STX.inst };
+  STX.pa = STX.ch = STX.t = 0; STX.inst = false; STX.busy = true;
+  try {
+    const { error } = await SB.rpc('stat_push', { p_dev: STX.dev, p_parties: b.pa, p_chantiers: b.ch, p_tonnes: b.t, p_install: b.inst });
+    if (error) throw error;
+    if (b.inst) try { localStorage.setItem('pp_inst', '1'); } catch (e) {}
+  } catch (e) { STX.pa += b.pa; STX.ch += b.ch; STX.t += b.t; STX.inst = STX.inst || b.inst; }
+  STX.busy = false;
+}
+setInterval(statFlush, 45000);
+setTimeout(statFlush, 4000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) statFlush(); });
+// une partie = un nouveau lancement de niveau avec un score remis à zéro (début de carrière, survie, duel…)
+startLevel = (prev => function (n) {
+  const nouvelle = G.screen !== 'play' && (G.score || 0) === 0 && !(typeof RP !== 'undefined' && RP.on);
+  prev(n);
+  if (nouvelle) STX.pa++;
+})(startLevel);
+// un chantier joué = une charge lâchée jusqu'au bout ; tonnes estimées d'après la taille de la charge
+finish = (prev => function (lvl, res) {
+  if (lvl === L && !(typeof RP !== 'undefined' && RP.on)) {
+    STX.ch++;
+    if (res === 'in' || res === 'perfect') STX.t += Math.max(2, Math.round((lvl.loadW || 100) * (lvl.loadH || 60) / 1000));
+  }
+  prev(lvl, res);
+})(finish);
+
+// =====================================================================
 //  PILE POIL — pages légales (mentions, conditions de vente, confidentialité)
 //  Le texte est injecté par build.py depuis build/legal_content.html ; le site a aussi legal.html
 // =====================================================================
