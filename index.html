@@ -3405,6 +3405,21 @@ act = (prev => function (id) {
   return prev(id);
 })(act);
 
+// ---------- nettoyage des sauvegardes abîmées par l'ancien bug ----------
+// un même record (même score) présent dans deux pays = une copie : on ne garde que celui du dernier pays joué
+function wbFixCopies() {
+  const R = ['fr', 'jp', 'eg'], keep = R.includes(save.lastRegion) ? save.lastRegion : 'fr'; let changed = false;
+  for (const a of R) for (const b of R) {
+    if (a >= b) continue; const A = regData(a), B = regData(b), ca = A && A.cbest, cb = B && B.cbest;
+    if (!ca || !cb || !ca.score || ca.score !== cb.score) continue;
+    if (ca.reg === a && cb.reg !== b) { B.cbest = null; changed = true; continue; }
+    if (cb.reg === b && ca.reg !== a) { A.cbest = null; changed = true; continue; }
+    if (a !== keep) { A.cbest = null; changed = true; } if (b !== keep) { B.cbest = null; changed = true; }
+  }
+  if (changed) { writeSave(save); if (typeof schedulePush === 'function') schedulePush(800); }
+}
+setInterval(() => { try { wbFixCopies(); } catch (e) {} }, 3000);
+
 // =====================================================================
 //  PILE POIL — GARAGE : pièces gagnées en jouant, peintures de grue, améliorations
 // =====================================================================
