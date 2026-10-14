@@ -10255,7 +10255,7 @@ act = (prev => function (id) {
 })(act);
 
 // ---------- dessin : bandeau REPLAY, barre de lecture ----------
-function bubble(x, y, s, opts = {}) {   // bulle blanche ; (x, y) = pointe
+function chatBubble(x, y, s, opts = {}) {   // bulle blanche ; (x, y) = pointe
   c.font = `900 ${opts.size || 26}px Inter`; const w = c.measureText(tr(s)).width + 40, h = (opts.size || 26) + 26, up = opts.up, al = opts.align || 'center';
   const bx = al === 'left' ? x - 30 : al === 'right' ? x - w + 30 : x - w / 2, by = up ? y + 14 : y - 14 - h;
   withShadow('rgba(0,0,0,.4)', 20, 0, 8, () => { rr(bx, by, w, h, h / 2); c.fillStyle = opts.col || '#fff'; c.fill(); });
@@ -10279,7 +10279,7 @@ function drawReplayUI() {
   G.buttons.unshift({ id: 'rpSkip', x: sx + 96, y: y0, w: 170, h: 72 });
   // son dernier message
   const s = tdState(RP.code), m = s && (s.r.chat || []).filter(q => q.p === s.op).pop();
-  if (m && nowS() - m.at < 900) bubble(x0 + 152 + tw / 2, y0 - 6, chatTxt(m.m), { size: 22 });
+  if (m && nowS() - m.at < 900) chatBubble(x0 + 152 + tw / 2, y0 - 6, chatTxt(m.m), { size: 22 });
 }
 drawTouch = (prev => function (lvl) { if (RP.on) { if (G.screen === 'play' && !G.paused) drawReplayUI(); return; } prev(lvl); })(drawTouch);
 
@@ -10302,8 +10302,8 @@ drawTdRoom = (prev => function () {
   prev(); const s = tdState(TD.cur); if (!s) return;
   // bulles : le dernier message de chacun (moins de 3 min)
   const ch = s.r.chat || [], mine = ch.filter(q => q.p === s.me).pop(), his = ch.filter(q => q.p === s.op).pop();
-  if (his && nowS() - his.at < 180) bubble(1480, 166, chatTxt(his.m));
-  if (mine && nowS() - mine.at < 180) bubble(600, 166, chatTxt(mine.m), { col: '#ffc21a', tc: '#2a1a00' });
+  if (his && nowS() - his.at < 180) chatBubble(1480, 166, chatTxt(his.m));
+  if (mine && nowS() - mine.at < 180) chatBubble(600, 166, chatTxt(mine.m), { col: '#ffc21a', tc: '#2a1a00' });
   if (s.oname && !s.over || ch.length) { chatBtn('tdChatT', 1180, 930, TDC.open, 'Message'); if (TDC.open) quickPanel(1220, 580, 'tdChat:'); }
   // le lancer de l'adversaire est prêt à être regardé
   if (tdUnseen(s) && !TD.busy) {
@@ -10351,17 +10351,17 @@ openRoom = (prev => function (code, me, h) {
 function liveChatUI(x, y, up) {
   chatBtn('lvChatT', x, y, LVC.open);
   if (LVC.open) quickPanel(x + 100, up ? y - 246 : y, 'lvChat:');
-  if (LVC.me && performance.now() - LVC.me.t < 4000) bubble(x + 42, y + 96, chatTxt(LVC.me.m), { up: true, col: '#ffc21a', tc: '#2a1a00', size: 22, align: 'left' });
+  if (LVC.me && performance.now() - LVC.me.t < 4000) chatBubble(x + 42, y + 96, chatTxt(LVC.me.m), { up: true, col: '#ffc21a', tc: '#2a1a00', size: 22, align: 'left' });
 }
 drawLiveHud = (prev => function () {
   prev(); if (G.mode !== 'live' || G.screen !== 'play') return;
-  if (LVC.op && performance.now() - LVC.op.t < 5000) bubble(36 + 420 + 30, 250 + 60, chatTxt(LVC.op.m), { align: 'left' });
+  if (LVC.op && performance.now() - LVC.op.t < 5000) chatBubble(36 + 420 + 30, 250 + 60, chatTxt(LVC.op.m), { align: 'left' });
   liveChatUI(36, 530, false);
 })(drawLiveHud);
 window.drawLiveHud = drawLiveHud;
 drawLiveEnd = (prev => function () {
   prev(); if (!LV.room) return;
-  if (LVC.op && performance.now() - LVC.op.t < 6000) bubble(1480, 200, chatTxt(LVC.op.m));
+  if (LVC.op && performance.now() - LVC.op.t < 6000) chatBubble(1480, 200, chatTxt(LVC.op.m));
   liveChatUI(60, 930, true);
 })(drawLiveEnd);
 act = (prev => function (id) {
