@@ -4319,7 +4319,7 @@ function purchaseInfo(id) {
   return null;
 }
 act = (prev => function (id) {
-  if (id === 'mo_no') { MO = null; sfx.click(); return; }
+  if (id === 'mo_no') { const f = MO && MO.onNo; MO = null; sfx.click(); if (f) f(); return; }
   if (id === 'mo_yes') { const f = MO && MO.onYes; MO = null; if (f) f(); return; }
   if (MO) return;
   if (id === 'shop') { sfx.click(); SH.from = G.screen === 'shop' ? SH.from : G.screen; G.screen = 'shop'; claimPurchases(false); return; }
@@ -4625,7 +4625,7 @@ function mergeSaves(local, remote, baseCoins) {
   m.lvl = Object.assign({}, remote.lvl || {}); Object.entries(local.lvl || {}).forEach(([k, v]) => { const r = m.lvl[k] || { s: 0, p: 0 }; m.lvl[k] = { s: Math.max(r.s || 0, v.s || 0), p: Math.max(r.p || 0, v.p || 0) }; });
   m.coins = Math.max(0, (remote.coins || 0) + ((local.coins || 0) - (baseCoins || 0)));
   if ((local.cbest && local.cbest.score || 0) > (remote.cbest && remote.cbest.score || 0)) m.cbest = local.cbest;
-  m.masterDone = remote.masterDone || local.masterDone; m.starterBought = remote.starterBought || local.starterBought;
+  m.masterDone = remote.masterDone || local.masterDone; m.starterBought = remote.starterBought || local.starterBought; m.permisPrime = remote.permisPrime || local.permisPrime;
   return m;
 }
 
@@ -9711,9 +9711,35 @@ const isNewPlayer = () => !save.tuto && (save.maxLevel || 1) <= 1 && !Object.key
 if (!isNewPlayer()) { if (!save.tuto) { save.tuto = 1; writeSave(save); } }
 else if (TUNE.tuto) setTimeout(() => {
   if (!isNewPlayer() || G.screen !== 'title') return;
+  bienvenue();
+}, 900);
+// premier lancement : on accueille le joueur au lieu de le jeter directement dans un niveau
+function lancerTuto() {
   G.mode = 'career'; G.runSeed = 0; G.replay = false; G.lives = 3; G.score = 0; G.perfects = 0; G.livesLost = 0; G.workersHit = 0; G.startTime = Date.now(); G.checkpoint = 1; save.checkpoint = 1;
   G.tuto = { step: 'wait', t0: G.t }; save.keysSeen = 1; startLevel(1); ppTrack('tuto_start');
-}, 600);
+}
+let bvEssais = 0;
+function bienvenue() {
+  if (typeof modal !== 'function') return lancerTuto();
+  const en = save.lang === 'en', depuisSite = !!window.PP_ARRIVEE;
+  if (depuisSite && !ACC.name && ++bvEssais < 12) return setTimeout(bienvenue, 500);   // connexion du compte du site en cours
+  const nom = ACC.name || save.name;
+  modal(nom ? {
+    title: en ? `WELCOME, ${nom.toUpperCase()}!` : `BIENVENUE ${nom.toUpperCase()} !`,
+    lines: [en ? 'Your account is signed in on this device.' : 'Ton compte est connecté sur cet appareil.',
+      en ? 'Start with a 1-minute practice site to learn the controls.' : 'Commence par un chantier d\'entraînement d\'une minute',
+      en ? 'Your progress is saved automatically.' : 'pour apprendre les commandes. Ta progression est sauvegardée.'],
+    yes: en ? 'PLAY PRACTICE' : 'JOUER L\'ENTRAÎNEMENT', onYes: lancerTuto,
+    no: en ? 'GO TO MENU' : 'ALLER AU MENU', onNo: () => { save.tuto = 1; writeSave(save); },
+  } : {
+    title: en ? 'WELCOME TO PILE POIL!' : 'BIENVENUE SUR PILE POIL !',
+    lines: [en ? 'First time here?' : 'Première fois ici ?',
+      en ? 'A 1-minute practice site teaches you the controls.' : 'Un chantier d\'entraînement d\'une minute t\'apprend les commandes.',
+      en ? 'Already have an account? Log in to get your progress back.' : 'Déjà un compte ? Connecte-toi pour retrouver ta progression.'],
+    yes: en ? 'PLAY PRACTICE' : 'JOUER L\'ENTRAÎNEMENT', onYes: lancerTuto,
+    no: en ? 'LOG IN' : 'ME CONNECTER', onNo: () => { if (typeof accForm === 'function') accForm('login'); },
+  });
+}
 function tutoLand(l) { // où tomberait la charge si on la lâchait maintenant (lâcher bref)
   const s = loadState(l), dir = Math.abs(s.vx) > 30 ? Math.sign(s.vx) : (l.cr.dir || 1), p = .08, dt = 1 / 60; let x = s.x, y = s.y, vx = s.vx + dir * p * 620, vy = s.vy - p * 260;
   for (let i = 0; i < 300 && y + l.loadH / 2 < GY; i++) { vx += (l.C.wind || 0) * PX_PER_KMH * dt; vy += GRAV * dt; x += vx * dt; y += vy * dt; } return x;
@@ -9739,7 +9765,16 @@ finish = (prev => function (lvl, res) {
 // fin du tutoriel : quelques secondes de bravo, puis le jeu normal
 startLevel = (prev => function (n) {
   const T = G.tuto; prev(n);
-  if (T && T.step === 'bravo') { G.tuto = null; G.tip = { t: G.t }; }
+  if (T && T.step === 'bravo') {
+    G.tuto = null; G.tip = typeof modal === 'function' ? null : { t: G.t };
+    if (typeof modal === 'function') {
+      const en = save.lang === 'en'; G.paused = true;
+      modal({ title: en ? 'PRACTICE DONE!' : 'ENTRAÎNEMENT RÉUSSI !',
+        lines: [en ? 'You know the basics.' : 'Tu connais les bases.', en ? 'Keep going with your career, or explore the menu' : 'Continue ta carrière, ou découvre le menu :', en ? '(duels, survival, garage, friends).' : 'duels, survie, garage, amis…'],
+        yes: en ? 'NEXT SITE' : 'CHANTIER SUIVANT', onYes: () => { G.paused = false; G.tip = { t: G.t }; },
+        no: en ? 'MENU' : 'MENU', onNo: () => { G.paused = false; G.screen = 'title'; } });
+    }
+  }
   else if (T && !tutoValide()) tutoAnnule();   // le tutoriel ne vit que sur le niveau 1 de la France, en carrière
   else if (T) T.step = 'wait';
 })(startLevel);
@@ -9821,6 +9856,8 @@ Object.assign(EN, {
   'Relâche !': 'Let go!', 'Plus tu maintiens, plus la charge part loin': 'The longer you hold, the further it flies', 'Presque !': 'Almost!', 'Aucune vie perdue, on recommence': 'No life lost, try again', "Les 49 chantiers suivants t'attendent": '49 more sites are waiting for you',
   '📸  Partager ce PILE POIL': '📸  Share this PILE POIL', '📤  PARTAGER MON RÉSULTAT': '📤  SHARE MY RESULT', 'Copié ! Colle-le dans ton groupe 📋': 'Copied! Paste it in your group chat 📋',
 });
+// pendant une fenêtre d'accueil, on ne dessine pas l'écran PAUSE derrière
+drawPause = (prev => function () { if (typeof MO !== 'undefined' && MO) return; prev(); })(drawPause);
 
 // =====================================================================
 //  PILE POIL — VISEUR LASER (amélioration à 4 000 pièces, carrière uniquement, dès le niveau 11)
@@ -11006,6 +11043,46 @@ if ((save.season || 1) < RESET_SEASON) {
   importSave({}); save.name = ''; save.season = RESET_SEASON; save.cbest = null; writeSave(save);
   if (ancien) setTimeout(() => { if (typeof toast === 'function') toast(save.lang === 'en' ? 'New season: everyone starts from zero!' : 'Nouvelle saison : tout le monde repart de zéro !', '#ffd447'); }, 2500);
 }
+
+// =====================================================================
+//  PILE POIL — arrivée depuis le site (épreuve du permis de grutier)
+//  #acc=<jeton du compte>&permis=or|argent|bronze
+//  Le compte créé sur le site est connecté automatiquement (pseudo réservé),
+//  et la prime du permis est créditée une seule fois par compte.
+// =====================================================================
+(function () {
+  const PRIMES = { or: 300, argent: 200, bronze: 100 };
+  let h; try { h = new URLSearchParams((location.hash || '').replace(/^#/, '')); } catch (e) { return; }
+  const tok = h.get('acc'), pm = h.get('permis');
+  if (!tok && !pm) return;
+  window.PP_ARRIVEE = true;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}   // le jeton ne reste pas dans l'adresse
+  const prime = () => {
+    if (!PRIMES[pm] || save.permisPrime) return;
+    save.permisPrime = pm; writeSave(save);
+    setTimeout(() => {
+      if (typeof giveCoins === 'function') giveCoins(PRIMES[pm], save.lang === 'en' ? 'crane licence bonus' : 'prime du permis de grutier');
+      if (typeof schedulePush === 'function') { ACC.dirty = true; accStore(); schedulePush(800); }
+    }, 1500);
+  };
+  if (!/^[0-9a-f-]{36}$/i.test(tok || '') || typeof SB === 'undefined' || !SB) { prime(); return; }
+  if (ACC.token === tok) { prime(); return; }
+  (async () => {
+    try {
+      const r = await accRpc('account_pull', { p_token: tok });
+      const local = exportSave(), fresh = !(local.coins > 0 || (local.maxLevel || 1) > 1 || (local.skins || []).length > 1);
+      Object.assign(ACC, { name: r.name, token: tok, v: r.version, state: 'idle' });
+      const remote = r.save || {};
+      importSave(fresh ? remote : mergeSaves(local, remote, 0));
+      ACC.base = remote.coins || 0; ACC.dirty = !fresh; ACC.lastSync = Date.now(); save.name = r.name; accStore(); writeSave(save);
+      if (!fresh) accPush();
+      if (typeof toast === 'function') toast((save.lang === 'en' ? 'Signed in as ' : 'Connecté : ') + r.name, '#3cf29b');
+      prime();
+    } catch (e) {
+      if (typeof toast === 'function') toast(save.lang === 'en' ? 'Sign-in link expired: log in with your password' : 'Lien expiré : connecte-toi avec ton mot de passe', '#ffb36b');
+    }
+  })();
+})();
 
 </script>
 </body></html>
