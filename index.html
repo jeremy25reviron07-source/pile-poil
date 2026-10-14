@@ -2263,7 +2263,7 @@ function drawLevel(lvl) {
   drawAccident(lvl);
   c.filter = 'none';
   // helpers: trajectory preview during apprenticeship
-  if (lvl.phase === 'hang' && C.t === 0) {
+  if (lvl.phase === 'hang' && C.t === 0 && !laserLive(lvl)) {
     let pts = predict(lvl); if (C.t !== 0) pts = pts.slice(0, Math.ceil(pts.length * .4)); c.save(); c.fillStyle = 'rgba(255,255,255,.9)'; pts.forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }); c.restore();
   }
   // weather
@@ -3583,7 +3583,7 @@ function drawEquip() {
     rr(x, y, w, h, 24); c.fillStyle = own ? 'rgba(60,242,155,.14)' : 'rgba(12,18,32,.84)'; c.fill(); rr(x, y, w, h, 24); c.strokeStyle = own ? '#3cf29b' : 'rgba(255,255,255,.14)'; c.lineWidth = 2; c.stroke();
     c.save(); c.translate(x + 110, y + 130); c.scale(4, 4); ICONS[u.icon](0, 0); c.restore();
     txt(u.name, x + 230, y + 120, '#fff', 34, 900); wrapText(u.desc, x + 230, y + 166, 460, 28, '#cfe0ff', 22);
-    if (own) txt('✓ INSTALLÉ', x + 230, y + 330, '#3cf29b', 28, 900);
+    if (own) txt('✓ INSTALLÉ', x + 230, y + (u.id === 'laser' ? 296 : 330), '#3cf29b', 28, 900);
     else { const ok = save.coins >= u.price; smallBtn('ug_' + u.id, x + 230, y + 290, 360, 70, `ACHETER · ${u.price.toLocaleString('fr-FR')}`, ok ? 'buy' : 'off'); if (!ok) G.buttons.push({ id: 'ug_' + u.id, x: x + 230, y: y + 290, w: 360, h: 70 }); }
   });
   rr(210, 740, 1500, 240, 24); c.fillStyle = 'rgba(12,18,32,.84)'; c.fill();
@@ -8586,6 +8586,85 @@ auFrame = (prev => function () {
 })(auFrame);
 
 // =====================================================================
+//  PILE POIL — MÉLANGE DES PAYS, VISEUR DÉSACTIVABLE, NOUVELLE CARTE « FRANCE »
+//  · survie, défi du jour et duels tirent leurs chantiers en France, au Japon ET en Égypte
+//    (même tirage pour tout le monde : le défi du jour change de mélange chaque jour)
+//  · le viseur laser peut être coupé depuis le garage
+// =====================================================================
+const MIX_REG = ['fr', 'jp', 'eg'];
+const MIX_MODES = ['survie', 'daily', 'duel', 'live', 'tour'];
+function mixRegion(seed, k) { const r = mulberry(((seed | 0) ^ Math.imul(k + 1, 2654435761)) >>> 0); r(); return MIX_REG[Math.floor(r() * 3)]; }
+function mixIndex() { if (G.mode === 'survie') return [SV.seed, SV.n]; if (G.run && G.run.seed !== undefined) return [G.run.seed, G.run.i || 0]; return null; }
+startLevel = (prev => function (n) {
+  const mi = MIX_MODES.includes(G.mode) && mixIndex(); if (!mi) return prev(n);
+  const r = mixRegion(mi[0], mi[1]), keep = window.REGION; if (keep !== 'fr') return prev(n);
+  window.REGION = r; LCACHE.clear();
+  try { prev(n); } finally { window.REGION = keep; LCACHE.clear(); }
+  if (L) L.mixReg = r;
+})(startLevel);
+// la musique et les sons suivent le pays du chantier en cours
+auMusicTick = (prev => function () {
+  if (G.screen === 'play' && L && L.zone && MIX_MODES.includes(G.mode)) {
+    if (L.zone.jp) { AU.nextT = 0; EA.zone = null; return jaTick(); }
+    if (L.zone.eg) { AU.nextT = 0; JA.nextT = 0; return eaTick(); }
+  }
+  return prev();
+})(auMusicTick);
+
+// ---------- viseur laser : on peut le couper ----------
+laserOn = function () { return isCareer() && hasUpg('laser') && !save.laserOff; };
+drawEquip = (prev => function () {
+  prev(); if (!hasUpg('laser')) return; const i = UPGRADES.findIndex(u => u.id === 'laser'), x = 210 + i * 770 + 230, y = 280 + 318, on = !save.laserOff, w = 300, h = 54;
+  rr(x, y, w, h, h / 2); c.fillStyle = on ? 'rgba(60,242,155,.22)' : 'rgba(255,255,255,.08)'; c.fill(); c.strokeStyle = on ? '#3cf29b' : 'rgba(255,255,255,.3)'; c.lineWidth = 2; c.stroke();
+  const kx = on ? x + w - 30 : x + 30; ell(kx, y + h / 2, 21, 21, on ? '#3cf29b' : '#8d9abb');
+  txt(on ? 'LASER ACTIVÉ' : 'LASER COUPÉ', on ? x + 26 : x + 64, y + 36, on ? '#3cf29b' : '#cfd6ea', 21, 900);
+  G.buttons.push({ id: 'laserToggle', x, y, w, h });
+})(drawEquip);
+act = (prev => function (id) { if (id === 'laserToggle') { sfx.click(); save.laserOff = !save.laserOff; writeSave(save); toast(save.laserOff ? 'Viseur laser coupé : à toi de viser !' : 'Viseur laser activé', save.laserOff ? '#ffd447' : '#3cf29b'); return; } return prev(id); })(act);
+
+// ---------- carte « FRANCE » de l'écran des régions : Paris au coucher du soleil ----------
+function eiffel(cx, by, H, col, lights) {
+  const o = document.createElement('canvas'); o.width = Math.ceil(H * .62); o.height = Math.ceil(H + 10); const x = o.getContext('2d'), m = o.width / 2, half = t => H * .26 * Math.pow(1 - t, 2.3) + H * .012, Y = t => H - t * H;
+  x.fillStyle = col; x.beginPath(); x.moveTo(m - half(0), Y(0)); for (let t = 0; t <= 1.0001; t += .02) x.lineTo(m - half(t), Y(t)); for (let t = 1; t >= 0; t -= .02) x.lineTo(m + half(t), Y(t)); x.closePath(); x.fill();
+  x.globalCompositeOperation = 'destination-out';
+  x.beginPath(); x.moveTo(m - half(0) * .62, Y(0)); x.quadraticCurveTo(m, Y(.2), m + half(0) * .62, Y(0)); x.fill();
+  x.beginPath(); x.moveTo(m - half(.2) * .5, Y(.2)); x.lineTo(m, Y(.4)); x.lineTo(m + half(.2) * .5, Y(.2)); x.fill();
+  x.lineWidth = 1; for (let t = .04; t < .9; t += .028) { const a = half(t) * .78; x.beginPath(); x.moveTo(m - a, Y(t)); x.lineTo(m + a * .2, Y(t + .028)); x.moveTo(m + a, Y(t)); x.lineTo(m - a * .2, Y(t + .028)); x.stroke(); }
+  x.globalCompositeOperation = 'source-over'; x.fillStyle = col;
+  [[.2, 1.25], [.42, 1.2], [.75, 1.6]].forEach(([t, k]) => x.fillRect(m - half(t) * k - 2, Y(t) - H * .012, half(t) * k * 2 + 4, H * .022));
+  x.fillRect(m - 1.2, Y(1) - H * .07, 2.4, H * .07);
+  c.drawImage(o, cx - m, by - H);
+}
+function hsmCard(x0, by, w, h, seedv) {
+  seed = seedv; const roof = '#4f5b6e', fac = ['#efe2c8', '#e8d8bb', '#f3e8d2'][seedv % 3];
+  fillR(x0, by - h, w, h, fac); fillR(x0, by - h, w, 6, '#d6c3a0');
+  for (let f = 0; f < 4; f++) { const fy = by - h + 16 + f * (h - 26) / 4; for (let k = x0 + 10; k < x0 + w - 16; k += 22) { fillR(k, fy, 10, 16, f === 0 ? 'rgba(255,214,140,.95)' : rnd() < .35 ? 'rgba(255,200,120,.9)' : '#3b4252'); } if (f === 1 || f === 3) { fillR(x0 + 4, fy + 17, w - 8, 3, '#2b2f36'); for (let k = x0 + 6; k < x0 + w - 6; k += 5) fillR(k, fy + 12, 1, 5, '#2b2f36'); } }
+  c.fillStyle = roof; c.beginPath(); c.moveTo(x0 - 3, by - h); c.lineTo(x0 + 8, by - h - 26); c.lineTo(x0 + w - 8, by - h - 26); c.lineTo(x0 + w + 3, by - h); c.fill();
+  for (let k = x0 + 14; k < x0 + w - 18; k += 26) { fillR(k, by - h - 22, 12, 14, '#e9dfcf'); fillR(k + 2, by - h - 19, 8, 9, rnd() < .5 ? 'rgba(255,214,140,.9)' : '#2b3140'); }
+  for (let k = 0; k < 2; k++) { const cx = x0 + 12 + k * (w - 34); fillR(cx, by - h - 38, 10, 14, '#b06a4a'); fillR(cx + 1, by - h - 41, 3, 4, '#c98a6a'); fillR(cx + 6, by - h - 41, 3, 4, '#c98a6a'); }
+}
+function franceArt(x, y, w, h) { // même style que les cartes Japon et Égypte : un monument, un grand soleil, une silhouette simple
+  c.save(); fillR(x, y, w, h, lg(0, y, 0, y + h, [[0, '#7fa8e8'], [.55, '#f4c4c8'], [1, '#ffdcb4']]));
+  ell(x + 360, y + 260, 82, 82, '#ffd27a'); ell(x + 360, y + 260, 66, 66, '#ffe2a0');
+  for (let i = 0; i < 3; i++) ell(x + 90 + i * 170 + Math.sin(G.t * .25 + i) * 8, y + 110 + (i % 2) * 50, 64, 11, 'rgba(255,255,255,.55)');
+  eiffel(x + 250, y + 505, 420, '#34406b', false);
+  // drapeau tricolore au sommet
+  const fx = x + 250, fy = y + 505 - 420 - 26; ln(fx, fy + 26, fx, fy - 8, '#34406b', 2); fillR(fx, fy - 8, 9, 14, '#1f4fbf'); fillR(fx + 9, fy - 8, 9, 14, '#f2f2f2'); fillR(fx + 18, fy - 8, 9, 14, '#e8402a');
+  // toits de Paris (zinc, cheminées) en silhouette
+  c.fillStyle = '#5a6a92'; c.beginPath(); c.moveTo(x, y + 505); let k = 0;
+  for (let px = x; px <= x + w; px += 46, k++) { const hh = 52 + (k % 3) * 16; c.lineTo(px, y + 505 - hh + 14); c.lineTo(px + 8, y + 505 - hh); c.lineTo(px + 38, y + 505 - hh); c.lineTo(px + 46, y + 505 - hh + 14); }
+  c.lineTo(x + w, y + 505); c.fill();
+  k = 0; for (let px = x; px < x + w; px += 46, k++) { const hh = 52 + (k % 3) * 16; fillR(px + 30, y + 505 - hh - 12, 7, 12, '#b06a4a'); fillR(px + 14, y + 505 - hh + 4, 9, 10, '#ffe2a0'); }
+  // petite grue jaune du chantier
+  const gx = x + 455; ln(gx, y + 505, gx, y + 330, '#f6b81a', 6); ln(gx - 70, y + 336, gx + 90, y + 336, '#f6b81a', 5); ln(gx, y + 318, gx - 70, y + 336, '#f6b81a', 2); ln(gx, y + 318, gx + 90, y + 336, '#f6b81a', 2); fillR(gx - 80, y + 336, 18, 14, '#9aa3ad'); ln(gx + 60, y + 336, gx + 60, y + 400, '#2b2f36', 2); fillR(gx + 50, y + 400, 20, 12, '#e8402a');
+  fillR(x, y + 500, w, 140, '#3f4a6a');
+  for (let i = 0; i < 16; i++) { const px = x + ((i * 61 + G.t * 22) % w); ell(px, y + 520 + (i % 4) * 26, 10, 1.6, 'rgba(255,226,160,.5)'); }
+  c.restore();
+}
+regionCard = (prev => function (id, x, w, title, sub, col, art, extra) { if (id === 'rgFR') { art = franceArt; col = ['#7fa8e8', '#2f3f9a']; } return prev(id, x, w, title, sub, col, art, extra); })(regionCard);
+Object.assign(EN, { 'LASER ACTIVÉ': 'LASER ON', 'LASER COUPÉ': 'LASER OFF', 'Viseur laser coupé : à toi de viser !': 'Laser sight off: aim on your own!', 'Viseur laser activé': 'Laser sight on' });
+
+// =====================================================================
 //  PILE POIL — COMMANDES : petite bulle en bas à gauche, le menu des touches s'ouvre au clic
 // =====================================================================
 const KEYS = { open: false, autoUntil: 0 };
@@ -8896,18 +8975,28 @@ Object.assign(EN, {
 //  · batterie de 6 s par chantier : le laser ne s'allume que pendant qu'on maintient le lancer
 // =====================================================================
 const LASER = { bat: 6, base: 18, wind: 3.2, swing: 260, night: 22, fog: 60, rain: 14 };   // réglages
-const laserLive = l => laserOn() && l && l.C && l.C.t > 0 && l.C.t !== 5;
+const laserLive = l => laserOn() && l && l.C && l.C.t !== 5;
 function laserZone(l) { const C = l.C; return LASER.base + Math.abs(C.wind || 0) * LASER.wind + Math.abs(l.th || 0) * LASER.swing + (C.night ? LASER.night : 0) + (C.fog || 0) * LASER.fog + (C.rain ? LASER.rain : 0); }
 startLevel = (prev => function (n) { prev(n); if (L) L.lzBat = LASER.bat; })(startLevel);
 updateCrane = (prev => function (lvl, dt) { prev(lvl, dt); if (laserLive(lvl) && lvl.phase === 'hang' && lvl.charging && lvl.lzBat > 0) { lvl.lzBat = Math.max(0, lvl.lzBat - dt); if (lvl.lzBat === 0) try { sfx.thud(.15); } catch (e) {} } })(updateCrane);
-drawLevel = (prev => function (lvl) {
+drawLevel = (prev => function (lvl) { // style « idée 1 » : faisceau lumineux continu + cible pulsante + écart, avec la zone d'incertitude
   prev(lvl); if (!laserLive(lvl) || lvl.phase !== 'hang' || !lvl.charging || !(lvl.lzBat > 0)) return;
-  const pts = predict(lvl); if (pts.length < 2) return; const t = lvl.target, lx = pts[pts.length - 1][0], z = laserZone(lvl), a = lx - z, b = lx + z;
-  const col = a >= t.x && b <= t.x + t.w ? '#3cf29b' : b > t.x && a < t.x + t.w ? '#ffb347' : '#ff4a5a', flick = lvl.lzBat < 1 && Math.sin(G.t * 40) > 0 ? .4 : 1;
-  c.save(); c.globalAlpha = flick; c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
-  for (let i = 1; i < pts.length; i++) { const k = i / pts.length; c.globalAlpha = .55 * flick; c.strokeStyle = `rgba(255,60,80,${(1 - k * .55).toFixed(2)})`; c.lineWidth = 3 + k * 10; c.beginPath(); c.moveTo(pts[i - 1][0], pts[i - 1][1]); c.lineTo(pts[i][0], pts[i][1]); c.stroke(); c.globalAlpha = flick; c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 1.6; c.stroke(); }
-  const g = c.createLinearGradient(a, 0, b, 0); g.addColorStop(0, col + '00'); g.addColorStop(.5, col + 'aa'); g.addColorStop(1, col + '00'); c.fillStyle = g; c.beginPath(); c.ellipse(lx, GY + 2, z, 13, 0, 0, 7); c.fill(); c.restore();
-  c.save(); c.globalAlpha = flick; c.strokeStyle = col; c.lineWidth = 3; c.setLineDash([6, 6]); c.beginPath(); c.ellipse(lx, GY + 2, z, 13, 0, 0, 7); c.stroke(); c.setLineDash([]); ln(a, GY - 14, a, GY + 18, col, 3); ln(b, GY - 14, b, GY + 18, col, 3); c.restore();
+  const pts = predict(lvl); if (pts.length < 2) return; const s0 = loadState(lvl); pts.unshift([s0.x, s0.y]);
+  const t = lvl.target, tc = t.x + t.w / 2, lx = pts[pts.length - 1][0], z = laserZone(lvl), a = lx - z, b = lx + z, tol = (t.w - lvl.loadW) / 2 + lvl.loadW * .18, err = Math.abs(lx - tc);
+  const inA = a >= t.x && b <= t.x + t.w, part = b > t.x && a < t.x + t.w, col = inA ? '#3cf29b' : part ? '#ffd447' : '#ff4a3a', flick = lvl.lzBat < 1 && Math.sin(G.t * 40) > 0 ? .4 : 1;
+  const path = () => { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length - 1; i++) c.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2); c.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]); };
+  c.save(); c.globalAlpha = flick; c.globalCompositeOperation = 'lighter'; c.lineCap = 'round'; c.lineJoin = 'round';
+  [[20, .12], [9, .3], [4, 1]].forEach(([w, al]) => { c.globalAlpha = al * flick; c.strokeStyle = '#ff3048'; c.lineWidth = w; path(); c.stroke(); });
+  c.globalAlpha = flick; c.strokeStyle = '#fff'; c.lineWidth = 1.6; path(); c.stroke();
+  // zone d'impact (incertitude selon la météo) + cible pulsante
+  const g = c.createLinearGradient(a, 0, b, 0); g.addColorStop(0, col + '00'); g.addColorStop(.5, col + '88'); g.addColorStop(1, col + '00'); c.fillStyle = g; c.beginPath(); c.ellipse(lx, GY + 2, Math.max(z, 46), 13, 0, 0, 7); c.fill();
+  c.strokeStyle = col; c.lineWidth = 4; for (let k = 0; k < 2; k++) { const r = 18 + ((G.t * 30 + k * 14) % 28); c.globalAlpha = (1 - r / 46) * flick; c.beginPath(); c.ellipse(lx, GY + 2, r * 1.6, r * .42, 0, 0, 7); c.stroke(); }
+  c.restore();
+  c.save(); c.globalAlpha = flick; c.strokeStyle = col; c.lineWidth = 2.5; c.setLineDash([6, 6]); c.beginPath(); c.ellipse(lx, GY + 2, z, 12, 0, 0, 7); c.stroke(); c.setLineDash([]);
+  ln(lx, GY - 22, lx, GY + 24, col, 3); ln(lx - 26, GY + 2, lx + 26, GY + 2, col, 3);
+  // écart au centre de la fouille
+  const em = Math.round(err / PXM * 2) / 2, pf = false, lab = em < .5 ? '≈ au centre' : `≈ ${em.toLocaleString('fr-FR')} m ${lx < tc ? '→' : '←'}`; c.font = '900 26px Inter'; const pw = c.measureText(lab).width + 40;
+  rr(lx - pw / 2, GY + 40, pw, 48, 24); c.fillStyle = pf ? '#3cf29b' : col; c.fill(); txt(lab, lx, GY + 73, '#0b1020', 26, 900, 'center'); c.restore();
 })(drawLevel);
 hud = (prev => function (lvl) {
   prev(lvl); if (!laserLive(lvl) || G.screen !== 'play') return;
