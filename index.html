@@ -1030,10 +1030,58 @@ function banksman2(lvl) {
   const tc = t.x + t.w / 2, over = s && Math.abs(s.x - tc) < t.w * .3, dir = s ? Math.sign(tc - s.x) || 1 : 1, face = Math.sign(tc - b.x) || 1;
   const look = lvl.banksLook || (lvl.banksLook = Object.assign(randLook(false), { vest: '#ff7a1a', helm: '#f2f4f7' }));
   const w = Math.sin(G.t * 10) * .12, sw = Math.sin(G.t * 5) * .25;
-  const pose = over ? { aL: [2.95 + w, .05], aR: [2.95 - w, .05] } : { aR: [1.65 + sw * (dir === face ? 1 : -1), .1], aL: [.15, .4] };
+  const panneau = lvl.C.t <= 1 && s && (window.BKV || 'A') === 'A';   // il tient le panneau Encore / Stop à bout de bras
+  const pose = panneau ? (over ? { aR: [2.98, -.04], aL: [1.75 + w, .15] } : { aR: [2.98, -.04], aL: [1.65 + sw * (dir === face ? 1 : -1), .1] })
+    : over ? { aL: [2.95 + w, .05], aR: [2.95 - w, .05] } : { aR: [1.65 + sw * (dir === face ? 1 : -1), .1], aL: [.15, .4] };
   const H = person2(b.x, b.y, S_FRONT, dir === face || over ? face : -face, look, pose);
   fillR(b.x - 3 * S_FRONT, b.y - 74 * S_FRONT, 6, 12, '#1d2026'); ln(b.x - 1, b.y - 74 * S_FRONT, b.x - 1, b.y - 84 * S_FRONT, '#1d2026', 1.5);
-  if (lvl.C.t <= 1 && s) { const msg = over ? 'STOP' : dir > 0 ? 'Encore ▶' : '◀ Encore'; c.font = '800 20px Inter'; const ww = c.measureText(msg).width + 26; rr(b.x - ww / 2, b.y - 150, ww, 36, 18); c.fillStyle = 'rgba(255,255,255,.95)'; c.fill(); txt(msg, b.x, b.y - 125, over ? '#c4281a' : '#1a2236', 20, 800, 'center'); }
+  if (lvl.C.t <= 1 && s) bkSignal(b, over, dir, Math.abs(s.x - tc) / 46, H && H.front);
+}
+// ---------- consignes du chef de manœuvre (Encore / Stop) ----------
+function bkChevron(x, y, d, sz, col) { c.fillStyle = col; c.beginPath(); c.moveTo(x - d * sz * .5, y - sz * .6); c.lineTo(x + d * sz * .1, y - sz * .6); c.lineTo(x + d * sz * .6, y); c.lineTo(x + d * sz * .1, y + sz * .6); c.lineTo(x - d * sz * .5, y + sz * .6); c.lineTo(x, y); c.closePath(); c.fill(); }
+function bkOcto(x, y, r, fill, edge) { c.beginPath(); for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + i * Math.PI / 4; c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } c.closePath(); c.fillStyle = edge; c.fill(); c.beginPath(); for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + i * Math.PI / 4; c.lineTo(x + Math.cos(a) * (r - 4), y + Math.sin(a) * (r - 4)); } c.closePath(); c.fillStyle = fill; c.fill(); }
+function bkSignal(b, over, dir, distM, hand) {
+  const V = window.BKV || 'A', x = b.x, top = b.y - 150, pulse = .5 + .5 * Math.sin(G.t * 8);
+  c.save();
+  if (V === '0') { const msg = over ? 'STOP' : dir > 0 ? 'Encore ▶' : '◀ Encore'; c.font = '800 20px Inter'; const ww = c.measureText(msg).width + 26; rr(x - ww / 2, top, ww, 36, 18); c.fillStyle = 'rgba(255,255,255,.95)'; c.fill(); txt(msg, x, top + 25, over ? '#c4281a' : '#1a2236', 20, 800, 'center'); }
+  if (V === 'A') { // panneau de signalisation tenu à la main, sur un manche
+    const hx = hand ? hand[0] : x, hy = hand ? hand[1] : top + 60, px = hx, cy = hy - 62;
+    rr(px - 2.5, cy + 30, 5, hy - cy - 18, 2); c.fillStyle = '#8c949e'; c.fill(); fillR(px - 2.5, cy + 30, 2, hy - cy - 18, '#b9c0c8');
+    ell(hx, hy + 2, 5.5 * S_FRONT, 5.5 * S_FRONT, '#3a3f48');
+    { const x = px;
+    withShadow('rgba(0,0,0,.4)', 10, 0, 4, () => { if (over) bkOcto(x, cy, 34, '#d6202f', '#fff'); else { ell(x, cy, 34, 34, '#fff'); ell(x, cy, 30, 30, '#1f5fd1'); } });
+    if (over) txt('STOP', x, cy + 8, '#fff', 20, 900, 'center');
+    else { c.fillStyle = '#fff'; c.save(); c.translate(x + dir * Math.sin(G.t * 8) * 3, cy); c.scale(dir, 1); c.beginPath(); c.moveTo(-16, -6); c.lineTo(2, -6); c.lineTo(2, -15); c.lineTo(18, 0); c.lineTo(2, 15); c.lineTo(2, 6); c.lineTo(-16, 6); c.closePath(); c.fill(); c.restore(); }
+    const lab = over ? 'PILE POIL !' : 'ENCORE'; c.font = '900 15px Inter'; const lw = c.measureText(typeof tr === 'function' ? tr(lab) : lab).width + 20;
+    rr(x - lw / 2, cy - 64, lw, 24, 12); c.fillStyle = over ? '#d6202f' : '#14233f'; c.fill(); txt(lab, x, cy - 47, '#fff', 15, 900, 'center');
+  } }
+  if (V === 'B') { // flèches lumineuses animées
+    const ww = 200, bx = x - ww / 2, by = top - 20;
+    withShadow('rgba(0,0,0,.4)', 10, 0, 4, () => { rr(bx, by, ww, 50, 25); c.fillStyle = over ? '#d6202f' : 'rgba(10,20,40,.9)'; c.fill(); });
+    if (over) { ell(bx + 30, by + 25, 17 + pulse * 3, 17 + pulse * 3, 'rgba(255,255,255,.3)'); c.font = '24px sans-serif'; c.textAlign = 'center'; c.fillText('✋', bx + 30, by + 34); c.textAlign = 'left'; txt('STOP !', bx + 118, by + 33, '#fff', 22, 900, 'center'); }
+    else { const ph = Math.floor(G.t * 6) % 3, cx0 = dir > 0 ? bx + 118 : bx + 26, tx = dir > 0 ? bx + 22 : bx + 104; txt('ENCORE', tx, by + 32, '#fff', 17, 900); for (let i = 0; i < 3; i++) { const k = dir > 0 ? i : 2 - i; bkChevron(cx0 + i * 24, by + 25, dir, 20, k === ph ? '#3cf29b' : 'rgba(60,242,155,.3)'); } }
+  }
+  if (V === 'C') { // bulle talkie-walkie
+    const msg = over ? 'STOP ! Pile poil !' : dir > 0 ? 'Encore, encore ! ▶▶' : '◀◀ Encore, encore !', col = over ? '#e3263a' : '#fff', ink = over ? '#fff' : '#14233f';
+    const sh = over ? Math.sin(G.t * 40) * 2 : 0; c.font = '900 19px Inter'; const ww = c.measureText(msg).width + 64, bx = x - ww / 2 + sh, by = top - 16;
+    withShadow('rgba(0,0,0,.4)', 10, 0, 4, () => { rr(bx, by, ww, 46, 23); c.fillStyle = col; c.fill(); c.beginPath(); c.moveTo(x - 10, by + 44); c.lineTo(x + 10, by + 44); c.lineTo(x + 2, by + 62); c.fill(); });
+    rr(bx + 14, by + 11, 14, 24, 4); c.fillStyle = ink; c.fill(); fillR(bx + 23, by + 3, 3, 10, ink);
+    c.strokeStyle = over ? '#fff' : '#1f9d55'; c.lineWidth = 2.5; for (let i = 1; i <= 2; i++) { c.beginPath(); c.arc(bx + 26, by + 14, 5 + i * 5, -1.2, -.3); c.stroke(); }
+    txt(msg, bx + 42, by + 30, ink, 19, 900);
+  }
+  if (V === 'D') { // distance annoncée comme sur un vrai chantier
+    const msg = over ? 'STOP ✋' : `Encore ${distM.toFixed(1).replace('.', ',')} m`, n = over ? 0 : distM > 6 ? 3 : distM > 2.5 ? 2 : 1;
+    c.font = '900 21px Inter'; const tw = c.measureText(msg).width, cw = n ? n * 22 + 8 : 0, ww = tw + 40 + cw, bx = x - ww / 2, by = top - 14;
+    withShadow('rgba(0,0,0,.4)', 10, 0, 4, () => { rr(bx, by, ww, 46, 23); c.fillStyle = over ? '#e3263a' : '#fff'; c.fill(); });
+    if (over) txt(msg, x, by + 31, '#fff', 21, 900, 'center');
+    else {
+      const txx = dir > 0 ? bx + 20 : bx + 20 + cw, chx = dir > 0 ? bx + 20 + tw + 8 : bx + 20, ph = Math.floor(G.t * 6) % n;
+      txt(msg, txx, by + 31, '#14233f', 21, 900);
+      for (let i = 0; i < n; i++) bkChevron(chx + 11 + i * 22, by + 23, dir, 17, i === (dir > 0 ? ph : n - 1 - ph) ? '#1f9d55' : 'rgba(31,157,85,.35)');
+      const k = Math.max(0, Math.min(1, 1 - distM / 12)); rr(bx + 16, by + 52, ww - 32, 6, 3); c.fillStyle = 'rgba(20,35,63,.35)'; c.fill(); rr(bx + 16, by + 52, (ww - 32) * k, 6, 3); c.fillStyle = '#3cf29b'; c.fill();
+    }
+  }
+  c.restore();
 }
 
 // ---------- Engins : roues, chenilles, cabines détaillées ----------
@@ -4485,7 +4533,7 @@ const EN = {
   'NIVEAU': 'LEVEL', 'VIES': 'LIVES', 'SCORE': 'SCORE', 'CONDITIONS': 'CONDITIONS', 'PUISSANCE': 'POWER', 'VITESSE GRUE': 'CRANE SPEED', 'Constante': 'Constant', 'CHARGE': 'LOAD',
   'Ensoleillé': 'Sunny', 'Vent de sable': 'Sandstorm', 'Canicule': 'Heatwave', 'Couvert': 'Overcast', 'Pluie': 'Rain', 'Pluie forte': 'Heavy rain', 'Bruine': 'Drizzle', 'Nuit': 'Night', 'Vent': 'Wind', 'Vent →': 'Wind →', 'Vent ←': 'Wind ←', 'Brouillard': 'Fog', 'Visibilité': 'Visibility', 'Ouvriers': 'Workers',
   'APPRENTISSAGE': 'APPRENTICESHIP', 'MAÎTRISE DU MOUVEMENT': 'MOTION MASTERY', 'CONDITIONS EXTRÊMES': 'EXTREME CONDITIONS', 'TRAVAIL DE NUIT': 'NIGHT SHIFT', 'LE CHANTIER VIVANT': 'LIVE SITE', 'MASTER NIVEAU': 'MASTER LEVEL',
-  'PILE POIL !': 'BULLSEYE!', 'DANS LE TROU !': 'IN THE HOLE!', 'RATÉ': 'MISSED', 'HORS ZONE': 'OUT OF BOUNDS', 'OUVRIER TOUCHÉ !': 'WORKER HIT!', 'FIN DE COURSE BASSE': 'LOWER LIMIT REACHED',
+  'ENCORE': 'KEEP GOING', 'PILE POIL !': 'BULLSEYE!', 'DANS LE TROU !': 'IN THE HOLE!', 'RATÉ': 'MISSED', 'HORS ZONE': 'OUT OF BOUNDS', 'OUVRIER TOUCHÉ !': 'WORKER HIT!', 'FIN DE COURSE BASSE': 'LOWER LIMIT REACHED',
   'La charge a manqué la cible · vie perdue': 'The load missed the target · life lost', 'La charge est tombée hors du chantier · vie perdue': 'The load fell off the site · life lost', 'Observe leurs trajets avant de lancer · vie perdue': 'Watch their paths before dropping · life lost',
   'Vue cabine': 'Cabin view', 'ANÉMOMÈTRE': 'ANEMOMETER', "⚠ ARRÊT D'URGENCE · SECOURS EN ROUTE": '⚠ EMERGENCY STOP · HELP ON THE WAY',
   'Bloc béton': 'Concrete block', 'Palette de parpaings': 'Pallet of blocks', 'Benne à béton pleine': 'Full concrete bucket', 'Prédalle préfabriquée': 'Precast slab', 'Poutre IPN': 'Steel I-beam', 'Banche métallique': 'Steel formwork panel', "Cage d'armatures": 'Rebar cage', 'Tube acier': 'Steel pipe',
@@ -4961,6 +5009,8 @@ const SVGI = {
   bolt: ['M13 2 4 14h7l-1 8 9-12h-7z', 'f'],
   hour: ['M6 2h12v5l-4 5 4 5v5H6v-5l4-5-4-5zm2 2v2.3l4 5 4-5V4z', 'f'],
   user: ['M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm-9 10a9 7 0 0 1 18 0z', 'f'],
+  podium: ['M8.5 8h7v14h-7zM1.5 13h6v9h-6zM16.5 11h6v11h-6zM12 1.5l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z', 'f'],
+  heart: ['M12 21s-8.5-5.2-8.5-11.2A4.8 4.8 0 0 1 12 6.6a4.8 4.8 0 0 1 8.5 3.2C20.5 15.8 12 21 12 21z', 'f'],
   helmet: ['M3.5 15C3.5 9 7 5.5 12 5.5S20.5 9 20.5 15zM1.5 15.5h21v2.5h-21zM11 6l1.6 3-1.8 2.2 1.8 3.3-.9.2-1.9-3.4 1.7-2.1-1.3-3z', 'f'],
 };
 const P2D = {};
@@ -5184,11 +5234,11 @@ drawTitle = function () {
   // colonne de droite
   const done = save.dailyBonus === todayKey();
   const rows = [
-    ['catEpreuves', 'orange', 'helmet', 'ÉPREUVES', typeof epreuvesRowSub === 'function' ? epreuvesRowSub() : '', done ? null : 'NOUVEAU'],
+    ['catEpreuves', 'orange', 'trophy', 'ÉPREUVES', typeof epreuvesRowSub === 'function' ? epreuvesRowSub() : '', done ? null : 'NOUVEAU'],
     ['catDefis', 'violet', 'swords', 'DUELS', 'En direct ou chacun son tour', (typeof tdPendingCount === 'function' && tdPendingCount()) ? `${tdPendingCount()} À TOI` : null],
     ['garage', 'blue', 'crane', 'GARAGE', 'Grues, peinture, équipement', null],
     ['shop', 'gold', 'cart', 'BOUTIQUE', 'Packs de pièces', typeof SHOP_OPEN !== 'undefined' && !SHOP_OPEN ? 'BIENTÔT' : save.starterBought ? null : 'PROMO'],
-    ['board', 'slate', 'trophy', 'CLASSEMENTS', (typeof crateNews === 'function' && crateNews()) || (WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour'), null],
+    ['board', 'slate', 'podium', 'CLASSEMENTS', (typeof crateNews === 'function' && crateNews()) || (WB.top ? `N°1 : ${WB.top.name} · ${WB.top.score.toLocaleString('fr-FR')} pts` : 'Mondial et du jour'), null],
   ];
   rows.forEach(([id, col, ic, title, sub, badge], i) => {
     const rx = 1080, ry = 184 + i * 170, rw = 720, rh = 144, d = relief(rx, ry, rw, rh, CARD[col][0], CARD[col][1], RAD, 10), tc = col === 'gold' ? '#2a1a00' : '#fff';
@@ -9505,12 +9555,12 @@ const MISSION_POOL = {
   medium: [
     { id: 'perfect3', txt: 'Faire 3 lancers parfaits', goal: 3, ic: 'star' },
     { id: 'daily', txt: 'Terminer le défi du jour', goal: 1, ic: 'cal' },
-    { id: 'survie8', txt: 'Tenir 8 chantiers en survie', goal: 8, ic: 'helmet' },
+    { id: 'survie8', txt: 'Tenir 8 chantiers en survie', goal: 8, ic: 'heart' },
     { id: 'levels6', txt: 'Réussir 6 chantiers en carrière', goal: 6, ic: 'build' },
   ],
   hard: [
     { id: 'combo', txt: 'Enchaîner 2 lancers parfaits', goal: 1, ic: 'bolt' },
-    { id: 'survie15', txt: 'Tenir 15 chantiers en survie', goal: 15, ic: 'helmet' },
+    { id: 'survie15', txt: 'Tenir 15 chantiers en survie', goal: 15, ic: 'heart' },
     { id: 'perfect6', txt: 'Faire 6 lancers parfaits', goal: 6, ic: 'star' },
     { id: 'levels10', txt: 'Réussir 10 chantiers en carrière', goal: 10, ic: 'build' },
   ],
@@ -9669,14 +9719,14 @@ function tutoLand(l) { // où tomberait la charge si on la lâchait maintenant (
   for (let i = 0; i < 300 && y + l.loadH / 2 < GY; i++) { vx += (l.C.wind || 0) * PX_PER_KMH * dt; vy += GRAV * dt; x += vx * dt; y += vy * dt; } return x;
 }
 function tutoUpdate() {
-  const T = G.tuto; if (!T || G.screen !== 'play' || !L) return;
+  const T = G.tuto; if (!T || G.screen !== 'play' || !L) return; if (T.step !== 'bravo' && !tutoValide()) return tutoAnnule();
   if (L.cr.speedK0 === undefined) L.cr.speedK0 = L.cr.speedK; L.gaugeK = .3;
   if (L.phase === 'hang') { const t = L.target, err = Math.abs(tutoLand(L) - (t.x + t.w / 2)), ok = err < Math.max(14, t.w * .26);
     T.step = L.charging ? 'release' : ok ? 'now' : 'wait'; L.cr.speedK = L.cr.speedK0 * (T.step === 'wait' ? 1 : TUNE.tutoSlow); }
   else { L.cr.speedK = L.cr.speedK0; if (L.phase === 'fly') T.step = 'fly'; }
 }
 finish = (prev => function (lvl, res) {
-  const T = G.tuto, lives = G.lives, lost = G.livesLost; prev(lvl, res);
+  const T = tutoValide() ? G.tuto : null, lives = G.lives, lost = G.livesLost; prev(lvl, res);
   if (T && G.mode === 'career') {
     if (res === 'in' || res === 'perfect') { T.step = 'bravo'; T.doneT = G.t; save.tuto = 1; writeSave(save); ppTrack('tuto_done'); }
     else if (TUNE.tutoSafeLives) { G.lives = lives; G.livesLost = lost; T.step = 'retry'; T.retryT = G.t; if (G.msg) G.msg.sub = 'Pas grave, réessaie : vise juste au-dessus de la fouille'; }
@@ -9687,7 +9737,19 @@ finish = (prev => function (lvl, res) {
   if (G.mode === 'daily' && G.run) (G.run.hist = G.run.hist || []).push(res === 'perfect' ? 'P' : res === 'in' ? 'I' : 'M');
 })(finish);
 // fin du tutoriel : quelques secondes de bravo, puis le jeu normal
-startLevel = (prev => function (n) { const T = G.tuto; prev(n); if (T && T.step === 'bravo') { G.tuto = null; G.tip = { t: G.t }; } else if (T) T.step = 'wait'; })(startLevel);
+startLevel = (prev => function (n) {
+  const T = G.tuto; prev(n);
+  if (T && T.step === 'bravo') { G.tuto = null; G.tip = { t: G.t }; }
+  else if (T && !tutoValide()) tutoAnnule();   // le tutoriel ne vit que sur le niveau 1 de la France, en carrière
+  else if (T) T.step = 'wait';
+})(startLevel);
+// le tutoriel est réservé au tout premier chantier d'un vrai nouveau joueur
+function tutoValide() { return !!G.tuto && (G.mode || 'career') === 'career' && (window.REGION || 'fr') === 'fr' && !G.replay && (!L || !L.C || L.C.n === 1) && (save.maxLevel || 1) <= 1; }
+function tutoAnnule() { G.tuto = null; G.tip = null; if (!save.tuto) { save.tuto = 1; writeSave(save); } }
+// compte retrouvé sur un nouvel appareil : la progression arrive après le lancement du tutoriel → on l'arrête
+importSave = (prev => function (remote) { prev(remote); if (save.tuto || (save.maxLevel || 1) > 1 || Object.keys(save.lvl || {}).length) { if (G.tuto) G.tuto = null; G.tip = null; if (!save.tuto) save.tuto = 1; } })(importSave);
+// retour au menu pendant le tutoriel : on ne le relance plus
+setInterval(() => { if (G.tuto && G.tuto.step !== 'bravo' && (G.screen !== 'play' || !tutoValide())) tutoAnnule(); }, 500);
 function bubble(x, y, w, title, sub, arrow) { // bulle blanche avec petite flèche
   const h = sub ? 96 : 66; c.save(); withShadow('rgba(0,0,0,.45)', 24, 0, 8, () => { rr(x, y, w, h, 22); c.fillStyle = '#fff'; c.fill(); });
   if (arrow) { c.fillStyle = '#fff'; c.beginPath(); const [ax, ay] = arrow; c.moveTo(ax - 16, ay < y ? y : y + h); c.lineTo(ax + 16, ay < y ? y : y + h); c.lineTo(ax, ay); c.fill(); }
@@ -9695,7 +9757,7 @@ function bubble(x, y, w, title, sub, arrow) { // bulle blanche avec petite flèc
 }
 function hand(x, y, press) { c.save(); c.translate(x, y + (press ? 10 : 0)); c.font = '84px sans-serif'; c.textAlign = 'center'; withShadow('rgba(0,0,0,.5)', 14, 0, 6, () => c.fillText('👆', 0, 0)); c.textAlign = 'left'; c.restore(); }
 function drawTuto() {
-  const T = G.tuto; if (!T || G.screen !== 'play' || !L) return; const t = L.target, tc = t.x + t.w / 2, pulse = .5 + .5 * Math.sin(G.t * 6);
+  const T = G.tuto; if (!T || G.screen !== 'play' || !L || (T.step !== 'bravo' && !tutoValide())) return; const t = L.target, tc = t.x + t.w / 2, pulse = .5 + .5 * Math.sin(G.t * 6);
   // la fouille visée clignote doucement
   if (T.step === 'wait' || T.step === 'now') { c.save(); c.globalAlpha = .35 + .4 * pulse; c.strokeStyle = '#3cf29b'; c.lineWidth = 6; rr(t.x - 18, GY - 18, t.w + 36, 182, 16); c.stroke(); c.restore(); }
   const side = window.SIDEPAD, pw = TOUCH && !side ? TBTN.power : null, px = side ? 1960 : pw ? pw[0] + pw[2] / 2 : 960, py = side ? 760 : pw ? pw[1] + pw[3] / 2 : 1000;
@@ -10938,10 +11000,11 @@ drawSettings = (prev => function () { prev(); rr(1360, 960, 420, 48, 24); c.fill
 // =====================================================================
 const RESET_SEASON = 2;
 if ((save.season || 1) < RESET_SEASON) {
+  const ancien = (save.maxLevel || 1) > 1 || Object.keys(save.lvl || {}).length > 0 || save.score > 0;   // le message ne concerne que les joueurs qui avaient déjà joué
   try { Object.keys(localStorage).filter(k => k.startsWith('ppdemo_')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
   Object.assign(ACC, { name: '', token: '', v: 0, base: 0, dirty: false, state: 'off' }); accStore();
   importSave({}); save.name = ''; save.season = RESET_SEASON; save.cbest = null; writeSave(save);
-  setTimeout(() => { if (typeof toast === 'function') toast(save.lang === 'en' ? 'New season: everyone starts from zero!' : 'Nouvelle saison : tout le monde repart de zéro !', '#ffd447'); }, 2500);
+  if (ancien) setTimeout(() => { if (typeof toast === 'function') toast(save.lang === 'en' ? 'New season: everyone starts from zero!' : 'Nouvelle saison : tout le monde repart de zéro !', '#ffd447'); }, 2500);
 }
 
 </script>
