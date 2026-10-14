@@ -2251,7 +2251,8 @@ function drawLevel(lvl) {
     lvl.relT = (lvl.relT || 0) + 1 / 60; const rec = -38 * Math.exp(-lvl.relT * 3.2) * Math.cos(lvl.relT * 11);
     cables(px, py, px, py + lvl.Lh + rec); const hb = hookBlock(px, py + lvl.Lh + rec);
     const f = lvl.fly;
-    if (lvl.phase === 'done' && (lvl.result === 'in' || lvl.result === 'perfect')) {
+    if (lvl.phase === 'done' && (lvl.result === 'in' || lvl.result === 'perfect') && lvl.land) drawLanded(lvl);
+    else if (lvl.phase === 'done' && (lvl.result === 'in' || lvl.result === 'perfect')) {
       // la charge s'enfonce dans le trou puis se tasse avec un léger rebond
       const depth = 150 - lvl.loadH - 6, u = Math.min(1, lvl.doneT / .55);
       const ease = u < 1 ? 1 - Math.pow(1 - u, 3) : 1, bounce = u >= 1 ? Math.exp(-(lvl.doneT - .55) * 9) * Math.sin((lvl.doneT - .55) * 30) * 5 : 0;
@@ -2539,7 +2540,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate', 'wheel', 'epreuves', 'survEnd', 'survPalier', 'regions', 'jpmap', 'egmap', 'profile'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate', 'wheel', 'epreuves', 'survEnd', 'survPalier', 'regions', 'jpmap', 'egmap', 'profile', 'friends', 'fchat'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -8663,6 +8664,12 @@ function franceArt(x, y, w, h) { // même style que les cartes Japon et Égypte 
 }
 regionCard = (prev => function (id, x, w, title, sub, col, art, extra) { if (id === 'rgFR') { art = franceArt; col = ['#7fa8e8', '#2f3f9a']; } return prev(id, x, w, title, sub, col, art, extra); })(regionCard);
 Object.assign(EN, { 'LASER ACTIVÉ': 'LASER ON', 'LASER COUPÉ': 'LASER OFF', 'Viseur laser coupé : à toi de viser !': 'Laser sight off: aim on your own!', 'Viseur laser activé': 'Laser sight on' });
+// ---------- sous les pays : le jeu continue de grandir ----------
+drawRegions = (prev => function () { prev(); const y = 1000, p = .5 + .5 * Math.sin(G.t * 2);
+  c.font = '800 26px Inter'; const t1 = tr('De nouveaux pays arrivent au fil des saisons'), w = c.measureText(t1).width + 100; rr(960 - w / 2, y - 38, w, 56, 28); c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(); c.strokeStyle = `rgba(255,194,26,${(.35 + .35 * p).toFixed(2)})`; c.lineWidth = 2; c.stroke();
+  txt('🌍', 960 - w / 2 + 34, y - 1, '#fff', 26, 900, 'center'); txt(t1, 960 + 14, y - 1, '#e6eef8', 26, 800, 'center');
+})(drawRegions);
+Object.assign(EN, { 'De nouveaux pays arrivent au fil des saisons': 'New countries are on the way, season after season' });
 
 // =====================================================================
 //  PILE POIL — COMMANDES : petite bulle en bas à gauche, le menu des touches s'ouvre au clic
@@ -9008,6 +9015,70 @@ hud = (prev => function (lvl) {
 Object.assign(EN, { 'LASER': 'LASER', 'vide': 'empty' });
 
 // =====================================================================
+//  PILE POIL — CHUTE RÉALISTE DANS LA FOUILLE
+//  la charge tombe là où elle arrive (plus de recentrage), garde sa vitesse, rebondit
+//  selon sa matière, se couche, et le sol réagit (terre, sable, neige, béton frais, métal…)
+// =====================================================================
+const LAND = { // e = rebond · tilt = bascule · wob = vibration · snd = son · fx = effet
+  bloc: { e: .12, snd: 'thud', fx: 'clods' }, palette: { e: .08, snd: 'thud', fx: 'chips', chip: '#c96a3a', wob: .4 }, benne: { e: .03, snd: 'splash', fx: 'splash' },
+  prefa: { e: .1, snd: 'slab', tilt: .14, fx: 'clods' }, ipn: { e: .22, snd: 'metal', tilt: .2, fx: 'sparks' }, banche: { e: .24, snd: 'metal', fx: 'sparks' },
+  cage: { e: .38, snd: 'rattle', wob: 1.2, fx: 'clods' }, tube: { e: .18, snd: 'metal', roll: 1, fx: 'sparks' },
+  tier: { e: .06, snd: 'wood', fx: 'clods', wob: .3 }, conteneur: { e: .14, snd: 'metal', tilt: .1, fx: 'clods' }, module: { e: .1, snd: 'metal', fx: 'clods' }, pierre: { e: .07, snd: 'stone', fx: 'clods', heavy: 1.2 },
+  taille: { e: .06, snd: 'stone', fx: 'clods', heavy: 1.2 }, obelisque: { e: .03, snd: 'stone', tilt: .1, fx: 'clods', heavy: 1.8 }, colonne: { e: .05, snd: 'stone', fx: 'clods', heavy: 1.4 },
+  statue: { e: .03, snd: 'stone', fx: 'clods', heavy: 2 }, caisse: { e: .2, snd: 'wood', fx: 'chips', chip: '#c8985a', wob: .5 }, solaire: { e: .2, snd: 'glass', tilt: .12, fx: 'glint' },
+  porte: { e: .1, snd: 'metal', fx: 'clods', heavy: 1.3 }, conteneurEG: { e: .14, snd: 'metal', tilt: .1, fx: 'clods' },
+};
+const rgbaP = hex => { const h = hex.replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map(c2 => c2 + c2).join('') : h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},`; };
+function soilColor(lvl) { const z = lvl.zone || {}; if (z.z === 'hokkaido' || (z.tod && /neige/.test(z.tod))) return '#eef3f8'; const g = GROUNDS[z.g]; return g ? g[0] : lvl.C.t === 2 ? '#6e5a48' : '#8b5a2b'; }
+const LSND = {
+  thud(k) { sfx.thud(k); burstN(.5, 'lowpass', 300, .7, .12 * k, .05, null, true); },
+  stone(k) { sfx.thud(k * 1.2); tone(55, .5, 'sine', .2 * k); burstN(.6, 'lowpass', 220, .7, .16 * k, .04, null, true); burstN(.25, 'bandpass', 1800, 2, .03 * k, .1); },
+  slab(k) { sfx.thud(k); burstN(.35, 'bandpass', 600, 1.5, .06 * k); },
+  metal(k) { sfx.thud(k * .7); metal(180, .05 * k, 1.2); metal(410, .025 * k, .7, .06); },
+  rattle(k) { sfx.thud(k * .6); for (let i = 0; i < 6; i++) metal(600 + i * 90, .012 * k, .18, i * .05); },
+  wood(k) { sfx.thud(k * .8); burstN(.18, 'bandpass', 900, 3, .06 * k); tone(220, .12, 'triangle', .04 * k, .02); },
+  glass(k) { sfx.thud(k * .5); [2400, 3100, 3900].forEach((f, i) => tone(f, .25, 'sine', .015 * k, i * .03)); },
+  splash(k) { sfx.thud(k * .6); burstN(.7, 'lowpass', 700, .8, .2 * k); burstN(.4, 'bandpass', 1400, 1.2, .06 * k, .08); },
+};
+finish = (prev => function (lvl, res) {
+  prev(lvl, res);
+  if (!(res === 'in' || res === 'perfect') || !lvl.fly || lvl.landed || lvl.C.t === 5 || (lvl.jm && lvl.jm.plat)) return;
+  const f = lvl.fly, t = lvl.target, P = LAND[lvl.load] || LAND.bloc, half = lvl.loadW / 2;
+  const x = clamp(f.x, t.x + Math.min(half + 4, t.w / 2), t.x + t.w - Math.min(half + 4, t.w / 2));
+  lvl.land = { x, y: GY - lvl.loadH / 2, vy: Math.max(240, f.vy * .9), vx: (P.roll ? f.vx * .35 : 0), rot: f.rot % (Math.PI * 2), vr: (P.tilt ? (Math.random() < .5 ? -1 : 1) * P.tilt * 6 : 0) + f.vr * .15, hits: 0, wob: 0, P, puddle: 0 };
+  const soil = rgbaP(soilColor(lvl)), k = clamp(f.vy / 1000, .6, 1.6) * (P.heavy || 1);
+  if (P.fx === 'splash') { burst(x, GY + 10, 46, { a0: -Math.PI * .95, spread: Math.PI * .9, sp: 520 * k, life: 1, r: 5, col: 'rgba(150,156,162,', g: 1500, drag: .5 }); }
+  else if (P.fx === 'sparks') { burst(x, GY + 20, 22, { a0: -Math.PI, spread: Math.PI, sp: 520, life: .45, r: 2.5, col: 'rgba(255,214,120,', g: 900, drag: 1.4 }); }
+  else if (P.fx === 'glint') { burst(x, GY, 14, { a0: -Math.PI, spread: Math.PI, sp: 300, life: .6, r: 3, col: 'rgba(200,230,255,', g: 600, drag: 1 }); }
+  burst(x, GY - 2, Math.round(16 * k), { a0: -Math.PI * .92, spread: Math.PI * .84, sp: 380 * k, life: .9, r: 5, col: soil, g: 1500, drag: .6 }); // mottes projetées
+  if (P.fx === 'chips') burst(x, GY + 10, 12, { a0: -Math.PI * .9, spread: Math.PI * .8, sp: 360, life: .8, r: 4, col: rgbaP(P.chip), g: 1400, drag: .5 });
+  FX.shake = Math.max(FX.shake || 0, 7 * k); try { (LSND[P.snd] || LSND.thud)(clamp(k, .5, 1.6)); } catch (e) {}
+})(finish);
+function landStep(lvl, dt) {
+  const L2 = lvl.land; if (!L2 || L2.rest) return; const P = L2.P, floor = GY + 144 - lvl.loadH / 2, t = lvl.target, half = lvl.loadW / 2;
+  L2.vy += GRAV * dt; L2.y += L2.vy * dt; L2.x += L2.vx * dt; L2.rot += L2.vr * dt;
+  if (L2.x - half < t.x + 2) { L2.x = t.x + 2 + half; L2.vx = -L2.vx * .3; } if (L2.x + half > t.x + t.w - 2) { L2.x = t.x + t.w - 2 - half; L2.vx = -L2.vx * .3; }
+  if (L2.y > floor) {
+    L2.y = floor; const v = L2.vy; L2.vy = -v * P.e; L2.vx *= .6; L2.vr = -L2.vr * .4; L2.hits++;
+    if (L2.hits === 1) { L2.wob = (P.wob || .15) * clamp(v / 700, .3, 1.4); dust(L2.x, GY + 120, Math.min(lvl.loadW, lvl.target.w), .45); if (P.fx === 'splash') L2.puddle = .01; try { if (P.snd === 'metal' || P.snd === 'rattle') metal(260, .02, .5); } catch (e) {} }
+    if (Math.abs(L2.vy) < 40) L2.vy = 0;
+  }
+  const flat = Math.round(L2.rot / Math.PI) * Math.PI; if (L2.hits) { L2.rot += (flat - L2.rot) * Math.min(1, dt * 8); L2.vr *= Math.exp(-6 * dt); }
+  L2.vx *= Math.exp(-(P.roll ? 1.2 : 6) * dt); L2.wob *= Math.exp(-5 * dt); if (L2.puddle) L2.puddle = Math.min(1, L2.puddle + dt * 1.6);
+  if (L2.hits && L2.vy === 0 && Math.abs(L2.vx) < 3 && L2.wob < .01 && Math.abs(L2.rot - flat) < .002) { L2.rot = flat; L2.rest = 1; }
+}
+function drawLanded(lvl) {
+  const L2 = lvl.land, t = lvl.target; c.save(); c.beginPath(); c.rect(0, 0, W, GY + 150); c.clip();
+  if (L2.puddle) { const k = L2.puddle, py = GY + 146 - 22 * k; c.fillStyle = 'rgba(132,138,144,.95)'; c.beginPath(); c.moveTo(t.x + 2, GY + 148); c.lineTo(t.x + 2, py); c.quadraticCurveTo(t.x + t.w / 2, py - 6 * k, t.x + t.w - 2, py); c.lineTo(t.x + t.w - 2, GY + 148); c.fill(); }
+  const wob = Math.sin(G.t * 38) * L2.wob * 4; c.translate(L2.x + wob, L2.y); c.rotate(L2.rot); drawLoad(lvl, 0, -lvl.loadH / 2);
+  c.restore();
+  if (L2.puddle) { c.save(); c.globalAlpha = .55 * L2.puddle; fillR(t.x + 4, GY + 146 - 22 * L2.puddle - 2, t.w - 8, 3, '#c8ccd0'); c.restore(); }
+}
+drawLevel = (prev => function (lvl) { if (lvl.land && lvl.phase === 'done' && !G.paused) landStep(lvl, Math.min(.05, G.dt || 1 / 60)); prev(lvl); })(drawLevel);
+startLevel = (prev => function (n) { prev(n); if (L) L.land = null; })(startLevel);
+if (typeof jmNextPose === 'function') jmNextPose = (prev => function (lvl) { lvl.land = null; return prev(lvl); })(jmNextPose);
+
+// =====================================================================
 //  PILE POIL — MON PROFIL : avatar personnalisable, grade de grutier, statistiques
 //  On l'ouvre depuis la pastille du profil (en haut à gauche de l'accueil)
 // =====================================================================
@@ -9283,6 +9354,723 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
   setInterval(apply, 150); addEventListener('resize', () => { mode = ''; setTimeout(apply, 60); });
   hud = (prev => function (lvl) { const k = window.CROP || 0; if (!k) return prev(lvl); c.save(); c.translate(0, k); try { prev(lvl); } finally { c.restore(); } })(hud);
 })();
+
+// =====================================================================
+//  PILE POIL — DUELS : REPLAY DU LANCER ADVERSE + MESSAGES RAPIDES
+//  · chacun son tour : ton lancer est enregistré (grue, câble, charge, résultat) et ton
+//    adversaire peut le regarder avant de jouer (×2, passer)
+//  · en direct et chacun son tour : 6 messages prêts à l'emploi + 6 émojis (rien à modérer)
+// =====================================================================
+const QCHAT = [['q0', '👋 Salut !'], ['q1', '🎯 Pile poil !'], ['q2', '👏 Bien joué'], ['q3', '😅 Aïe…'], ['q4', '💨 Ce vent !'], ['q5', '🔁 Revanche ?']];
+const ECHAT = [['e0', '😎'], ['e1', '🔥'], ['e2', '😂'], ['e3', '😱'], ['e4', '🏗️'], ['e5', '👑']];
+const chatTxt = id => ((QCHAT.find(q => q[0] === id) || ECHAT.find(q => q[0] === id) || [0, '…'])[1]);
+const nowS = () => Date.now() / 1000;
+
+// ---------- enregistrement de mon lancer (mode « chacun son tour ») ----------
+const REC = { on: false };
+const RP = { on: false, pending: null };
+function recFrame(lvl) {
+  const f = lvl.fly, J = lvl.jm;
+  REC.fr.push([Math.round((G.t - REC.g0) * 100), Math.round(lvl.cr.x), Math.round(lvl.th * 1000), Math.round(lvl.Lh), lvl.phase === 'fly' ? 1 : lvl.phase === 'done' ? 2 : 0,
+    f ? Math.round(f.x) : 0, f ? Math.round(f.y) : 0, f ? Math.round(f.rot * 100) : 0, Math.round((lvl.charging ? lvl.power : 0) * 100), Math.round(lvl.target.x), J && J.plat ? Math.round(J.plat.x) : 0]);
+  if (REC.fr.length > 1500) { REC.fr = REC.fr.filter((_, i) => i % 2 === 0); REC.step *= 2; }
+}
+startLevel = (prev => function (n) {
+  prev(n);
+  if (G.mode === 'turn' && !RP.on && L) Object.assign(REC, { on: true, g0: G.t, acc: 0, step: .05, fr: [], ev: [], lvl: n, li: G.run.i, base: G.run.base, lives: G.lives, reg: L.mixReg || window.REGION || 'fr' });
+  else REC.on = false;
+})(startLevel);
+drawLevel = (prev => function (lvl) {
+  if (REC.on && lvl === L && G.screen === 'play' && !G.paused && G.mode === 'turn' && lvl.phase !== 'done') { REC.acc += G.dt || 0; if (REC.acc >= REC.step) { REC.acc = 0; recFrame(lvl); } }
+  prev(lvl);
+})(drawLevel);
+finish = (prev => function (lvl, res) {
+  if (REC.on && lvl === L && G.mode === 'turn') { recFrame(lvl); REC.ev.push([Math.round((G.t - REC.g0) * 100), 'r', res]); }
+  prev(lvl, res);
+})(finish);
+tdSendTurn = (prev => async function (res) {
+  if (REC.on) { REC.on = false; RP.pending = { v: 1, lvl: REC.lvl, li: REC.li, base: REC.base, lives: REC.lives, reg: REC.reg, g0: Math.round(REC.g0 * 100) / 100, fr: REC.fr, ev: REC.ev }; }
+  return prev(res);
+})(tdSendTurn);
+
+// ---------- serveur : lancer + replay, lecture du replay, messages ----------
+const TDX = { noV2: false };
+{
+  const _play = TDB.play.bind(TDB);
+  if (SB) {
+    TDB.play = async function (e, res, pts, perfect) {
+      const rep = RP.pending; RP.pending = null;
+      if (rep && !TDX.noV2) {
+        const { data, error } = await SB.rpc('tduel_play2', { p_code: e.code, p_token: e.token, p_res: res, p_pts: pts, p_perfect: perfect, p_rep: rep });
+        if (!error) return data;
+        if (!/tduel_play2|schema cache|function/i.test(error.message || '')) throw new Error(error.message);
+        TDX.noV2 = true;
+      }
+      return _play(e, res, pts, perfect);
+    };
+    TDB.rep = async (code, p) => { const { data, error } = await SB.rpc('tduel_rep', { p_code: code, p_p: p }); if (error) throw new Error('Replay indisponible'); return data; };
+    TDB.chat = async (e, m) => { const { data, error } = await SB.rpc('tduel_chat', { p_code: e.code, p_token: e.token, p_m: m }); if (error) throw new Error(/function|schema/.test(error.message) ? 'Messages bientôt disponibles' : error.message); return data; };
+  } else {
+    const _pub = TDB.pub.bind(TDB);
+    TDB.pub = r => { const o = _pub(r); o.rn = { 1: r.reps && r.reps[1] ? r.reps[1].n : null, 2: r.reps && r.reps[2] ? r.reps[2].n : null }; o.chat = r.chat || []; delete o.reps; return o; };
+    TDB.play = async function (e, res, pts, perfect) {
+      const rep = RP.pending; RP.pending = null; await _play(e, res, pts, perfect);
+      const raw = TDB._r(e.code), me = raw.t1 === e.token ? 1 : 2, s = raw['s' + me];
+      if (rep) { raw.reps = raw.reps || {}; raw.reps[me] = Object.assign(rep, { n: s.i + 3 - s.lives, p: me, res, pts: Math.max(0, pts | 0) }); TDB._w(raw); }
+      return TDB.pub(raw);
+    };
+    TDB.rep = async (code, p) => { const r = TDB._r(code); return r && r.reps ? r.reps[p] || null : null; };
+    TDB.chat = async (e, m) => { const r = TDB._r(e.code); if (!r) throw new Error('Duel introuvable'); const me = r.t1 === e.token ? 1 : 2; r.chat = [...(r.chat || []), { p: me, m, at: Math.floor(nowS()) }].slice(-12); TDB._w(r); return TDB.pub(r); };
+  }
+}
+
+// ---------- lecture du replay ----------
+function rpIdx(t) { const F = RP.rep.fr; let lo = 0, hi = F.length - 1; if (t * 100 <= F[0][0]) return 0; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (F[m][0] <= t * 100) lo = m; else hi = m - 1; } return lo; }
+function rpSet(lvl, t) {
+  const F = RP.rep.fr; if (!F.length) return; const i = rpIdx(t), a = F[i], b = F[i + 1];
+  const span = b ? Math.max(1, b[0] - a[0]) : 1, u = b ? clamp((t * 100 - a[0]) / span, 0, 1) : 0, m = k => b ? a[k] + (b[k] - a[k]) * u : a[k], ds = span / 100;
+  const ph = u > .999 && b ? b[4] : a[4];
+  lvl.cr.x = m(1); lvl.cr.v = b ? (b[1] - a[1]) / ds : 0; if (Math.abs(lvl.cr.v) > 1) lvl.cr.dir = Math.sign(lvl.cr.v);
+  lvl.th = m(2) / 1000; lvl.om = b ? (b[2] - a[2]) / 1000 / ds : 0; lvl.Lh = m(3);
+  if (ph === 1) {
+    if (lvl.phase !== 'fly') { lvl.phase = 'fly'; lvl.relT = 0; lvl.charging = false; lvl.fly = { x: m(5), y: m(6), vx: 0, vy: 0, rot: m(7) / 100, vr: 0 }; try { sfx.drop(); } catch (e) {} }
+    const f = lvl.fly; f.x = m(5); f.y = m(6); f.rot = m(7) / 100; if (b && b[4] === 1) { f.vx = (b[5] - a[5]) / ds; f.vy = (b[6] - a[6]) / ds; }
+  } else if (ph === 0) {
+    if (lvl.phase === 'fly') { lvl.phase = 'hang'; lvl.fly = null; }
+    lvl.power = m(8) / 100; lvl.charging = a[8] > 0;
+  }
+}
+function rpFinish(lvl, res) {
+  const snap = JSON.stringify(save), pops = FX.pops.length, f = lvl.fly;
+  if (res === 'worker' && f && lvl.workers && lvl.workers.length) {
+    const w = lvl.workers.reduce((a2, b2) => Math.abs(b2.x - f.x) < Math.abs(a2.x - f.x) ? b2 : a2), d = Math.sign(w.x - f.x) || 1;
+    w.hitT = 0; w.fallDir = d; w.rag = { x: w.x, y: w.y, vx: d * 230, vy: -300, rot: 0, vr: d * 4.2, ground: false };
+    w.helm = { x: w.x, y: w.y - 135 * w.s, vx: d * 420, vy: -620, rot: 0, vr: d * 14 }; lvl.accident = { x: w.x, t: 0 }; lvl.workers.forEach(o => { if (o !== w) o.rescue = w; });
+    FX.shake = 20; try { sfx.thud(1.2); sfx.siren(); } catch (e) {}
+  }
+  if (res === 'in' || res === 'perfect') { const t = lvl.target, imp = clamp(((f && f.vy) || 800) / 1100, .5, 1.6); lvl.impactV = imp; finish(lvl, res); dust(t.x + t.w / 2, GY - 4, t.w, .8 * imp); FX.shake = 10 * imp; try { sfx.thud(imp); } catch (e) {} }
+  else {
+    if (f && res === 'miss') { const fl = floorAt(lvl, f.x, lvl.loadW / 2); f.y = Math.min(f.y, fl - lvl.loadH / 2); }
+    finish(lvl, res);
+    if (f && res === 'miss') { dust(f.x, GY - 4, Math.min(lvl.loadW, 200), 1); FX.shake = 14; try { sfx.thud(1); shatter(lvl); } catch (e) {} }
+  }
+  // rien de ce replay ne compte pour moi : pièces, statistiques, missions, étoiles
+  const o = JSON.parse(snap); Object.keys(save).forEach(k => delete save[k]); Object.assign(save, o); writeSave(save);
+  FX.pops = FX.pops.filter((p, i) => i < pops || !/pièces|prime|★/.test(p.text || '')); G.pose = null;
+}
+async function rpWatch(code) {
+  const s = tdState(code); if (!s) return; TD.msg = 'Chargement du replay…';
+  let rep = null; try { rep = await TDB.rep(code, s.op); } catch (e) {}
+  TD.msg = '';
+  if (!rep || !rep.fr || rep.fr.length < 2) { rpSeen(code, s); toast('Replay indisponible pour ce lancer', '#ffd447'); return; }
+  RP.keep = { mode: G.mode, runSeed: G.runSeed, run: G.run, score: G.score, lives: G.lives, level: G.level, checkpoint: G.checkpoint, combo: G.combo, perfects: G.perfects, livesLost: G.livesLost, workersHit: G.workersHit, t: G.t };
+  const levels = runLevels(s.r.seed);
+  G.mode = 'tdreplay'; G.runSeed = s.r.seed; G.run = { levels, i: rep.li || 0, seed: s.r.seed, base: rep.base || 0 };
+  G.score = rep.base || 0; G.lives = rep.lives || 3; G.combo = 0; G.perfects = 0; G.checkpoint = levels[rep.li || 0];
+  Object.assign(RP, { on: true, rep, code, n: rep.n, name: s.oname || 'Adversaire', t: 0, ev: 0, speed: 1, real: 0, over: false, g0: rep.g0 || G.t });
+  const keep = window.REGION; window.REGION = rep.reg || keep; if (typeof LCACHE !== 'undefined') LCACHE.clear();
+  try { startLevel(rep.lvl); } finally { window.REGION = keep; if (typeof LCACHE !== 'undefined') LCACHE.clear(); }
+  G.t = RP.g0; G.paused = false;
+}
+function rpSeen(code, s) { save.tdRepSeen = save.tdRepSeen || {}; const n = s && s.r.rn ? s.r.rn[s.op] : RP.n; if (n) save.tdRepSeen[code] = n; writeSave(save); }
+function rpEnd() {
+  if (!RP.on) return; RP.on = false; const k = RP.keep || {};
+  Object.assign(G, { mode: k.mode || 'career', runSeed: k.runSeed || 0, run: k.run, score: k.score || 0, lives: k.lives ?? 3, level: k.level || 1, checkpoint: k.checkpoint || 1, combo: k.combo || 0, perfects: k.perfects || 0, livesLost: k.livesLost || 0, workersHit: k.workersHit || 0 });
+  G.t = (k.t || 0) + RP.real; G.paused = false; G.msg = null; FX.parts = []; FX.pops = []; FX.shake = 0;
+  rpSeen(RP.code, tdState(RP.code)); G.screen = 'tdRoom'; tdRefresh(true);
+}
+updateCrane = (prev => function (lvl, dt) {
+  if (!RP.on || lvl !== L) return prev(lvl, dt);
+  RP.real += dt; RP.t += dt * RP.speed; const F = RP.rep.fr, E = RP.rep.ev || [];
+  { const i = rpIdx(RP.t); if (F[i + 1] && F[i + 1][0] - F[i][0] > 100 && RP.t * 100 > F[i][0] + 10) RP.t = F[i + 1][0] / 100; }   // pause pendant le lancer : on saute
+  G.t = RP.g0 + RP.t;
+  if (lvl.phase === 'done' && RP.speed > 1) lvl.doneT += dt * (RP.speed - 1);
+  while (RP.ev < E.length && E[RP.ev][0] <= RP.t * 100) { const e = E[RP.ev++]; if (e[1] === 'r' && lvl.phase !== 'done') { rpSet(lvl, e[0] / 100); rpFinish(lvl, e[2]); } }
+  if (!RP.over && lvl.phase !== 'done' && RP.ev >= E.length && RP.t * 100 > F[F.length - 1][0] + 30) { RP.over = true; rpFinish(lvl, 'miss'); }
+  const k = Object.assign({}, keys); for (const q in keys) keys[q] = false;
+  try { prev(lvl, dt); } finally { Object.assign(keys, k); }
+  if (lvl.phase !== 'done') rpSet(lvl, RP.t);
+})(updateCrane);
+updatePendulum = (prev => function (lvl, dt) { if (RP.on) return; prev(lvl, dt); })(updatePendulum);
+updateFlight = (prev => function (lvl, dt) { if (RP.on) return; prev(lvl, dt); })(updateFlight);
+pressPower = (prev => function () { if (RP.on) return; prev(); })(pressPower);
+afterResult = (prev => function () { if (RP.on) return rpEnd(); prev(); })(afterResult);
+controlsBar = (prev => function () { if (RP.on) return; prev(); })(controlsBar);
+act = (prev => function (id) {
+  if (RP.on && ['quit', 'menu', 'liveMenu', 'rpSkip'].includes(id)) { sfx.click(); return rpEnd(); }
+  if (id === 'rpSpeed') { sfx.click(); RP.speed = RP.speed > 1 ? 1 : 2; return; }
+  if (id === 'rpWatch') { sfx.click(); return rpWatch(TD.cur); }
+  if (id === 'rpPass') { sfx.click(); const s = tdState(TD.cur); if (s) rpSeen(TD.cur, s); return; }
+  if (id === 'rpNoop') return;
+  return prev(id);
+})(act);
+
+// ---------- dessin : bandeau REPLAY, barre de lecture ----------
+function bubble(x, y, s, opts = {}) {   // bulle blanche ; (x, y) = pointe
+  c.font = `900 ${opts.size || 26}px Inter`; const w = c.measureText(tr(s)).width + 40, h = (opts.size || 26) + 26, up = opts.up, al = opts.align || 'center';
+  const bx = al === 'left' ? x - 30 : al === 'right' ? x - w + 30 : x - w / 2, by = up ? y + 14 : y - 14 - h;
+  withShadow('rgba(0,0,0,.4)', 20, 0, 8, () => { rr(bx, by, w, h, h / 2); c.fillStyle = opts.col || '#fff'; c.fill(); });
+  c.fillStyle = opts.col || '#fff'; c.beginPath(); if (up) { c.moveTo(x - 12, by + 1); c.lineTo(x, y); c.lineTo(x + 12, by + 1); } else { c.moveTo(x - 12, by + h - 1); c.lineTo(x, y); c.lineTo(x + 12, by + h - 1); } c.fill();
+  txt(s, bx + w / 2, by + h / 2 + (opts.size || 26) * .36, opts.tc || '#14233f', opts.size || 26, 900, 'center');
+}
+function drawReplayUI() {
+  const F = RP.rep.fr, tot = Math.max(1, F[F.length - 1][0] / 100), p = clamp(RP.t / tot, 0, 1);
+  c.save(); c.strokeStyle = 'rgba(255,79,109,.85)'; c.lineWidth = 10; c.strokeRect(5, 5, W - 10, H - 10); c.restore();
+  // une seule barre en bas : REPLAY · nom · progression · ×2 · passer
+  let fs = 30; c.font = `400 ${fs}px ${TF}`; const nm = RP.name.toUpperCase(); while (c.measureText(nm).width > 230 && fs > 18) { fs -= 2; c.font = `400 ${fs}px ${TF}`; }
+  const tw = c.measureText(nm).width, w0 = 1060, x0 = 960 - w0 / 2, y0 = TOUCH ? 966 : 992;
+  withShadow('rgba(0,0,0,.4)', 24, 0, 8, () => { rr(x0, y0, w0, 72, 36); c.fillStyle = 'rgba(14,20,36,.95)'; c.fill(); }); rr(x0, y0, w0, 72, 36); c.strokeStyle = 'rgba(255,79,109,.7)'; c.lineWidth = 2; c.stroke();
+  rr(x0 + 12, y0 + 15, 124, 42, 21); c.fillStyle = '#ff4f6d'; c.fill(); if (Math.sin(G.t * 6) > -.3) ell(x0 + 33, y0 + 36, 6, 6, '#fff'); txt('REPLAY', x0 + 47, y0 + 44, '#fff', 20, 900);
+  T(nm, x0 + 152, y0 + 36 + fs * .36, '#fff', fs);
+  const px = x0 + 172 + tw, pw = w0 - (px - x0) - 300;
+  rr(px, y0 + 30, pw, 12, 6); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); rr(px, y0 + 30, pw * p, 12, 6); c.fillStyle = '#ff4f6d'; c.fill(); ell(px + pw * p, y0 + 36, 13, 13, '#fff');
+  const sx = x0 + w0 - 270, sp = RP.speed > 1; rr(sx, y0 + 14, 90, 44, 22); c.fillStyle = sp ? '#ffc21a' : 'rgba(255,255,255,.12)'; c.fill(); txt('×2', sx + 45, y0 + 45, sp ? '#2a1a00' : '#fff', 24, 900, 'center');
+  G.buttons.unshift({ id: 'rpSpeed', x: sx - 10, y: y0, w: 110, h: 72 });
+  rr(sx + 104, y0 + 14, 150, 44, 22); c.fillStyle = 'rgba(255,255,255,.12)'; c.fill(); txt('PASSER ⏭', sx + 179, y0 + 45, '#fff', 22, 900, 'center');
+  G.buttons.unshift({ id: 'rpSkip', x: sx + 96, y: y0, w: 170, h: 72 });
+  // son dernier message
+  const s = tdState(RP.code), m = s && (s.r.chat || []).filter(q => q.p === s.op).pop();
+  if (m && nowS() - m.at < 900) bubble(x0 + 152 + tw / 2, y0 - 6, chatTxt(m.m), { size: 22 });
+}
+drawTouch = (prev => function (lvl) { if (RP.on) { if (G.screen === 'play' && !G.paused) drawReplayUI(); return; } prev(lvl); })(drawTouch);
+
+// ---------- salle du duel : « Lucas vient de jouer », messages rapides ----------
+const TDC = { open: false, last: 0 };
+function tdUnseen(s) { if (!s || !s.r.rn || !s.oname) return 0; const n = s.r.rn[s.op]; if (!n) return 0; return n > ((save.tdRepSeen || {})[s.r.code] || 0) ? n : 0; }
+function quickPanel(x, y, prefix) {   // panneau des messages rapides ; renvoie la hauteur
+  const w = 640, h = 330; withShadow('rgba(0,0,0,.45)', 30, 0, 12, () => { rr(x, y, w, h, 28); c.fillStyle = 'rgba(14,20,36,.97)'; c.fill(); }); rr(x, y, w, h, 28); c.strokeStyle = '#ffc21a'; c.lineWidth = 2; c.stroke();
+  T('MESSAGES RAPIDES', x + 28, y + 50, '#ffc21a', 30);
+  QCHAT.forEach(([id, s], i) => { const bx = x + 24 + (i % 2) * 300, by = y + 72 + Math.floor(i / 2) * 64, hv = hov(bx, by, 288, 54); rr(bx, by, 288, 54, 16); c.fillStyle = hv ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.08)'; c.fill(); txt(s, bx + 18, by + 36, '#fff', 24, 800); G.buttons.unshift({ id: prefix + id, x: bx, y: by, w: 288, h: 54 }); });
+  ECHAT.forEach(([id, s], i) => { const bx = x + 24 + i * 100, by = y + 268, hv = hov(bx, by - 12, 90, 64); if (hv) { rr(bx, by - 12, 90, 64, 18); c.fillStyle = 'rgba(255,255,255,.12)'; c.fill(); } txt(s, bx + 45, by + 34, '#fff', 44, 400, 'center'); G.buttons.unshift({ id: prefix + id, x: bx, y: by - 12, w: 90, h: 64 }); });
+  return h;
+}
+function chatBtn(id, x, y, open, label) {
+  const w = label ? 250 : 84, hv = hov(x, y, w, 84); rr(x, y, w, 84, 42); c.fillStyle = open ? '#ffc21a' : hv ? 'rgba(40,52,82,.96)' : 'rgba(14,20,36,.92)'; c.fill(); c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke();
+  txt('💬', x + 42, y + 56, '#fff', 38, 400, 'center'); if (label) txt(label, x + 84, y + 53, open ? '#2a1a00' : '#fff', 26, 900);
+  G.buttons.unshift({ id, x, y, w, h: 84 });
+}
+drawTdRoom = (prev => function () {
+  prev(); const s = tdState(TD.cur); if (!s) return;
+  // bulles : le dernier message de chacun (moins de 3 min)
+  const ch = s.r.chat || [], mine = ch.filter(q => q.p === s.me).pop(), his = ch.filter(q => q.p === s.op).pop();
+  if (his && nowS() - his.at < 180) bubble(1480, 166, chatTxt(his.m));
+  if (mine && nowS() - mine.at < 180) bubble(600, 166, chatTxt(mine.m), { col: '#ffc21a', tc: '#2a1a00' });
+  if (s.oname && !s.over || ch.length) { chatBtn('tdChatT', 1180, 930, TDC.open, 'Message'); if (TDC.open) quickPanel(1220, 580, 'tdChat:'); }
+  // le lancer de l'adversaire est prêt à être regardé
+  if (tdUnseen(s) && !TD.busy) {
+    fillR(0, 0, W, H, 'rgba(6,9,20,.86)');
+    G.buttons.unshift({ id: 'rpNoop', x: 0, y: 0, w: W, h: H });
+    const x = 460, y = 250, w = 1000, h = 470, mv = (s.r.moves || []).find(m => m.p === s.op) || {}, [lab, col] = TD_RES[mv.res] || TD_RES.miss;
+    uiPanel(x, y, w, h); rr(x, y, w, h, RAD); c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke();
+    rr(960 - 80, y + 50, 160, 40, 20); c.fillStyle = '#ff4f6d'; c.fill(); txt('🎬 NOUVEAU', 960, y + 78, '#fff', 20, 900, 'center');
+    T(`${s.oname} vient de jouer`, 960, y + 160, '#fff', 56, 'center');
+    txt(`${lab}${mv.pts ? ' · +' + mv.pts + ' pts' : mv.res === 'miss' ? ' · une vie en moins' : ''}`, 960, y + 210, col, 28, 900, 'center');
+    const pu = 1 + .05 * Math.sin(G.t * 4); c.save(); c.translate(960, y + 310); c.scale(pu, pu); ell(0, 0, 62, 62, 'rgba(255,255,255,.2)'); ell(0, 0, 50, 50, '#fff'); c.fillStyle = '#0b1020'; c.beginPath(); c.moveTo(-14, -22); c.lineTo(24, 0); c.lineTo(-14, 22); c.fill(); c.restore();
+    G.buttons.unshift({ id: 'rpWatch', x: 960 - 70, y: y + 240, w: 140, h: 140 });
+    iconBtn('rpWatch', 540, y + h + 30, 440, 110, 'play', 'REGARDER', PAL.play[0], PAL.play[1], '#06210f', 42); G.buttons.unshift(G.buttons.pop());
+    iconBtn('rpPass', 1010, y + h + 30, 370, 110, null, 'PASSER', CARD.slate[0], CARD.slate[1], '#fff', 42); G.buttons.unshift(G.buttons.pop());
+  }
+})(drawTdRoom);
+act = (prev => function (id) {
+  let mt;
+  if (id === 'tdChatT') { sfx.click(); TDC.open = !TDC.open; return; }
+  if ((mt = id.match(/^tdChat:([qe]\d)$/))) {
+    sfx.click(); TDC.open = false; const e = tdEntry(TD.cur); if (!e) return;
+    if (Date.now() - TDC.last < 1500) return toast('Doucement 🙂', '#ffd447'); TDC.last = Date.now();
+    const r = TD.list[TD.cur]; if (r) r.chat = [...(r.chat || []), { p: e.me, m: mt[1], at: Math.floor(nowS()) }];
+    TDB.chat(e, mt[1]).then(r2 => { if (r2) TD.list[TD.cur] = r2; tdPing(); }).catch(er => toast(er.message, '#ff6b5b'));
+    return;
+  }
+  if (id === 'tdBack' || id === 'tdPlay') TDC.open = false;
+  return prev(id);
+})(act);
+// nouveau message de l'adversaire : petit son + toast hors de la salle
+tdRefresh = (prev => async function (force) {
+  const before = {}; Object.keys(TD.list).forEach(k => before[k] = (TD.list[k].chat || []).length);
+  await prev(force);
+  Object.keys(TD.list).forEach(k => { const r = TD.list[k], s = tdState(k); if (!s || before[k] === undefined) return; const ch = r.chat || [];
+    if (ch.length > before[k]) { const m = ch[ch.length - 1]; if (m.p === s.op) { try { tone(880, .08, 'sine', .05); tone(1320, .1, 'sine', .04, .08); } catch (e) {} if (G.screen !== 'tdRoom' || TD.cur !== k) { if (G.screen !== 'play') toast(`${s.oname} : ${chatTxt(m.m)}`, '#6fb1ff'); } } } });
+})(tdRefresh);
+
+// ---------- duel en direct : messages rapides ----------
+LIVE_EVENTS.push('chat');
+const LVC = { open: false, me: null, op: null, last: 0 };
+openRoom = (prev => function (code, me, h) {
+  const m = h.msg; h.msg = (ev, p) => { if (ev === 'chat') { if (p && /^[qe]\d$/.test(p.m)) { LVC.op = { m: p.m, t: performance.now() }; try { tone(880, .08, 'sine', .05); tone(1320, .1, 'sine', .04, .08); } catch (e) {} } return; } m(ev, p); };
+  return prev(code, me, h);
+})(openRoom);
+function liveChatUI(x, y, up) {
+  chatBtn('lvChatT', x, y, LVC.open);
+  if (LVC.open) quickPanel(x + 100, up ? y - 246 : y, 'lvChat:');
+  if (LVC.me && performance.now() - LVC.me.t < 4000) bubble(x + 42, y + 96, chatTxt(LVC.me.m), { up: true, col: '#ffc21a', tc: '#2a1a00', size: 22, align: 'left' });
+}
+drawLiveHud = (prev => function () {
+  prev(); if (G.mode !== 'live' || G.screen !== 'play') return;
+  if (LVC.op && performance.now() - LVC.op.t < 5000) bubble(36 + 420 + 30, 250 + 60, chatTxt(LVC.op.m), { align: 'left' });
+  liveChatUI(36, 530, false);
+})(drawLiveHud);
+window.drawLiveHud = drawLiveHud;
+drawLiveEnd = (prev => function () {
+  prev(); if (!LV.room) return;
+  if (LVC.op && performance.now() - LVC.op.t < 6000) bubble(1480, 200, chatTxt(LVC.op.m));
+  liveChatUI(60, 930, true);
+})(drawLiveEnd);
+act = (prev => function (id) {
+  let mt;
+  if (id === 'lvChatT') { sfx.click(); LVC.open = !LVC.open; return; }
+  if ((mt = id.match(/^lvChat:([qe]\d)$/))) {
+    sfx.click(); LVC.open = false; if (!LV.room) return; if (Date.now() - LVC.last < 1500) return; LVC.last = Date.now();
+    LV.room.send('chat', { m: mt[1] }); LVC.me = { m: mt[1], t: performance.now() }; return;
+  }
+  return prev(id);
+})(act);
+liveCountdown = (prev => function (seed) { LVC.open = false; return prev(seed); })(liveCountdown);
+
+Object.assign(EN, {
+  '👋 Salut !': '👋 Hi!', '🎯 Pile poil !': '🎯 Spot on!', '👏 Bien joué': '👏 Nice one', '😅 Aïe…': '😅 Ouch…', '💨 Ce vent !': '💨 This wind!', '🔁 Revanche ?': '🔁 Rematch?',
+  'MESSAGES RAPIDES': 'QUICK MESSAGES', 'Message': 'Message', 'REGARDER': 'WATCH', 'PASSER': 'SKIP', 'PASSER ⏭': 'SKIP ⏭', '🎬 NOUVEAU': '🎬 NEW', 'REPLAY': 'REPLAY', 'LE LANCER DE ': 'THE DROP OF ',
+  'Chargement du replay…': 'Loading replay…', 'Replay indisponible pour ce lancer': 'No replay for this drop', 'Doucement 🙂': 'Easy there 🙂', 'Messages bientôt disponibles': 'Messages coming soon', 'Replay indisponible': 'Replay unavailable',
+});
+EN_RX.push([/^(.*) vient de jouer$/, '$1 just played']);
+
+// =====================================================================
+//  PILE POIL — AMIS : code ami, demandes, qui est en ligne, invitations en duel,
+//  classement entre amis et discussion libre (filtrée : insultes et coordonnées masquées)
+//  Seuls des amis acceptés peuvent s'écrire ou se défier. Messages effacés après 7 jours.
+// =====================================================================
+const FR = { tab: 'list', data: null, err: '', busy: false, chat: null, msgs: [], lastId: 0, scroll: 0, page: 0, fetchedAt: 0, msgAt: 0, seen: { inv: 0, req: 0, unread: 0 }, flash: '' };
+const FR_DEMO = !SB && /amisdemo/.test(location.search);
+const frOn = () => !!(SB ? ACC.token : FR_DEMO);
+const FR_REG = { fr: 'en France', jp: 'au Japon', eg: 'en Égypte' };
+const QFR = [['👋 Salut !'], ['🎯 Pile poil !'], ['👏 Bien joué'], ['🔁 Revanche ?'], ['⏰ Ton tour !'], ['🏆 Bats mon score']];
+
+// ---------- filtre (même règle que la fonction SQL fr_filter, utilisé en démo et pour prévenir l'envoyeur) ----------
+function frNorm(t) {
+  const a = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœ013457@$€!|', b = 'aaaaaaceeeeiiiinooooouuuuyyooieastaseii';
+  return String(t || '').toLowerCase().split('').map(ch => { const i = a.indexOf(ch); return i >= 0 ? b[i] : ch; }).join('').replace(/[^a-z ]/g, ' ').replace(/([a-z])\1+/g, '$1');
+}
+const FRF = {
+  pre: ['conard', 'conase', 'salope', 'salaud', 'encul', 'enfoir', 'batard', 'putain', 'pute', 'niqu', 'fdp', 'ntm', 'ftg', 'pede', 'tapet', 'gouine', 'negro', 'negre', 'bougnoul', 'youpin', 'bicot', 'bite', 'couil', 'porn', 'nude', 'sexe', 'sexy', 'branl', 'trouduc', 'mongol', 'gogol', 'atarde', 'nazi', 'hitler', 'suicid', 'kys', 'fuck', 'shit', 'bitch', 'cunt', 'dick', 'pusy', 'whore', 'slut', 'niga'],
+  exact: ['pd', 'cul', 'con', 'cone', 'tg', 'vtf', 'vtff', 'ta gueule', 'va mourir', 'tue toi', 'sex', 'ass', 'suce', 'sucer'],
+  persox: ['snap', 'insta', 'num', 'adresse', 'whatsapp'],
+  glued: ['conard', 'conase', 'salope', 'enfoir', 'batard', 'putain', 'gouine', 'bougnoul', 'youpin', 'branl', 'trouduc', 'bitch', 'whore', 'fuck', 'niquetamere', 'tagueule', 'encule'],
+  perso: ['snapchat', 'instagram', 'whatsap', 'telegram', 'discord', 'tiktok', 'facebok', 'mesenger', 'tonumero', 'monumero', 'numdetel', 'tonsnap', 'monsnap', 'adrese', 'habite'],
+};
+function frFilter(t) {
+  const raw = String(t || '').toLowerCase();
+  if (/(\d[\s.\-]?){9,}/.test(raw) || /[^\s]+@[^\s]+\.[a-z]{2,}/.test(raw) || /(https?:\/\/|www\.|\.(com|fr|net|org|io|gg|be|ch|me|ly)(\s|\/|$))/.test(raw)) return 'perso';
+  const n = ' ' + frNorm(t).replace(/\s+/g, ' ').trim() + ' ', ns = n.replace(/ /g, '').replace(/([a-z])\1+/g, '$1');
+  if (FRF.perso.some(w => ns.includes(w)) || FRF.persox.some(w => n.includes(' ' + frNorm(w) + ' '))) return 'perso';
+  if (FRF.exact.some(w => n.includes(' ' + frNorm(w) + ' '))) return 'mots';
+  if (FRF.pre.some(w => n.includes(' ' + w))) return 'mots';
+  if (FRF.glued.some(w => ns.includes(w))) return 'mots';
+  return null;
+}
+
+// ---------- serveur (Supabase) ou démo locale (?amisdemo) ----------
+const FRB = SB ? {
+  async call(fn, a) { const { data, error } = await SB.rpc(fn, Object.assign({ p_token: ACC.token }, a)); if (error) throw new Error(/schema cache|function/i.test(error.message) ? 'Les amis arrivent très bientôt !' : error.message); return data; },
+  me(where) { return this.call('fr_me', { p_where: where, p_day: todayKey() }); },
+  add(q) { return this.call('fr_add', { p_q: q }); },
+  answer(name, ok) { return this.call('fr_answer', { p_name: name, p_ok: ok }); },
+  remove(name, block) { return this.call('fr_remove', { p_name: name, p_block: block }); },
+  msgs(name, after) { return this.call('fr_msgs', { p_name: name, p_after: after || 0 }); },
+  send(name, k, b, p) { return this.call('fr_send', { p_name: name, p_kind: k, p_body: b || '', p_payload: p || null }); },
+  invite(id, ok) { return this.call('fr_invite_answer', { p_id: id, p_ok: ok }); },
+} : {
+  _db() { try { return JSON.parse(localStorage.getItem('ppdemo_fr')) || null; } catch (e) { return null; } },
+  _w(d) { try { localStorage.setItem('ppdemo_fr', JSON.stringify(d)); } catch (e) {} },
+  _me() { return (playerName() || 'Moi').toLowerCase(); },
+  _get() {
+    let d = this._db(); const me = this._me();
+    if (!d) d = { acc: {}, friends: [], req: [], msgs: [], nid: 1 };
+    if (!d.acc[me]) d.acc[me] = { name: playerName() || 'Moi', code: (frNorm(me).replace(/[^a-z]/g, '').toUpperCase() + 'XXXX').slice(0, 4) + '-' + 'K7Q', seen: Date.now() };
+    return d;
+  },
+  pair: (x, y) => x < y ? [x, y] : [y, x],
+  are(d, x, y) { const [a, b] = this.pair(x, y); return d.friends.some(f => f[0] === a && f[1] === b); },
+  async me(where) {
+    const d = this._get(), me = this._me(), now = Date.now(), A = d.acc[me]; A.seen = now; A.where = where; A.av = save.av; this._w(d);
+    const day = n => (d.day || {})[n]; const fr = d.friends.filter(f => f.includes(me)).map(f => f[0] === me ? f[1] : f[0]).map(o => { const B = d.acc[o] || { name: o };
+      const [a, b] = this.pair(me, o), mm = d.msgs.filter(m => m.a === a && m.b === b);
+      return { name: B.name, seen: Math.floor((now - (B.seen || 0)) / 1000), where: B.where, av: B.av, day: day(o), unread: mm.filter(m => m.src !== me && !m.seen).length, last: mm.length ? mm[mm.length - 1].id : null }; })
+      .sort((p, q) => p.seen - q.seen);
+    return { code: A.code, name: A.name, me_day: day(me), friends: fr,
+      req_in: d.req.filter(r => r[1] === me).map(r => ({ name: (d.acc[r[0]] || { name: r[0] }).name, av: (d.acc[r[0]] || {}).av, lvl: (d.acc[r[0]] || {}).lvl })),
+      req_out: d.req.filter(r => r[0] === me).map(r => (d.acc[r[1]] || { name: r[1] }).name),
+      invites: d.msgs.filter(m => (m.a === me || m.b === me) && m.src !== me && m.k === 'duel' && !m.p.st && (now / 1000 - m.at) < (m.p.m === 'live' ? 300 : 259200)).map(m => ({ id: m.id, from: d.acc[m.src].name, av: d.acc[m.src].av, p: m.p, age: Math.floor(now / 1000 - m.at) })).reverse() };
+  },
+  async add(q) {
+    const d = this._get(), me = this._me(), qc = q.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const o = Object.keys(d.acc).find(k => k === q.trim().toLowerCase() || (qc.length === 7 && d.acc[k].code.replace('-', '') === qc));
+    if (!o) throw new Error('Joueur introuvable : vérifie le code ou le pseudo'); if (o === me) throw new Error('C\'est ton propre code !'); if (this.are(d, me, o)) throw new Error(`${d.acc[o].name} est déjà ton ami`);
+    if (d.req.some(r => r[0] === o && r[1] === me)) { d.req = d.req.filter(r => !(r.includes(o) && r.includes(me))); d.friends.push(this.pair(me, o)); this._w(d); return { st: 'friends', name: d.acc[o].name }; }
+    if (!d.req.some(r => r[0] === me && r[1] === o)) d.req.push([me, o]); this._w(d); return { st: 'sent', name: d.acc[o].name };
+  },
+  async answer(name, ok) { const d = this._get(), me = this._me(), o = name.toLowerCase(); d.req = d.req.filter(r => !(r.includes(o) && r.includes(me))); if (ok && !this.are(d, me, o)) d.friends.push(this.pair(me, o)); this._w(d); return { ok: true }; },
+  async remove(name) { const d = this._get(), me = this._me(), o = name.toLowerCase(), [a, b] = this.pair(me, o); d.friends = d.friends.filter(f => !(f[0] === a && f[1] === b)); this._w(d); return { ok: true }; },
+  async msgs(name, after) {
+    const d = this._get(), me = this._me(), [a, b] = this.pair(me, name.toLowerCase()); if (!this.are(d, a, b)) throw new Error('Vous n\'êtes plus amis');
+    const out = d.msgs.filter(m => m.a === a && m.b === b && m.id > (after || 0)).slice(-60).map(m => ({ id: m.id, me: m.src === me, k: m.k, b: m.x && m.src !== me ? null : m.t, p: m.p, x: m.x, at: m.at }));
+    d.msgs.forEach(m => { if (m.a === a && m.b === b && m.src !== me) m.seen = true; }); this._w(d); return out;
+  },
+  async send(name, k, body, p, from) {
+    const d = this._get(), me = from || this._me(), o = from ? this._me() : name.toLowerCase(), [a, b] = this.pair(me, o); if (!this.are(d, a, b)) throw new Error('Tu ne peux écrire qu\'à tes amis');
+    const m = { id: d.nid++, a, b, src: me, k, t: String(body || '').slice(0, 200), p: p || null, x: k === 'txt' || k === 'emo' ? frFilter(body) : null, at: Math.floor(Date.now() / 1000), seen: false };
+    d.msgs.push(m); this._w(d); return { id: m.id, me: !from, k, b: m.t, p: m.p, x: m.x, at: m.at };
+  },
+  async invite(id, ok) { const d = this._get(), m = d.msgs.find(q => q.id === id); if (!m) throw new Error('Invitation introuvable'); m.p.st = ok ? 'ok' : 'no'; m.seen = true; this._w(d); return m.p; },
+};
+
+// ---------- présence et rafraîchissement ----------
+function frWhere() {
+  if (G.screen === 'play' && L) {
+    if (['live', 'turn', 'duel', 'tdreplay'].includes(G.mode)) return 'en duel'; if (G.mode === 'survie') return 'en survie'; if (G.mode === 'daily') return 'au défi du jour';
+    return `joue ${FR_REG[window.REGION] || 'en France'}, niv. ${G.level}`;
+  }
+  if (G.screen === 'garage') return 'au garage'; if (['defis', 'tdRoom', 'tdForm', 'liveLobby', 'liveEnd'].includes(G.screen)) return 'dans les duels';
+  return 'dans les menus';
+}
+async function frRefresh(force) {
+  if (!frOn() || (FR.busyMe && !force)) return; FR.busyMe = true; FR.fetchedAt = Date.now();
+  try {
+    const d = await FRB.me(frWhere()), prev = FR.data; FR.data = d; FR.err = '';
+    if (prev && G.screen !== 'play') {
+      d.invites.forEach(iv => { if (!prev.invites.some(p => p.id === iv.id)) { toast(`⚔ ${iv.from} t'invite en duel !`, '#b58bff'); try { tone(660, .1, 'sine', .06); tone(990, .14, 'sine', .05, .1); } catch (e) {} } });
+      d.req_in.forEach(r => { if (!prev.req_in.some(p => p.name === r.name)) toast(`👥 ${r.name} veut être ton ami`, '#6fb1ff'); });
+      d.friends.forEach(f => { const p = prev.friends.find(q => q.name === f.name); if (p && f.unread > p.unread && FR.chat !== f.name) toast(`💬 Nouveau message de ${f.name}`, '#3cf29b'); });
+    }
+  } catch (e) { FR.err = e.message; }
+  FR.busyMe = false;
+}
+async function frLoadMsgs(reset) {
+  if (!FR.chat || FR.busyMsg) return; FR.busyMsg = true; FR.msgAt = Date.now();
+  try {
+    if (reset) { FR.msgs = []; FR.lastId = 0; FR.scroll = 0; }
+    const list = await FRB.msgs(FR.chat, FR.lastId);
+    list.forEach(m => { if (!FR.msgs.some(q => q.id === m.id)) FR.msgs.push(m); FR.lastId = Math.max(FR.lastId, m.id); });
+    if (list.length && list.some(m => !m.me) && !reset) { try { tone(880, .08, 'sine', .05); } catch (e) {} }
+  } catch (e) { FR.err = e.message; if (/plus amis/.test(e.message)) { FR.chat = null; G.screen = 'friends'; } }
+  FR.busyMsg = false;
+}
+setInterval(() => {
+  if (!frOn() || document.hidden) return;
+  const onFr = G.screen === 'friends' || G.screen === 'fchat', gap = onFr ? 5000 : G.screen === 'play' ? 60000 : 25000;
+  if (Date.now() - FR.fetchedAt > gap) frRefresh();
+  if (G.screen === 'fchat' && Date.now() - FR.msgAt > 3000) frLoadMsgs(false);
+}, 1000);
+setTimeout(() => frRefresh(true), 2500);
+
+// ---------- petits outils de dessin ----------
+const frOnline = f => f && f.seen < 120;
+function frAgo(s) { if (s < 90) return 'en ligne'; const m = s / 60, h = m / 60, d = h / 24; return m < 60 ? `vu il y a ${Math.round(m)} min` : h < 24 ? `vu il y a ${Math.round(h)} h` : d < 2 ? 'vu hier' : d < 7 ? `vu il y a ${Math.floor(d)} jours` : d < 14 ? 'vu la semaine dernière' : 'vu il y a longtemps'; }
+function frAv(cx, cy, r, av) { drawAvatar(cx, cy, r, Object.assign({ skin: 1, helm: 0, acc: 0, bg: 0 }, av || {})); }
+function frCard(x, y, w, h, col) { uiPanel(x, y, w, h, 30); if (col) { rr(x, y, w, h, 30); c.strokeStyle = col; c.lineWidth = 3; c.stroke(); } }
+function frBtn(id, x, y, w, h, label, kind) {
+  const K = { v: ['#a98bff', '#6a46d9', '#fff'], g: ['#5ff2ad', '#17a764', '#06210f'], k: ['rgba(255,255,255,.14)', 'rgba(255,255,255,.08)', '#fff'], y: ['#ffe066', '#ffa41a', '#2a1a00'], r: ['#ff7f6e', '#e02f4a', '#fff'] }[kind || 'v'], hv = hov(x, y, w, h);
+  rr(x, y, w, h, h / 2); c.fillStyle = kind === 'k' ? (hv ? 'rgba(255,255,255,.2)' : K[0]) : lg(0, y, 0, y + h, [[0, K[0]], [1, K[1]]]); c.fill();
+  if (hv && kind !== 'k') { rr(x, y, w, h, h / 2); c.fillStyle = 'rgba(255,255,255,.12)'; c.fill(); }
+  txt(label, x + w / 2, y + h / 2 + Math.round(h * .19), K[2], Math.round(h * .42), 900, 'center'); G.buttons.push({ id, x, y, w, h });
+}
+function frBadge(x, y, n) { if (!n) return; ell(x, y, 16, 16, '#ff4f6d'); txt(String(Math.min(9, n)), x, y + 7, '#fff', 18, 900, 'center'); }
+function frWrap(s, maxW, size) { c.font = `800 ${size}px Inter`; const out = []; let line = ''; String(s).split(/\s+/).forEach(wd => { const t = line ? line + ' ' + wd : wd; if (c.measureText(t).width > maxW && line) { out.push(line); line = wd; } else line = t; }); if (line) out.push(line); return out.length ? out : ['']; }
+function frTotalBadge() { const d = FR.data; if (!d) return 0; return d.req_in.length + d.invites.length + d.friends.reduce((a, f) => a + (f.unread || 0), 0); }
+function frTdWith(name) { return tdMine().map(e => tdState(e.code)).find(s => s && !s.over && s.oname && s.oname.toLowerCase() === name.toLowerCase()); }
+
+// ---------- pastille « Amis » sur l'accueil ----------
+function amisChip() {
+  const x = 40 + (window.ACC_CHIP_W || 260) + 14 + 236 + 14, y = 40, w = 236, h = 72, hv = hov(x, y, w, h), d = FR.data;
+  chip(x, y, w, h); if (hv) { rr(x, y, w, h, h / 2); c.fillStyle = 'rgba(255,255,255,.06)'; c.fill(); }
+  ell(x + 38, y + 36, 24, 24, 'rgba(255,255,255,.1)');
+  [[-8, 0, '#ffc21a'], [8, 3, '#6fb1ff']].forEach(([dx, dy, col]) => { ell(x + 38 + dx, y + 30 + dy, 6.5, 6.5, col); c.fillStyle = col; c.beginPath(); c.ellipse(x + 38 + dx, y + 47 + dy, 10, 7, 0, Math.PI, 0); c.fill(); });
+  txt('Amis', x + 72, y + 34, PAL.text, 22, 900);
+  const on = d ? d.friends.filter(frOnline).length : 0;
+  if (d && on) { ell(x + 79, y + 52, 5, 5, '#3cf29b'); txt(`${on} en ligne`, x + 90, y + 58, '#3cf29b', 16, 800); } else txt(d ? `${d.friends.length} ami${d.friends.length > 1 ? 's' : ''}` : 'Joue avec tes potes', x + 72, y + 58, PAL.sub, 16, 800);
+  const n = frTotalBadge(); if (n) { const pu = 1 + Math.max(0, Math.sin(G.t * 5)) * .12; c.save(); c.translate(x + w - 18, y + 14); c.scale(pu, pu); ell(0, 0, 16, 16, '#e0392b'); txt(String(Math.min(9, n)), 0, 7, '#fff', 18, 900, 'center'); c.restore(); }
+  G.buttons.unshift({ id: 'friends', x, y, w, h });
+}
+drawTitle = (prev => function () { prev(); amisChip(); })(drawTitle);
+
+// ---------- écran « Mes amis » ----------
+function frTabs() {
+  const d = FR.data, tabs = [['list', `Amis · ${d ? d.friends.length : 0}`], ['req', `Demandes · ${d ? d.req_in.length : 0}`], ['add', 'Ajouter +']];
+  let x = 470; tabs.forEach(([id, label]) => { c.font = '900 24px Inter'; const w = c.measureText(tr(label)).width + 56, on = FR.tab === id, hv = hov(x, 48, w, 56);
+    rr(x, 48, w, 56, 28); c.fillStyle = on ? '#ffc21a' : hv ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.08)'; c.fill(); txt(label, x + w / 2, 85, on ? '#2a1a00' : '#fff', 24, 900, 'center');
+    if (id === 'req' && d && d.req_in.length && !on) frBadge(x + w - 6, 52, d.req_in.length);
+    G.buttons.push({ id: 'frTab:' + id, x, y: 48, w, h: 56 }); x += w + 14; });
+}
+function drawFriendsGate(title, lines, btn) {
+  frCard(460, 230, 1000, 560);
+  [[-46, 0, '#ffc21a'], [46, 10, '#6fb1ff']].forEach(([dx, dy, col]) => { ell(960 + dx, 340 + dy, 34, 34, col); c.fillStyle = col; c.beginPath(); c.ellipse(960 + dx, 430 + dy, 56, 40, 0, Math.PI, 0); c.fill(); });
+  T(title, 960, 520, '#fff', 54, 'center'); lines.forEach((s, i) => txt(s, 960, 576 + i * 40, PAL.sub, 26, 800, 'center'));
+  if (btn) frBtn(btn[0], 710, 680, 500, 84, btn[1], 'g');
+}
+function drawFriends() {
+  screenBg(); navBar('frBack', 'MES AMIS');
+  if (!SB && !FR_DEMO) return drawFriendsGate('Joue avec tes amis', ['Les amis sont disponibles dans la version en ligne du jeu :', 'pile-poil-jeu.netlify.app']);
+  if (!ACC.token && SB) return drawFriendsGate('Tes amis t\'attendent', ['Crée ton compte (pseudo + mot de passe) pour avoir ton code ami,', 'ajouter tes potes, les défier en duel et discuter avec eux.'], ['account', 'CRÉER MON COMPTE']);
+  frTabs(); const d = FR.data;
+  if (!d) { txt(FR.err || 'Chargement de tes amis…', 960, 520, FR.err ? '#ffd447' : PAL.sub, 30, 800, 'center'); if (FR.err) frBtn('frRetry', 810, 580, 300, 70, 'RÉESSAYER', 'k'); return; }
+  if (FR.tab === 'list') drawFrList(d); else if (FR.tab === 'req') drawFrReq(d); else drawFrAdd(d);
+  if (FR.flash) txt(FR.flash, 960, 1062, '#ffd447', 22, 800, 'center');
+}
+function drawFrList(d) {
+  const x0 = 60, y0 = 140, w0 = 1090, h0 = 900, rows = 7, rh = 118, list = d.friends, pages = Math.max(1, Math.ceil(list.length / rows));
+  FR.page = Math.min(FR.page, pages - 1); frCard(x0, y0, w0, h0);
+  if (!list.length) {
+    T('Pas encore d\'amis', x0 + w0 / 2, y0 + 330, '#fff', 50, 'center'); txt('Envoie ton code ami ou ajoute quelqu\'un avec son code ou son pseudo.', x0 + w0 / 2, y0 + 386, PAL.sub, 24, 800, 'center');
+    frBtn('frTab:add', x0 + w0 / 2 - 220, y0 + 440, 440, 84, 'AJOUTER UN AMI', 'g');
+  }
+  list.slice(FR.page * rows, FR.page * rows + rows).forEach((f, i) => {
+    const y = y0 + 20 + i * rh, on = frOnline(f), td = frTdWith(f.name), hv = hov(x0 + 10, y, w0 - 20, rh - 8);
+    if (hv) { rr(x0 + 10, y, w0 - 20, rh - 8, 22); c.fillStyle = 'rgba(255,255,255,.05)'; c.fill(); }
+    if (i) fillR(x0 + 30, y - 4, w0 - 60, 1, 'rgba(255,255,255,.07)');
+    frAv(x0 + 70, y + 55, 40, f.av);
+    txt(f.name, x0 + 128, y + 50, '#fff', 30, 900);
+    ell(x0 + 136, y + 80, 7, 7, on ? '#3cf29b' : td && td.myTurn ? '#ffa14a' : '#6b7894');
+    const st = td && td.myTurn ? `À ton tour dans votre duel` : on ? `En ligne · ${f.where || 'dans les menus'}` : frAgo(f.seen);
+    txt(st, x0 + 152, y + 87, on ? '#9ff5c8' : td && td.myTurn ? '#ffc98a' : PAL.sub, 21, 800);
+    G.buttons.push({ id: 'frOpen:' + f.name, x: x0 + 10, y, w: 560, h: rh - 8 });
+    const bx = x0 + w0 - 110; ell(bx + 36, y + 55, 34, 34, hov(bx, y + 21, 72, 68) ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.1)'); txt('💬', bx + 36, y + 67, '#fff', 30, 400, 'center'); frBadge(bx + 62, y + 28, f.unread);
+    G.buttons.push({ id: 'frOpen:' + f.name, x: bx, y: y + 21, w: 72, h: 68 });
+    if (td && td.myTurn) frBtn('frTurn:' + td.r.code, bx - 300, y + 30, 280, 54, '▶ JOUER MON TOUR', 'g');
+    else frBtn('frDuel:' + f.name, bx - 210, y + 30, 190, 54, on ? '⚔ DUEL' : '⚔ DÉFIER', 'v');
+  });
+  if (pages > 1) { txt(`${FR.page + 1} / ${pages}`, x0 + w0 / 2, y0 + h0 - 24, PAL.sub, 22, 800, 'center'); if (FR.page > 0) frBtn('frPage:-1', x0 + w0 / 2 - 200, y0 + h0 - 60, 110, 48, '◀', 'k'); if (FR.page < pages - 1) frBtn('frPage:1', x0 + w0 / 2 + 90, y0 + h0 - 60, 110, 48, '▶', 'k'); }
+  // classement entre amis (défi du jour)
+  const x1 = 1180, w1 = 680; frCard(x1, y0, w1, 430);
+  T('CLASSEMENT ENTRE AMIS', x1 + 34, y0 + 60, '#ffc21a', 34); txt('Défi du jour · aujourd\'hui', x1 + 36, y0 + 94, PAL.sub, 20, 800);
+  const board = [{ name: d.name, day: d.me_day, me: true }, ...d.friends.map(f => ({ name: f.name, day: f.day }))].sort((a, b) => (b.day ?? -1) - (a.day ?? -1)).slice(0, 6);
+  board.forEach((p, i) => { const y = y0 + 150 + i * 46; txt(p.day != null ? ['🥇', '🥈', '🥉'][i] || `${i + 1}` : `${i + 1}`, x1 + 50, y, PAL.sub, 24, 900, 'center'); txt(p.me ? 'Toi' : p.name, x1 + 88, y, p.me ? '#ffc21a' : '#fff', 26, 900); txt(p.day != null ? p.day.toLocaleString('fr-FR') : '—', x1 + w1 - 40, y, p.me ? '#ffc21a' : '#fff', 26, 900, 'right'); });
+  if (board.every(p => p.day == null)) txt('Personne n\'a encore joué le défi du jour.', x1 + 36, y0 + 400, PAL.sub, 20, 800);
+  // invitation reçue (sinon : ton code ami)
+  const y2 = y0 + 460, iv = d.invites[0];
+  if (iv) {
+    frCard(x1, y2, w1, 440, '#b58bff'); T('INVITATION REÇUE', x1 + 34, y2 + 60, '#c9b1ff', 34);
+    frAv(x1 + 80, y2 + 140, 44, iv.av); txt(iv.from, x1 + 142, y2 + 128, '#fff', 30, 900);
+    txt(iv.p.m === 'live' ? 'te défie en duel en direct' : 'te défie · chacun son tour', x1 + 142, y2 + 166, '#c9b1ff', 24, 800);
+    frBtn('frInv:' + iv.id, x1 + 34, y2 + 220, 300, 74, '✓ ACCEPTER', 'g'); frBtn('frInvNo:' + iv.id, x1 + 352, y2 + 220, 230, 74, 'Plus tard', 'k');
+    const left = (iv.p.m === 'live' ? 300 : 259200) - iv.age - Math.floor((Date.now() - FR.fetchedAt) / 1000);
+    txt(iv.p.m === 'live' ? `L'invitation expire dans ${Math.max(0, Math.floor(left / 60))} min ${String(Math.max(0, left % 60)).padStart(2, '0')}` : `Le duel t'attend pendant ${Math.max(1, Math.ceil(left / 86400))} jours`, x1 + 34, y2 + 340, PAL.sub, 20, 800);
+    if (d.invites.length > 1) txt(`+ ${d.invites.length - 1} autre${d.invites.length > 2 ? 's' : ''} invitation${d.invites.length > 2 ? 's' : ''}`, x1 + 34, y2 + 390, '#c9b1ff', 20, 800);
+  } else {
+    frCard(x1, y2, w1, 440); T('TON CODE AMI', x1 + 34, y2 + 60, '#ffc21a', 34);
+    rr(x1 + 34, y2 + 96, w1 - 68, 120, 24); c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(); T(d.code, x1 + w1 / 2, y2 + 182, '#fff', 72, 'center');
+    frBtn('frShare', x1 + 34, y2 + 250, 340, 70, '📤 PARTAGER', 'g'); frBtn('frCopy', x1 + 392, y2 + 250, 254, 70, '📋 Copier', 'k');
+    txt('Seuls tes amis peuvent t\'écrire ou te défier.', x1 + 34, y2 + 380, PAL.sub, 20, 800);
+  }
+}
+function drawFrReq(d) {
+  const x0 = 60, y0 = 140; frCard(x0, y0, 1090, 900); T('DEMANDES REÇUES', x0 + 34, y0 + 64, '#ffc21a', 36);
+  if (!d.req_in.length) txt('Aucune demande pour l\'instant.', x0 + 36, y0 + 130, PAL.sub, 24, 800);
+  d.req_in.slice(0, 7).forEach((r, i) => { const y = y0 + 100 + i * 112; frAv(x0 + 80, y + 50, 40, r.av); txt(r.name, x0 + 140, y + 46, '#fff', 30, 900); txt(r.lvl ? `Niveau ${r.lvl} en carrière` : 'veut être ton ami', x0 + 140, y + 80, PAL.sub, 21, 800);
+    frBtn('frAcc:' + r.name, x0 + 1090 - 360, y + 20, 200, 62, '✓ ACCEPTER', 'g'); frBtn('frDec:' + r.name, x0 + 1090 - 140, y + 20, 90, 62, '✕', 'k'); });
+  txt('Personne ne peut t\'écrire ou te défier sans être ton ami. Tu peux retirer ou bloquer quelqu\'un à tout moment.', x0 + 36, y0 + 870, PAL.sub, 19, 800);
+  const x1 = 1180; frCard(x1, y0, 680, 900); T('DEMANDES ENVOYÉES', x1 + 34, y0 + 64, '#ffc21a', 36);
+  if (!d.req_out.length) txt('Aucune demande en attente.', x1 + 36, y0 + 130, PAL.sub, 24, 800);
+  d.req_out.slice(0, 10).forEach((n, i) => { const y = y0 + 130 + i * 64; txt(n, x1 + 36, y, '#fff', 28, 900); txt('en attente…', x1 + 644, y, PAL.sub, 21, 800, 'right'); });
+}
+function frSuggest(d) {
+  const known = new Set([d.name, ...d.friends.map(f => f.name), ...d.req_out].map(s => s.toLowerCase())), out = [];
+  tdMine().slice().reverse().forEach(e => { const s = tdState(e.code); if (s && s.oname && !known.has(s.oname.toLowerCase())) { known.add(s.oname.toLowerCase()); out.push([s.oname, s.over ? 'duel terminé' : 'duel en cours']); } });
+  (save.recentOpp || []).slice().reverse().forEach(n => { if (!known.has(n.toLowerCase())) { known.add(n.toLowerCase()); out.push([n, 'duel en direct']); } });
+  return out.slice(0, 5);
+}
+function drawFrAdd(d) {
+  const x0 = 60, y0 = 140; frCard(x0, y0, 1090, 900);
+  T('TON CODE AMI', x0 + 34, y0 + 64, '#ffc21a', 36); txt('Donne-le à tes amis pour qu\'ils t\'ajoutent', x0 + 36, y0 + 100, PAL.sub, 22, 800);
+  rr(x0 + 34, y0 + 128, 560, 130, 24); c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(); T(d.code, x0 + 314, y0 + 222, '#fff', 84, 'center');
+  frBtn('frShare', x0 + 34, y0 + 282, 420, 72, '📤 PARTAGER MON LIEN', 'g'); frBtn('frCopy', x0 + 470, y0 + 282, 200, 72, '📋 Copier', 'k');
+  fillR(x0 + 34, y0 + 396, 1022, 2, 'rgba(255,255,255,.08)');
+  T('AJOUTER QUELQU\'UN', x0 + 34, y0 + 464, '#ffc21a', 36); txt('Avec son code ami (ex. LUCA-2Q9) ou son pseudo', x0 + 36, y0 + 500, PAL.sub, 22, 800);
+  FR.addRect = [x0 + 34, y0 + 530, 640, 84]; rr(...FR.addRect, 22); c.fillStyle = 'rgba(10,15,30,.9)'; c.fill(); c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke();
+  frBtn('frAdd', x0 + 694, y0 + 530, 260, 84, FR.busy ? '…' : 'AJOUTER', 'g');
+  txt('Il recevra une demande : vous serez amis quand il l\'acceptera.', x0 + 36, y0 + 660, PAL.sub, 21, 800);
+  if (d.req_in.length) { fillR(x0 + 34, y0 + 700, 1022, 2, 'rgba(255,255,255,.08)'); T('DEMANDES REÇUES', x0 + 34, y0 + 760, '#ffc21a', 32);
+    d.req_in.slice(0, 1).forEach(r => { const y = y0 + 790; frAv(x0 + 80, y + 46, 38, r.av); txt(r.name, x0 + 134, y + 42, '#fff', 28, 900); txt(r.lvl ? `Niveau ${r.lvl} en carrière` : 'veut être ton ami', x0 + 134, y + 74, PAL.sub, 20, 800);
+      frBtn('frAcc:' + r.name, x0 + 1090 - 360, y + 16, 200, 60, '✓ ACCEPTER', 'g'); frBtn('frDec:' + r.name, x0 + 1090 - 140, y + 16, 90, 60, '✕', 'k'); }); }
+  else txt('🛡 Personne ne peut t\'écrire ou te défier sans être ton ami.', x0 + 36, y0 + 840, PAL.sub, 21, 800);
+  const x1 = 1180; frCard(x1, y0, 680, 900); T('SUGGESTIONS', x1 + 34, y0 + 64, '#ffc21a', 36); txt('Tes derniers adversaires en duel', x1 + 36, y0 + 100, PAL.sub, 22, 800);
+  const sg = frSuggest(d); if (!sg.length) txt('Joue des duels : tes adversaires apparaîtront ici.', x1 + 36, y0 + 160, PAL.sub, 22, 800);
+  sg.forEach(([n, why], i) => { const y = y0 + 140 + i * 104; frAv(x1 + 76, y + 46, 38, null); txt(n, x1 + 132, y + 42, '#fff', 28, 900); txt(why, x1 + 132, y + 74, PAL.sub, 20, 800); frBtn('frAddN:' + n, x1 + 680 - 210, y + 18, 176, 58, '+ Ajouter', 'k'); });
+}
+
+// ---------- conversation ----------
+function frChatFriend() { return FR.data && FR.data.friends.find(f => f.name === FR.chat); }
+function drawFChat() {
+  screenBg(); const f = frChatFriend() || { name: FR.chat, seen: 1e9 };
+  navBar('fcBack', (FR.chat || '').toUpperCase());
+  const x0 = 60, y0 = 140, w0 = 1090, h0 = 900; frCard(x0, y0, w0, h0);
+  frAv(x0 + 70, y0 + 64, 40, f.av); txt(f.name, x0 + 128, y0 + 58, '#fff', 30, 900);
+  const on = frOnline(f); ell(x0 + 136, y0 + 88, 7, 7, on ? '#3cf29b' : '#6b7894'); txt(on ? `En ligne · ${f.where || ''}` : frAgo(f.seen), x0 + 152, y0 + 95, on ? '#9ff5c8' : PAL.sub, 21, 800);
+  frBtn('frDuel:' + f.name, x0 + w0 - 420, y0 + 34, 300, 60, on ? '⚔ DÉFIER EN DUEL' : '⚔ DÉFIER', 'v'); frBtn('fcMenu', x0 + w0 - 100, y0 + 34, 64, 60, '⋯', 'k');
+  fillR(x0 + 30, y0 + 124, w0 - 60, 1, 'rgba(255,255,255,.08)');
+  // messages (du plus récent en bas)
+  const top = y0 + 140, bot = y0 + h0 - 120, maxW = 560; c.save(); c.beginPath(); c.rect(x0 + 10, top, w0 - 20, bot - top); c.clip();
+  let y = bot - 10 + FR.scroll; const L2 = FR.msgs.slice(), name = f.name;
+  for (let i = L2.length - 1; i >= 0; i--) {
+    const m = L2[i], mine = m.me; let h = 0;
+    if (m.k === 'pose') {
+      h = 230; const bx = mine ? x0 + w0 - 40 - 300 : x0 + 40, by = y - h;
+      rr(bx, by, 300, 220, 20); c.fillStyle = mine ? 'rgba(255,194,26,.18)' : 'rgba(255,255,255,.08)'; c.fill();
+      const im = frImg(m.p && m.p.img); c.save(); rr(bx + 10, by + 10, 280, 158, 14); c.clip(); if (im) c.drawImage(im, bx + 10, by + 10, 280, 158); else fillR(bx + 10, by + 10, 280, 158, '#3b4a6a'); c.restore();
+      txt(`📸 Pose parfaite · ${(m.p && FR_PAYS[m.p.reg]) || 'France'} niv. ${(m.p && m.p.n) || '?'}`, bx + 14, by + 200, '#fff', 19, 800);
+    } else if (m.k === 'duel') {
+      h = 120; const bw = 520, bx = mine ? x0 + w0 - 40 - bw : x0 + 40, by = y - h + 8, p = m.p || {};
+      rr(bx, by, bw, 104, 22); c.fillStyle = 'rgba(106,70,217,.25)'; c.fill(); c.strokeStyle = '#a98bff'; c.lineWidth = 2; c.stroke();
+      txt(`⚔ ${mine ? 'Tu as invité ' + name : name + ' t\'invite'} · ${p.m === 'live' ? 'en direct' : 'chacun son tour'}`, bx + 20, by + 40, '#fff', 22, 900);
+      const fresh = nowS() - m.at < (p.m === 'live' ? 300 : 259200);
+      if (!mine && !p.st && fresh) frBtn('frInv:' + m.id, bx + 20, by + 54, 200, 42, '✓ ACCEPTER', 'g');
+      else txt(p.st === 'ok' ? 'Accepté ✓' : p.st === 'no' ? 'Refusé' : !fresh ? 'Expirée' : 'En attente…', bx + 20, by + 84, p.st === 'ok' ? '#3cf29b' : PAL.sub, 20, 800);
+    } else {
+      const masked = m.x && !mine, lines = masked ? [m.x === 'perso' ? '🙈 Message masqué : pas de coordonnées ni de liens' : '🙈 Message masqué : propos inappropriés'] : frWrap(m.b || '', maxW, m.k === 'emo' ? 44 : 24);
+      const size = m.k === 'emo' && !masked ? 44 : masked ? 21 : 24; c.font = `800 ${size}px Inter`; const bw = Math.min(masked ? 900 : maxW, Math.max(...lines.map(s => c.measureText(tr(s)).width))) + 40;
+      h = lines.length * (size + 10) + 30 + (mine && m.x ? 30 : 0); const bx = mine ? x0 + w0 - 40 - bw : x0 + 40, by = y - h + 8;
+      if (m.k !== 'emo' || masked) { rr(bx, by, bw, lines.length * (size + 10) + 22, 22); c.fillStyle = masked ? 'rgba(255,255,255,.06)' : mine ? (m.x ? 'rgba(255,194,26,.35)' : '#ffc21a') : 'rgba(255,255,255,.1)'; c.fill(); }
+      lines.forEach((s, k) => txt(s, bx + 20, by + 14 + size + k * (size + 10) - 4, masked ? PAL.sub : mine ? '#2a1a00' : '#fff', size, 800));
+      if (mine && m.x) txt(m.x === 'perso' ? 'Masqué pour ' + name + ' : pas de coordonnées ni de liens' : 'Masqué pour ' + name + ' : propos inappropriés', bx + bw, by + lines.length * (size + 10) + 48, '#ff8f80', 18, 800, 'right');
+    }
+    y -= h + 8;
+  }
+  { const contentH = bot - 10 + FR.scroll - y; FR.scroll = Math.min(FR.scroll, Math.max(0, contentH - (bot - top) + 20)); } c.restore();
+  if (!FR.msgs.length) txt(`Dis bonjour à ${name} 👋`, x0 + w0 / 2, (top + bot) / 2, PAL.sub, 26, 800, 'center');
+  // zone de saisie
+  FR.chatRect = [x0 + 34, y0 + h0 - 100, w0 - 280, 72]; rr(...FR.chatRect, 36); c.fillStyle = 'rgba(10,15,30,.9)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.2)'; c.lineWidth = 2; c.stroke();
+  frBtn('fcSend', x0 + w0 - 230, y0 + h0 - 100, 196, 72, 'ENVOYER', 'y');
+  // colonne de droite : envois rapides
+  const x1 = 1180, w1 = 680; frCard(x1, y0, w1, h0); T('ENVOYER', x1 + 34, y0 + 60, '#ffc21a', 34);
+  QFR.forEach(([s], i) => { const bx = x1 + 30 + (i % 2) * 314, by = y0 + 90 + Math.floor(i / 2) * 70, hv = hov(bx, by, 300, 58); rr(bx, by, 300, 58, 16); c.fillStyle = hv ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.08)'; c.fill(); txt(s, bx + 18, by + 38, '#fff', 23, 800); G.buttons.push({ id: 'fcQ:' + i, x: bx, y: by, w: 300, h: 58 }); });
+  ECHAT.forEach(([, s], i) => { const bx = x1 + 30 + i * 104, by = y0 + 320, hv = hov(bx, by, 92, 76); if (hv) { rr(bx, by, 92, 76, 18); c.fillStyle = 'rgba(255,255,255,.12)'; c.fill(); } txt(s, bx + 46, by + 56, '#fff', 46, 400, 'center'); G.buttons.push({ id: 'fcE:' + i, x: bx, y: by, w: 92, h: 76 }); });
+  const lp = frLastPose(); rr(x1 + 30, y0 + 420, w1 - 60, 70, 18); c.fillStyle = lp ? (hov(x1 + 30, y0 + 420, w1 - 60, 70) ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.08)') : 'rgba(255,255,255,.03)'; c.fill();
+  txt(lp ? `📸 Partager ma dernière pose parfaite (niv. ${lp.n})` : '📸 Fais un PILE POIL pour partager ta pose', x1 + 52, y0 + 465, lp ? '#fff' : PAL.sub, 22, 800); if (lp) G.buttons.push({ id: 'fcPose', x: x1 + 30, y: y0 + 420, w: w1 - 60, h: 70 });
+  rr(x1 + 30, y0 + 530, w1 - 60, 330, 22); c.fillStyle = 'rgba(60,242,155,.07)'; c.fill();
+  txt('🛡 Discussion protégée', x1 + 56, y0 + 580, '#3cf29b', 24, 900);
+  if (FR.menu) { const mx = x0 + w0 - 300, my = y0 + 100; G.buttons.unshift({ id: 'fcMenu', x: 0, y: 0, w: W, h: H }); uiPanel(mx, my, 264, 150, 22); frBtn('fcRemove', mx + 16, my + 16, 232, 54, 'Retirer', 'k'); frBtn('fcBlock', mx + 16, my + 80, 232, 54, '⛔ Bloquer', 'r'); G.buttons.unshift(G.buttons.pop()); G.buttons.unshift(G.buttons.pop()); }
+  ['Seuls tes amis peuvent t\'écrire.', 'Insultes et propos déplacés sont masqués.', 'Numéros, adresses, réseaux et liens aussi :', 'ne donne jamais tes coordonnées.', 'Les messages s\'effacent après 7 jours.', 'Un souci ? ⋯ → Bloquer.'].forEach((s, i) => txt(s, x1 + 56, y0 + 630 + i * 38, '#cfe0ff', 21, 800));
+}
+const FR_PAYS = { fr: 'France', jp: 'Japon', eg: 'Égypte' };
+const FRIMG = {};
+function frImg(src) { if (!src || !/^data:image\/jpeg;base64,/.test(src)) return null; if (!FRIMG[src]) { const im = new Image(); im.src = src; FRIMG[src] = im; } const im = FRIMG[src]; return im.complete && im.naturalWidth ? im : null; }
+function frLastPose() { try { return JSON.parse(localStorage.getItem('pp_lastpose')); } catch (e) { return null; } }
+// une miniature de chaque pose parfaite est gardée sur l'appareil (pour l'envoyer à un ami)
+hud = (prev => function (lvl) {
+  prev(lvl); const P = G.pose;
+  if (P && P.shot && !P.thumb) { P.thumb = 1; try { const s = document.createElement('canvas'); s.width = 256; s.height = 144; s.getContext('2d').drawImage(P.shot, 0, 0, 256, 144); localStorage.setItem('pp_lastpose', JSON.stringify({ n: P.n, reg: P.region || 'fr', img: s.toDataURL('image/jpeg', .62), at: Date.now() })); } catch (e) {} }
+})(hud);
+
+// ---------- champ de texte HTML (ajout d'ami, message) ----------
+let FRO = null;
+function frInput() {
+  if (FRO) return FRO;
+  FRO = document.createElement('input'); FRO.id = 'fro'; FRO.maxLength = 200; FRO.autocomplete = 'off';
+  FRO.style.cssText = 'position:fixed;z-index:6;border:0;outline:0;background:transparent;color:#fff;font-family:Inter,system-ui,sans-serif;font-weight:800;padding:0 18px;box-sizing:border-box';
+  ['keydown', 'keyup', 'keypress'].forEach(ev => FRO.addEventListener(ev, e => { e.stopPropagation(); if (ev === 'keydown' && e.key === 'Enter') act(G.screen === 'fchat' ? 'fcSend' : 'frAdd'); if (ev === 'keydown' && e.key === 'Escape') FRO.blur(); }));
+  document.body.appendChild(FRO); return FRO;
+}
+setInterval(() => {
+  const rect = G.screen === 'fchat' ? FR.chatRect : G.screen === 'friends' && FR.tab === 'add' && FR.data && frOn() ? FR.addRect : null;
+  if (!rect || (typeof MO !== 'undefined' && MO)) { if (FRO && FRO.style.display !== 'none') { FRO.style.display = 'none'; FRO.blur(); } return; }
+  const o = frInput(), r = cv.getBoundingClientRect(), k = r.width / W, mode = G.screen;
+  if (o.dataset.mode !== mode) { o.dataset.mode = mode; o.value = ''; o.placeholder = mode === 'fchat' ? tr('Écris un message…') : tr('Code ami ou pseudo'); o.maxLength = mode === 'fchat' ? 200 : 20; }
+  o.style.display = 'block'; o.style.left = (r.left + rect[0] * k) + 'px'; o.style.top = (r.top + rect[1] * k) + 'px'; o.style.width = (rect[2] * k) + 'px'; o.style.height = (rect[3] * k) + 'px'; o.style.setProperty('font-size', Math.max(16, 28 * k) + 'px', 'important');
+}, 100);
+const frStyle = document.createElement('style'); frStyle.textContent = '#fro::placeholder{color:rgba(255,255,255,.45)}'; document.head.appendChild(frStyle);
+
+// ---------- actions ----------
+async function frDo(fn, okMsg) { if (FR.busy) return; FR.busy = true; try { const r = await fn(); if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg, '#3cf29b'); await frRefresh(true); } catch (e) { toast(e.message, '#ff6b5b'); } FR.busy = false; }
+async function frDuel(name) {
+  const f = FR.data && FR.data.friends.find(q => q.name === name); if (!f) return;
+  const td = frTdWith(name); if (td) { TD.cur = td.r.code; G.screen = 'tdRoom'; tdListen(td.r.code); tdRefresh(true); return; }
+  if (frOnline(f)) {   // en ligne : duel en direct, il reçoit l'invitation tout de suite
+    const code = newCode();
+    try { await FRB.send(name, 'duel', '', { m: 'live', room: code }); } catch (e) { return toast(e.message, '#ff6b5b'); }
+    G.mode = 'live'; liveConnect(code, true); LV.msg = `Invitation envoyée à ${name} · en attente…`; return;
+  }
+  if (FR.busy) return; FR.busy = true;   // hors ligne : duel chacun son tour, il jouera quand il reviendra
+  try { const d = await TDB.create(playerName() || FR.data.name); tdMine().push({ code: d.code, token: d.token, me: d.me }); writeSave(save);
+    await FRB.send(name, 'duel', '', { m: 'td', code: d.code }); TD.cur = d.code; TD.msg = ''; G.screen = 'tdRoom'; tdListen(d.code); tdRefresh(true).then(tdPing);
+    toast(`Défi envoyé à ${name} : joue ton premier lancer !`, '#b58bff');
+  } catch (e) { toast(e.message, '#ff6b5b'); }
+  FR.busy = false;
+}
+async function frAccept(id) {
+  const d = FR.data, iv = d && d.invites.find(q => q.id === id) || (FR.msgs.find(m => m.id === id) || {}); const p = iv.p; if (!p) return;
+  try { await FRB.invite(id, true); } catch (e) { return toast(e.message, '#ff6b5b'); }
+  if (p.m === 'live') { G.mode = 'live'; liveConnect(p.room, false); return; }
+  if (tdEntry(p.code)) { TD.cur = p.code; G.screen = 'tdRoom'; tdListen(p.code); tdRefresh(true); return; }
+  try { const r = await TDB.join(p.code, playerName() || d.name); tdMine().push({ code: r.code, token: r.token, me: r.me }); writeSave(save); TD.cur = r.code; TD.msg = ''; G.screen = 'tdRoom'; tdListen(r.code); tdRefresh(true).then(tdPing); }
+  catch (e) { toast(e.message, '#ff6b5b'); }
+}
+async function frSend(k, body, p) {
+  if (!FR.chat) return; if (Date.now() - (FR.lastSend || 0) < 700) return; FR.lastSend = Date.now();
+  try { const m = await FRB.send(FR.chat, k, body, p); if (!FR.msgs.some(q => q.id === m.id)) FR.msgs.push(m); FR.lastId = Math.max(FR.lastId, m.id); FR.scroll = 0;
+    if (m.x) toast(m.x === 'perso' ? 'Message masqué : ne partage pas tes coordonnées' : 'Message masqué : propos inappropriés', '#ffd447');
+  } catch (e) { toast(e.message, '#ff6b5b'); }
+}
+function frShareLink() { const code = FR.data && FR.data.code; return `${location.origin}${location.pathname}?ami=${encodeURIComponent(code || '')}`; }
+act = (prev => function (id) {
+  let mt;
+  if (id === 'friends') { sfx.click(); FR.tab = FR.data && FR.data.req_in.length && !FR.data.friends.length ? 'req' : 'list'; FR.page = 0; G.screen = 'friends'; frRefresh(true); return; }
+  if (id === 'frBack') { sfx.click(); G.screen = 'title'; return; }
+  if (id === 'fcBack') { sfx.click(); FR.chat = null; G.screen = 'friends'; frRefresh(true); return; }
+  if (id === 'frRetry') { sfx.click(); FR.err = ''; frRefresh(true); return; }
+  if ((mt = id.match(/^frTab:(\w+)$/))) { sfx.click(); FR.tab = mt[1]; return; }
+  if ((mt = id.match(/^frPage:(-?1)$/))) { sfx.click(); FR.page = Math.max(0, FR.page + +mt[1]); return; }
+  if ((mt = id.match(/^frOpen:(.+)$/))) { sfx.click(); FR.chat = mt[1]; G.screen = 'fchat'; frLoadMsgs(true).then(() => frRefresh(true)); return; }
+  if ((mt = id.match(/^frDuel:(.+)$/))) { sfx.click(); frDuel(mt[1]); return; }
+  if ((mt = id.match(/^frTurn:(\w+)$/))) { sfx.click(); TD.cur = mt[1]; G.screen = 'tdRoom'; tdListen(mt[1]); tdRefresh(true); return; }
+  if ((mt = id.match(/^frInv:(\d+)$/))) { sfx.click(); frAccept(+mt[1]); return; }
+  if ((mt = id.match(/^frInvNo:(\d+)$/))) { sfx.click(); frDo(() => FRB.invite(+mt[1], false)); return; }
+  if ((mt = id.match(/^frAcc:(.+)$/))) { sfx.click(); frDo(() => FRB.answer(mt[1], true), `${mt[1]} est maintenant ton ami !`); return; }
+  if ((mt = id.match(/^frDec:(.+)$/))) { sfx.click(); frDo(() => FRB.answer(mt[1], false)); return; }
+  if ((mt = id.match(/^frAddN:(.+)$/))) { sfx.click(); frDo(() => FRB.add(mt[1]), r => r.st === 'friends' ? `${r.name} est maintenant ton ami !` : `Demande envoyée à ${r.name}`); return; }
+  if (id === 'frAdd') { sfx.click(); const q = (FRO && FRO.value || '').trim(); if (q.length < 2) return toast('Entre un code ami ou un pseudo', '#ffd447'); frDo(() => FRB.add(q), r => r.st === 'friends' ? `${r.name} est maintenant ton ami !` : `Demande envoyée à ${r.name}`).then(() => { if (FRO) FRO.value = ''; }); return; }
+  if (id === 'frCopy') { sfx.click(); const s = FR.data ? FR.data.code : ''; try { navigator.clipboard.writeText(s).then(() => toast('Code copié : ' + s, '#6fb1ff'), () => toast('Ton code : ' + s, '#6fb1ff')); } catch (e) { toast('Ton code : ' + s, '#6fb1ff'); } return; }
+  if (id === 'frShare') { sfx.click(); const link = frShareLink(), text = `Ajoute-moi en ami sur PILE POIL 🏗️ Mon code : ${FR.data ? FR.data.code : ''}`;
+    if (navigator.share) navigator.share({ title: 'PILE POIL', text, url: link }).catch(() => {}); else { try { navigator.clipboard.writeText(text + ' ' + link).then(() => toast('Lien copié : envoie-le à tes amis', '#6fb1ff')); } catch (e) { toast(link, '#6fb1ff'); } } return; }
+  if (id === 'fcSend') { const v = (FRO && FRO.value || '').trim(); if (!v) return; sfx.click(); FRO.value = ''; frSend('txt', v); return; }
+  if ((mt = id.match(/^fcQ:(\d)$/))) { sfx.click(); frSend('txt', tr(QFR[+mt[1]][0])); return; }
+  if ((mt = id.match(/^fcE:(\d)$/))) { sfx.click(); frSend('emo', ECHAT[+mt[1]][1]); return; }
+  if (id === 'fcPose') { sfx.click(); const lp = frLastPose(); if (lp) frSend('pose', '', { n: lp.n, reg: lp.reg, img: lp.img }); return; }
+  if (id === 'fcMenu') { sfx.click(); FR.menu = !FR.menu; return; }
+  if (id === 'fcRemove' || id === 'fcBlock') { const n = FR.chat, bl = id === 'fcBlock'; FR.menu = false;
+    return modal({ title: bl ? `BLOQUER ${n.toUpperCase()} ?` : `RETIRER ${n.toUpperCase()} ?`, lines: bl ? ['Il ne pourra plus t\'ajouter ni t\'écrire.', 'Votre conversation sera effacée.'] : ['Vous ne serez plus amis.', 'Vous pourrez vous rajouter plus tard.'], yes: bl ? 'BLOQUER' : 'RETIRER', no: 'ANNULER',
+      onYes: () => frDo(() => FRB.remove(n, bl), bl ? `${n} est bloqué` : `${n} retiré de tes amis`).then(() => { FR.chat = null; G.screen = 'friends'; }) }); }
+  if (FR.menu && id !== 'fcMenu') FR.menu = false;
+  return prev(id);
+})(act);
+drawOnline = (prev => function () { if (G.screen === 'friends') drawFriends(); else if (G.screen === 'fchat') drawFChat(); else prev(); })(drawOnline);
+addEventListener('keydown', ev => { if (ev.key !== 'Escape' || (typeof MO !== 'undefined' && MO)) return; if (G.screen === 'fchat') act('fcBack'); else if (G.screen === 'friends') act('frBack'); });
+cv.addEventListener('wheel', e => { if (G.screen !== 'fchat') return; e.preventDefault(); FR.scroll = Math.max(0, FR.scroll - e.deltaY); }, { passive: false });
+// adversaires récents en direct → suggestions d'amis
+liveCountdown = (prev => function (seed) { if (LV.opp && LV.opp.name) { save.recentOpp = [...(save.recentOpp || []).filter(n => n !== LV.opp.name), LV.opp.name].slice(-8); } return prev(seed); })(liveCountdown);
+// lien reçu : ?ami=CODE
+(function () {
+  const code = (new URLSearchParams(location.search).get('ami') || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 9); if (!code) return;
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => { FR.tab = 'add'; G.screen = 'friends'; if (frOn()) { frRefresh(true).then(() => frDo(() => FRB.add(code), r => r.st === 'friends' ? `${r.name} est maintenant ton ami !` : `Demande envoyée à ${r.name}`)); } else FR.pendingCode = code; }, 600);
+})();
+
+Object.assign(EN, {
+  'MES AMIS': 'MY FRIENDS', 'Amis': 'Friends', 'Joue avec tes potes': 'Play with your mates', 'Ajouter +': 'Add +', 'CLASSEMENT ENTRE AMIS': 'FRIENDS LEADERBOARD', 'Défi du jour · aujourd\'hui': 'Daily challenge · today', 'Toi': 'You',
+  'INVITATION REÇUE': 'INVITE RECEIVED', 'te défie en duel en direct': 'challenges you to a live duel', 'te défie · chacun son tour': 'challenges you · turn by turn', '✓ ACCEPTER': '✓ ACCEPT', 'Plus tard': 'Later',
+  'TON CODE AMI': 'YOUR FRIEND CODE', '📤 PARTAGER': '📤 SHARE', '📋 Copier': '📋 Copy', '📤 PARTAGER MON LIEN': '📤 SHARE MY LINK', 'Seuls tes amis peuvent t\'écrire ou te défier.': 'Only your friends can message or challenge you.',
+  '⚔ DUEL': '⚔ DUEL', '⚔ DÉFIER': '⚔ CHALLENGE', '▶ JOUER MON TOUR': '▶ PLAY MY TURN', 'À ton tour dans votre duel': 'Your turn in your duel', 'Pas encore d\'amis': 'No friends yet', 'AJOUTER UN AMI': 'ADD A FRIEND',
+  'Envoie ton code ami ou ajoute quelqu\'un avec son code ou son pseudo.': 'Share your friend code or add someone with their code or username.',
+  'DEMANDES REÇUES': 'REQUESTS RECEIVED', 'DEMANDES ENVOYÉES': 'REQUESTS SENT', 'Aucune demande pour l\'instant.': 'No requests yet.', 'Aucune demande en attente.': 'No pending requests.', 'en attente…': 'pending…', 'veut être ton ami': 'wants to be your friend',
+  'Personne ne peut t\'écrire ou te défier sans être ton ami. Tu peux retirer ou bloquer quelqu\'un à tout moment.': 'Nobody can message or challenge you unless they are your friend. You can remove or block anyone at any time.',
+  'Donne-le à tes amis pour qu\'ils t\'ajoutent': 'Give it to your friends so they can add you', 'AJOUTER QUELQU\'UN': 'ADD SOMEONE', 'Avec son code ami (ex. LUCA-2Q9) ou son pseudo': 'With their friend code (e.g. LUCA-2Q9) or username', 'AJOUTER': 'ADD',
+  'Il recevra une demande : vous serez amis quand il l\'acceptera.': 'They get a request: you become friends once they accept.', 'SUGGESTIONS': 'SUGGESTIONS', 'Tes derniers adversaires en duel': 'Your latest duel opponents', 'Joue des duels : tes adversaires apparaîtront ici.': 'Play duels: your opponents will show up here.', '+ Ajouter': '+ Add',
+  'ENVOYER': 'SEND', '⚔ DÉFIER EN DUEL': '⚔ CHALLENGE TO A DUEL', 'Écris un message…': 'Write a message…', 'Code ami ou pseudo': 'Friend code or username', '🛡 Discussion protégée': '🛡 Protected chat',
+  'Seuls tes amis peuvent t\'écrire.': 'Only your friends can message you.', 'Insultes et propos déplacés sont masqués.': 'Insults and inappropriate words are hidden.', 'Numéros, adresses, réseaux et liens aussi :': 'Phone numbers, addresses, socials and links too:', 'ne donne jamais tes coordonnées.': 'never share your contact details.', 'Les messages s\'effacent après 7 jours.': 'Messages are deleted after 7 days.', 'Un souci ? ⋯ → Bloquer.': 'A problem? ⋯ → Block.',
+  '🙈 Message masqué : pas de coordonnées ni de liens': '🙈 Hidden message: no contact details or links', '🙈 Message masqué : propos inappropriés': '🙈 Hidden message: inappropriate words', '📸 Fais un PILE POIL pour partager ta pose': '📸 Land a PILE POIL to share your shot',
+  '⏰ Ton tour !': '⏰ Your turn!', '🏆 Bats mon score': '🏆 Beat my score', 'Joue avec tes amis': 'Play with your friends', 'Les amis sont disponibles dans la version en ligne du jeu :': 'Friends are available in the online version of the game:',
+  'Tes amis t\'attendent': 'Your friends are waiting', 'CRÉER MON COMPTE': 'CREATE MY ACCOUNT', 'Crée ton compte (pseudo + mot de passe) pour avoir ton code ami,': 'Create your account (username + password) to get your friend code,', 'ajouter tes potes, les défier en duel et discuter avec eux.': 'add your mates, challenge them and chat with them.',
+  'Chargement de tes amis…': 'Loading your friends…', 'RÉESSAYER': 'RETRY', 'Les amis arrivent très bientôt !': 'Friends are coming very soon!', 'Personne n\'a encore joué le défi du jour.': 'Nobody has played the daily challenge yet.', 'en ligne': 'online', 'vu hier': 'seen yesterday', 'vu la semaine dernière': 'seen last week', 'vu il y a longtemps': 'seen a long time ago',
+  'Accepté ✓': 'Accepted ✓', 'Refusé': 'Declined', 'Expirée': 'Expired', 'En attente…': 'Waiting…', 'BLOQUER': 'BLOCK', 'RETIRER': 'REMOVE', 'Retirer : vous ne serez plus amis.': 'Remove: you will no longer be friends.', 'Bloquer : il ne pourra plus t\'ajouter ni t\'écrire.': 'Block: they can no longer add or message you.',
+});
+EN_RX.push([/^(\d+) en ligne$/, '$1 online'], [/^(\d+) amis?$/, '$1 friend(s)'], [/^Amis · (\d+)$/, 'Friends · $1'], [/^Demandes · (\d+)$/, 'Requests · $1'], [/^En ligne · (.*)$/, 'Online · $1'], [/^vu il y a (\d+) min$/, 'seen $1 min ago'], [/^vu il y a (\d+) h$/, 'seen $1 h ago'], [/^vu il y a (\d+) jours$/, 'seen $1 days ago'],
+  [/^Dis bonjour à (.*) 👋$/, 'Say hi to $1 👋'], [/^Niveau (\d+) en carrière$/, 'Career level $1'], [/^📸 Partager ma dernière pose parfaite \(niv\. (\d+)\)$/, '📸 Share my last perfect shot (lvl $1)']);
 
 // =====================================================================
 //  PILE POIL — pages légales (mentions, conditions de vente, confidentialité)
