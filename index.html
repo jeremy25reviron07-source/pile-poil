@@ -9224,7 +9224,7 @@ const canInstall = () => !STANDALONE() && (IOS || PWA_PROMPT) && location.protoc
 drawTitle = (prev => function () {
   prev();
   if (!canInstall() || MI.open || MI.slide > 0) return;
-  const x = 40 + (window.ACC_CHIP_W || 260) + 14 + 236 + 14, y = 40, w = 196, h = 72;
+  const x = 40 + (window.ACC_CHIP_W || 260) + 14 + 236 + 14 + 236 + 14, y = 40, w = 196, h = 72;
   chip(x, y, w, h); if (hov(x, y, w, h)) { rr(x, y, w, h, h / 2); c.fillStyle = 'rgba(255,255,255,.06)'; c.fill(); }
   rr(x + 22, y + 18, 24, 38, 6); c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke(); ln(x + 34, y + 26, x + 34, y + 44, '#ffc21a', 3); ln(x + 28, y + 38, x + 34, y + 44, '#ffc21a', 3); ln(x + 40, y + 38, x + 34, y + 44, '#ffc21a', 3);
   txt('Installer', x + 62, y + 34, PAL.text, 22, 900); txt("l'application", x + 62, y + 58, PAL.sub, 16, 800);
@@ -9785,7 +9785,7 @@ function amisChip() {
   [[-8, 0, '#ffc21a'], [8, 3, '#6fb1ff']].forEach(([dx, dy, col]) => { ell(x + 38 + dx, y + 30 + dy, 6.5, 6.5, col); c.fillStyle = col; c.beginPath(); c.ellipse(x + 38 + dx, y + 47 + dy, 10, 7, 0, Math.PI, 0); c.fill(); });
   txt('Amis', x + 72, y + 34, PAL.text, 22, 900);
   const on = d ? d.friends.filter(frOnline).length : 0;
-  if (d && on) { ell(x + 79, y + 52, 5, 5, '#3cf29b'); txt(`${on} en ligne`, x + 90, y + 58, '#3cf29b', 16, 800); } else txt(d ? `${d.friends.length} ami${d.friends.length > 1 ? 's' : ''}` : 'Joue avec tes potes', x + 72, y + 58, PAL.sub, 16, 800);
+  if (d && on) { ell(x + 79, y + 52, 5, 5, '#3cf29b'); txt(`${on} en ligne`, x + 90, y + 58, '#3cf29b', 16, 800); } else txt(d ? `${d.friends.length} ami${d.friends.length > 1 ? 's' : ''}` : 'Défie tes potes', x + 72, y + 58, PAL.sub, 16, 800);
   const n = frTotalBadge(); if (n) { const pu = 1 + Math.max(0, Math.sin(G.t * 5)) * .12; c.save(); c.translate(x + w - 18, y + 14); c.scale(pu, pu); ell(0, 0, 16, 16, '#e0392b'); txt(String(Math.min(9, n)), 0, 7, '#fff', 18, 900, 'center'); c.restore(); }
   G.buttons.unshift({ id: 'friends', x, y, w, h });
 }
@@ -10052,7 +10052,7 @@ liveCountdown = (prev => function (seed) { if (LV.opp && LV.opp.name) { save.rec
 })();
 
 Object.assign(EN, {
-  'MES AMIS': 'MY FRIENDS', 'Amis': 'Friends', 'Joue avec tes potes': 'Play with your mates', 'Ajouter +': 'Add +', 'CLASSEMENT ENTRE AMIS': 'FRIENDS LEADERBOARD', 'Défi du jour · aujourd\'hui': 'Daily challenge · today', 'Toi': 'You',
+  'MES AMIS': 'MY FRIENDS', 'Amis': 'Friends', 'Défie tes potes': 'Play with your mates', 'Ajouter +': 'Add +', 'CLASSEMENT ENTRE AMIS': 'FRIENDS LEADERBOARD', 'Défi du jour · aujourd\'hui': 'Daily challenge · today', 'Toi': 'You',
   'INVITATION REÇUE': 'INVITE RECEIVED', 'te défie en duel en direct': 'challenges you to a live duel', 'te défie · chacun son tour': 'challenges you · turn by turn', '✓ ACCEPTER': '✓ ACCEPT', 'Plus tard': 'Later',
   'TON CODE AMI': 'YOUR FRIEND CODE', '📤 PARTAGER': '📤 SHARE', '📋 Copier': '📋 Copy', '📤 PARTAGER MON LIEN': '📤 SHARE MY LINK', 'Seuls tes amis peuvent t\'écrire ou te défier.': 'Only your friends can message or challenge you.',
   '⚔ DUEL': '⚔ DUEL', '⚔ DÉFIER': '⚔ CHALLENGE', '▶ JOUER MON TOUR': '▶ PLAY MY TURN', 'À ton tour dans votre duel': 'Your turn in your duel', 'Pas encore d\'amis': 'No friends yet', 'AJOUTER UN AMI': 'ADD A FRIEND',
