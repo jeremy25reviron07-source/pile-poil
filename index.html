@@ -5934,9 +5934,10 @@ function wAngles(segs) { const tot = segs.reduce((a, s) => a + s[1], 0); let a =
 const WH = { cp: 0, base: 0, phase: null, rot: 0, from: 0, to: 0, t0: 0, T: 5, red: false, res: null, bres: null, stake: 0, win: -1, lastSeg: -1, flick: 0, busy: false };
 
 // ---------- serveur (ou démo locale) ----------
+const wCode = () => WH.cp + ({ fr: 0, jp: 100, eg: 200 }[window.REGION] || 0);   // chaque pays a ses propres paliers de roue
 async function wheelSpinRPC(kind, stake) {
-  if (SB) { const { data, error } = await SB.rpc('wheel_spin', { p_pid: save.pid, p_name: playerName() || ACC.name || '', p_cp: WH.cp, p_kind: kind, p_stake: stake | 0 }); if (error) throw new Error(error.message); return data; }
-  const k = 'ppdemo_wheel_' + WH.cp + '_' + kind; if (localStorage.getItem(k)) throw new Error('Roue déjà tournée pour ce checkpoint');
+  if (SB) { const { data, error } = await SB.rpc('wheel_spin', { p_pid: save.pid, p_name: playerName() || ACC.name || '', p_cp: wCode(), p_kind: kind, p_stake: stake | 0 }); if (error) throw new Error(error.message); return data; }
+  const k = 'ppdemo_wheel_' + wCode() + '_' + kind; if (localStorage.getItem(k)) throw new Error('Roue déjà tournée pour ce checkpoint');
   const r = Math.floor(Math.random() * 10000), base = kind === 'free' ? WHEEL_BASE[WH.cp] : Math.max(0, Math.min(600, stake | 0));
   const T2 = kind === 'free' ? [[1200, 0], [2870, .25], [5070, .5], [7470, 1], [8970, 2], [9670, 5], [9970, 10], [1e9, 100]] : [[3040, 0], [4440, .25], [6240, .5], [8240, 1], [9440, 2], [9840, 5], [9990, 10], [1e9, 100]];
   const mult = T2.find(([l]) => r < l)[1]; try { localStorage.setItem(k, '1'); } catch (e) {}
@@ -6110,7 +6111,7 @@ drawOnline = (prev => function () { if (G.screen === 'wheel') drawWheel(); else 
 async function wLaunch() {
   if (WH.phase !== 'intro' || WH.busy) return; WH.busy = true;
   try { const r = await wheelSpinRPC('free', 0); WH.res = r; if (r.win) { save.coins += r.win; writeSave(save); } WH.phase = 'spin'; wStartSpin(W_FREE, r.mult); }
-  catch (er) { toast(er.message, '#ff6b5b'); wFinish(); }
+  catch (er) { const used = /déjà/.test(er.message); wFinish(); modal({ title: used ? 'ROUE DÉJÀ TOURNÉE' : 'ROUE INDISPONIBLE', lines: used ? ['Tu as déjà tourné la roue de ce palier.', 'Elle ne se tourne qu\'une fois par palier et par pays.'] : ['La roue n\'a pas pu être lancée (connexion).', er.message], yes: 'CONTINUER', no: null }); }
   WH.busy = false;
 }
 async function wBet() {
