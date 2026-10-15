@@ -82,7 +82,7 @@ create or replace function push_due(p_hour int) returns setof jsonb
 language plpgsql security definer set search_path = public as $$
 declare s push_subs; d date := push_today(); inactif int; msg jsonb; du td_duels; adv text; n int; f text; cr crates;
 begin
-  if p_hour < 9 or p_hour >= 21 then return; end if;                       -- jamais la nuit
+  if p_hour is null or p_hour < 9 or p_hour >= 21 then return; end if;     -- jamais la nuit
   for s in select * from push_subs where last_sent is distinct from d loop     -- 1 par jour maximum
     msg := null; inactif := coalesce(d - s.last_play, 0);
     if inactif > 30 then continue; end if;
@@ -168,3 +168,11 @@ select cron.schedule('pilepoil-notifs', '2 * * * *', $cron$
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-key', (select cron_key from public.push_keys where id = 1)),
     body := '{}'::jsonb, timeout_milliseconds := 30000)
 $cron$);
+
+-- notification d'essai (déclenchée à la main, ne compte pas dans « 1 par jour »)
+create or replace function push_test(p_pid text) returns setof jsonb language sql security definer set search_path = public as $$
+  select jsonb_build_object('kind','test','title','Ta caisse du jour t''attend 🎁','body','Notification d''essai PILE POIL : tout fonctionne !','url','/','tag','test','state','{}'::jsonb,
+    'pid', pid, 'endpoint', endpoint, 'p256dh', p256dh, 'auth', auth) from push_subs where pid = p_pid
+$$;
+revoke all on function push_test(text) from public;
+grant execute on function push_test(text) to service_role;
