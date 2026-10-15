@@ -1,6 +1,22 @@
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Pile Poil</title>
+<script>
+// lien partagé (?p=CODE) : un nouveau joueur découvre d'abord le site vitrine, un joueur connu reste dans le jeu
+(function () { try {
+  var q = location.search, m = /[?&]p=([A-Za-z0-9-]{7,9})(&|$)/.exec(q); if ((!m && !/[?&]via=partage/.test(q)) || /[?&](duel|salle|tour|ami|achat)=/.test(q)) return;
+  var a = JSON.parse(localStorage.getItem('pilepoil_compte') || '{}') || {}, s = JSON.parse(localStorage.getItem('pilepoil_v1') || '{}') || {};
+  var connu = !!a.token || (s.maxLevel || 1) > 1 || !!s.tuto || (s.coins || 0) > 0 || Object.keys(s.lvl || {}).length > 0;
+  if (!connu) location.replace('https://pilepoil.lovable.app/' + (m ? '?p=' + encodeURIComponent(m[1]) : ''));
+} catch (e) {} })();
+</script>
+<meta name="description" content="Lâche la charge pile poil dans la fouille. Jeu de grue gratuit, sans téléchargement : 150 chantiers, duels entre amis.">
+<meta property="og:title" content="PILE POIL — le jeu de grue gratuit">
+<meta property="og:description" content="150 chantiers, des duels entre amis : est-ce que ça tombe pile poil ?">
+<meta property="og:image" content="https://pilepoil.lovable.app/img/partage.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PILE POIL"><meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1154,7 +1170,7 @@ function towerCrane2(o) {
   rr(cx0 + 4, jt + 36, 120, 110, 4); c.fillStyle = lg(cx0, 0, cx0 + 120, 0, [[0, '#b5bcc4'], [1, '#7d858f']]); c.fill(); for (let k = 1; k < 4; k++) fillR(cx0 + 4, jt + 36 + k * 27, 120, 2, 'rgba(0,0,0,.25)'); ell(cx0 + 64, jt + 44, 4, 4, '#4a5058');
   rr(cx1 - 120, jt - 4, 64, 26, 4); c.fillStyle = '#5b636e'; c.fill(); ell(cx1 - 104, jt + 9, 11, 11, '#3a3f46'); ell(cx1 - 104, jt + 9, 6, 6, '#8a929c'); for (let k = -8; k <= 8; k += 3) ln(cx1 - 104 + k, jt - 1, cx1 - 104 + k, jt + 19, 'rgba(200,205,210,.5)', 1);
   rr(cx1 - 48, jt - 8, 34, 30, 3); c.fillStyle = '#d9dee4'; c.fill(); fillR(cx1 - 44, jt - 2, 10, 4, '#e8483b');
-  rr(cx0 + 130, jt + 1, 110, 20, 2); c.fillStyle = '#ffc21a'; c.fill(); c.strokeStyle = '#1a1300'; c.lineWidth = 1.5; c.stroke(); { let fs = 13; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > 102 && fs > 8) { fs--; c.font = `900 ${fs}px Inter`; } txt(companyName(), cx0 + 185, jt + 16, '#1a1300', fs, 900, 'center'); }
+  companySign(cx0 + 130, jt + 1, 110);
   // câble de levage le long de la flèche
   ln(cx1 - 104, jt + 9, jibR - 10, jt + jh - 2, 'rgba(40,44,50,.55)', 1.5);
   // cabine (le grutier est ajouté en dynamique)
@@ -2589,7 +2605,7 @@ function frame(now) {
   else if (G.screen === 'checkpoint') drawCheckpoint();
   else if (G.screen === 'gameover') drawGameOver();
   else if (G.screen === 'victory') drawVictory();
-  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate', 'wheel', 'epreuves', 'survEnd', 'survPalier', 'regions', 'jpmap', 'egmap', 'profile', 'friends', 'fchat'].includes(G.screen)) drawOnline();
+  else if (['runEnd', 'board', 'duelIntro', 'liveLobby', 'liveCount', 'liveEnd', 'garage', 'shop', 'settings', 'defis', 'levels', 'career', 'tdRoom', 'tdForm', 'crate', 'wheel', 'epreuves', 'survEnd', 'survPalier', 'regions', 'jpmap', 'egmap', 'profile', 'friends', 'fchat', 'parrain'].includes(G.screen)) drawOnline();
   else if (G.screen === 'play' && L) {
     if (!G.paused) {
       L.time += dt;
@@ -2686,7 +2702,7 @@ async function submitRun() {
       ON.msg = me > him ? `Victoire ! ${me.toLocaleString('fr-FR')} contre ${him.toLocaleString('fr-FR')}` : me < him ? `Défaite : ${r.name} garde l'avantage` : 'Égalité parfaite';
     } else {
       const r = await api('/duel', { method: 'POST', body: JSON.stringify(body) });
-      ON.link = `${location.origin}${location.pathname}?duel=${r.id}`; ON.msg = 'Duel créé : envoie le lien à ton adversaire';
+      ON.link = `${location.origin}${location.pathname}?duel=${r.id}` + (typeof refQ === 'function' ? refQ('&') : ''); ON.msg = 'Duel créé : envoie le lien à ton adversaire';
     }
     ON.submitted = true;
   } catch (e) { ON.msg = e.message; }
@@ -2938,7 +2954,7 @@ function showLiveOverlay() {
   const o = liveOverlayEl(); o.hidden = false; const inRoom = LV.phase === 'lobby';
   if (!o.querySelector('#lvName').value) o.querySelector('#lvName').value = playerName();
   ['#lvName', '#lvCreate', '#lvCode', '#lvJoin'].forEach(s => o.querySelector(s).hidden = inRoom);
-  const link = `${location.origin}${location.pathname}?salle=${LV.code}`;
+  const link = `${location.origin}${location.pathname}?salle=${LV.code}` + (typeof refQ === 'function' ? refQ('&') : '');
   o.querySelector('#lvLink').hidden = !(inRoom && LV.host); o.querySelector('#lvLink').textContent = link; o.querySelector('#lvCopy').hidden = !(inRoom && LV.host);
 }
 function hideLiveOverlay() { if (LVO) LVO.hidden = true; }
@@ -3606,7 +3622,7 @@ function drawModels(slot) {
 }
 function wrapText(s, x, y, maxW, lh, col, size) { c.font = `700 ${size}px Inter`; let line = '', yy = y; s.split(' ').forEach(w => { const t = line ? line + ' ' + w : w; if (c.measureText(t).width > maxW) { txt(line, x, yy, col, size, 700); line = w; yy += lh; } else line = t; }); if (line) txt(line, x, yy, col, size, 700); }
 // catégories de peintures et de tenues (pour ne pas tout afficher d'un coup)
-const skCat = sk => sk.jp ? 'jp' : sk.eg ? 'eg' : (sk.crate || sk.shop) ? 'spe' : 'base';
+const skCat = sk => sk.jp ? 'jp' : sk.eg ? 'eg' : (sk.crate || sk.shop || sk.ref) ? 'spe' : 'base';
 const ofCat = o => o.jp ? 'jp' : o.eg ? 'eg' : 'base';
 const SK_CATS = [['base', 'Classiques', '#9fd6ff'], ['spe', 'Spéciales', '#39ff9f'], ['jp', '🗾 Japon', '#ff7aa8'], ['eg', '🐫 Égypte', '#ffcf6a']];
 const OF_CATS = [['base', 'Classiques', '#9fd6ff'], ['jp', '🗾 Japon', '#ff7aa8'], ['eg', '🐫 Égypte', '#ffcf6a']];
@@ -3628,7 +3644,7 @@ function drawStyle() {
     c.strokeStyle = sk.dark; c.lineWidth = 3; c.beginPath(); for (let xx = sx; xx < sx + w - 70; xx += 24) { c.moveTo(xx, sy + 36); c.lineTo(xx + 12, sy + 5); c.lineTo(xx + 24, sy + 36); } c.stroke();
     rr(x + w / 2 - 22, sy + 48, 44, 16, 4); c.fillStyle = sk.trolley; c.fill();
     txt(sk.name, x + w / 2, y + 110, '#fff', 20, 800, 'center');
-    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 138, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 138, '#9fd6ff', 17, 900, 'center'); else if (sk.eg) txt('Boss de zone', x + w / 2, y + 138, '#ffcf6a', 16, 900, 'center'); else if (sk.jp) txt('Boss de zone', x + w / 2, y + 138, '#ff7aa8', 16, 900, 'center'); else if (sk.crate) txt('🎁 CAISSE', x + w / 2, y + 138, '#39ff9f', 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 138, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 140, sk.price, save.coins >= sk.price, 18);
+    if (eq) txt('ÉQUIPÉE', x + w / 2, y + 138, '#3cf29b', 17, 900, 'center'); else if (own) txt('ÉQUIPER', x + w / 2, y + 138, '#9fd6ff', 17, 900, 'center'); else if (sk.eg) txt('Boss de zone', x + w / 2, y + 138, '#ffcf6a', 16, 900, 'center'); else if (sk.jp) txt('Boss de zone', x + w / 2, y + 138, '#ff7aa8', 16, 900, 'center'); else if (sk.ref) txt(`PARRAINAGE · ${sk.ref} AMI${sk.ref > 1 ? 'S' : ''}`, x + w / 2, y + 138, '#3cf29b', 15, 900, 'center'); else if (sk.crate) txt('🎁 CAISSE', x + w / 2, y + 138, '#39ff9f', 17, 900, 'center'); else if (sk.shop) txt('★ BOUTIQUE', x + w / 2, y + 138, '#ffd447', 17, 900, 'center'); else price(x + w / 2 - 40, y + 140, sk.price, save.coins >= sk.price, 18);
     G.buttons.push({ id: 'sk_' + sk.id, x, y, w, h });
   });
   // nom de l'entreprise
@@ -4313,7 +4329,7 @@ function purchaseInfo(id) {
   let mt;
   if ((mt = id.match(/^buy_(\w+)_(\w+)$/))) { const m = modelOf(mt[1], mt[2]); if (save.owned.includes(m.id) || (save.maxLevel || 1) < m.req) return null; return { name: m.name, price: m.price }; }
   if ((mt = id.match(/^up_(\w+)_(\w+)$/))) { const cost = upgCost(mt[1], mt[2]); if (!cost) return null; const m = modelOf(mt[1], mt[2]); return { name: `Amélioration ${(save.clvl[m.id] || 0) + 1}/3 · ${m.name}`, price: cost }; }
-  if (id.startsWith('sk_')) { const sk = SKINS.find(s => s.id === id.slice(3)); if (!sk || save.skins.includes(sk.id)) return null; return sk.crate ? { name: `Peinture ${sk.name}`, crateOnly: true } : sk.shop ? { name: `Peinture ${sk.name}`, shopOnly: true } : { name: `Peinture ${sk.name}`, price: sk.price }; }
+  if (id.startsWith('sk_')) { const sk = SKINS.find(s => s.id === id.slice(3)); if (!sk || save.skins.includes(sk.id)) return null; return sk.ref ? { name: `Peinture ${sk.name}`, refOnly: sk.ref } : sk.crate ? { name: `Peinture ${sk.name}`, crateOnly: true } : sk.shop ? { name: `Peinture ${sk.name}`, shopOnly: true } : { name: `Peinture ${sk.name}`, price: sk.price }; }
   if (id.startsWith('of_')) { const o = OUTFITS.find(s => s.id === id.slice(3)); if (!o || save.outfits.includes(o.id)) return null; return { name: `Tenue ${o.name}`, price: o.price }; }
   if (id.startsWith('ug_')) { const u = UPGRADES.find(s => s.id === id.slice(3)); if (!u || hasUpg(u.id)) return null; return { name: u.name, price: u.price }; }
   return null;
@@ -4328,9 +4344,10 @@ act = (prev => function (id) {
   if (id.startsWith('of_buy_')) return askPay(OFFERS.find(o => o.id === id.slice(7)));
   const info = purchaseInfo(id);
   if (info && !SH.confirmed) {
+    if (info.refOnly) return refExclu(info.name, info.refOnly);
     if (info.crateOnly) return modal({ title: 'EXCLUSIVITÉ CAISSE', lines: [`${info.name} se gagne seulement dans la caisse du chantier.`, 'Une caisse gratuite chaque jour sur l\'accueil !'], yes: 'OK', no: null });
     if (info.shopOnly) return modal({ title: 'EXCLUSIVITÉ BOUTIQUE', lines: [`${info.name} n'existe que dans le Pack Démarrage.`], yes: 'VOIR LA BOUTIQUE', onYes: () => act('shop') });
-    if (save.coins < info.price) return modal({ title: 'PIÈCES INSUFFISANTES', lines: [info.name, `Il te manque ${(info.price - save.coins).toLocaleString('fr-FR')} pièces.`, 'Continue à jouer, ou passe par la boutique.'], yes: 'BOUTIQUE', onYes: () => act('shop'), no: 'PLUS TARD' });
+    if (save.coins < info.price) { const inv = typeof refNudge === 'function' && (SB || REF_DEMO) && refNudge(); return modal({ title: 'PIÈCES INSUFFISANTES', lines: [info.name, `Il te manque ${(info.price - save.coins).toLocaleString('fr-FR')} pièces.`, inv ? 'Astuce : invite un pote, +250 pièces quand il atteint le niveau 10.' : 'Continue à jouer, ou passe par la boutique.'], yes: inv ? 'INVITER UN POTE' : 'BOUTIQUE', onYes: () => act(inv ? 'parrain' : 'shop'), no: inv && SHOP_OPEN ? 'BOUTIQUE' : 'PLUS TARD', onNo: inv && SHOP_OPEN ? () => act('shop') : null }); }
     return modal({ title: 'CONFIRMER L\'ACHAT', lines: [info.name], price: info.price, yes: 'ACHETER', onYes: () => { SH.confirmed = true; try { act(id); } finally { SH.confirmed = false; } } });
   }
   return prev(id);
@@ -4608,7 +4625,7 @@ let accImporting = false;
 function importSave(remote) {
   const keep = {}; DEVICE_KEYS.forEach(k => { if (k in save) keep[k] = save[k]; });
   Object.keys(save).forEach(k => delete save[k]); Object.assign(save, remote || {}, keep);
-  ['skins', 'owned', 'outfits', 'upg', 'cpDone'].forEach(k => { if (!Array.isArray(save[k])) save[k] = k === 'skins' ? ['jaune'] : k === 'owned' ? ['elements', 'treillis'] : k === 'outfits' ? ['classique'] : []; });
+  ['skins', 'owned', 'outfits', 'upg', 'cpDone', 'refItems'].forEach(k => { if (!Array.isArray(save[k])) save[k] = k === 'skins' ? ['jaune'] : k === 'owned' ? ['elements', 'treillis'] : k === 'outfits' ? ['classique'] : []; });
   save.coins = save.coins || 0; save.crane = save.crane || { tower: 'elements', mobile: 'treillis' }; save.clvl = save.clvl || {};
   if (!save.pid) save.pid = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
   accImporting = true; writeSave(save); accImporting = false;
@@ -4618,14 +4635,14 @@ function importSave(remote) {
 // fusion quand deux appareils ont joué en même temps : on ne perd ni objet ni progression
 function mergeSaves(local, remote, baseCoins) {
   const m = JSON.parse(JSON.stringify(remote || {}));
-  ['skins', 'owned', 'outfits', 'upg', 'cpDone'].forEach(k => { m[k] = [...new Set([...(remote[k] || []), ...(local[k] || [])])]; });
+  ['skins', 'owned', 'outfits', 'upg', 'cpDone', 'refItems'].forEach(k => { m[k] = [...new Set([...(remote[k] || []), ...(local[k] || [])])]; });
   ['maxLevel', 'best', 'checkpoint'].forEach(k => { m[k] = Math.max(remote[k] || 0, local[k] || 0) || undefined; });
   m.clvl = Object.assign({}, remote.clvl || {}); Object.entries(local.clvl || {}).forEach(([k, v]) => { m.clvl[k] = Math.max(m.clvl[k] || 0, v); });
   m.tduels = [...(remote.tduels || [])]; (local.tduels || []).forEach(d => { if (!m.tduels.some(x => x.code === d.code)) m.tduels.push(d); });
   m.lvl = Object.assign({}, remote.lvl || {}); Object.entries(local.lvl || {}).forEach(([k, v]) => { const r = m.lvl[k] || { s: 0, p: 0 }; m.lvl[k] = { s: Math.max(r.s || 0, v.s || 0), p: Math.max(r.p || 0, v.p || 0) }; });
   m.coins = Math.max(0, (remote.coins || 0) + ((local.coins || 0) - (baseCoins || 0)));
   if ((local.cbest && local.cbest.score || 0) > (remote.cbest && remote.cbest.score || 0)) m.cbest = local.cbest;
-  m.masterDone = remote.masterDone || local.masterDone; m.starterBought = remote.starterBought || local.starterBought; m.permisPrime = remote.permisPrime || local.permisPrime;
+  m.masterDone = remote.masterDone || local.masterDone; m.starterBought = remote.starterBought || local.starterBought; m.permisPrime = remote.permisPrime || local.permisPrime; ['refRecrue', 'refDone', 'refAsk10', 'refCode'].forEach(k => { m[k] = remote[k] || local[k]; }); if (!m.refDone && (local.refPending || remote.refPending)) m.refPending = local.refPending || remote.refPending;
   return m;
 }
 
@@ -5676,7 +5693,7 @@ act = (prev => function (id) {
   if (id === 'tdFormBack' || id === 'tdBack') { sfx.click(); tdUnlisten(); TD.msg = ''; G.screen = 'defis'; return; }
   if ((mt = id.match(/^tdOpen:(\w+)$/))) { sfx.click(); TD.cur = mt[1]; TD.msg = ''; G.screen = 'tdRoom'; tdListen(mt[1]); tdRefresh(true); return; }
   if (id === 'tdPlay') { sfx.click(); return tdStartTurn(); }
-  if (id === 'tdCopy') { const link = `${location.origin}${location.pathname}?tour=${TD.cur}`; try { navigator.clipboard.writeText(link).then(() => toast('Lien copié : envoie-le à ton adversaire', '#6fb1ff'), () => toast(`Code : ${TD.cur}`, '#6fb1ff')); } catch (er) { toast(`Code : ${TD.cur}`, '#6fb1ff'); } return; }
+  if (id === 'tdCopy') { const link = `${location.origin}${location.pathname}?tour=${TD.cur}` + (typeof refQ === 'function' ? refQ('&') : ''); try { navigator.clipboard.writeText(link).then(() => toast('Lien copié : envoie-le à ton adversaire', '#6fb1ff'), () => toast(`Code : ${TD.cur}`, '#6fb1ff')); } catch (er) { toast(`Code : ${TD.cur}`, '#6fb1ff'); } return; }
   // quitter pendant son lancer = lancer raté (pas d'abandon gratuit)
   if ((id === 'menu' || id === 'liveMenu') && G.mode === 'turn' && G.screen === 'play') { G.paused = false; return tdSendTurn('miss'); }
   return prev(id);
@@ -9694,8 +9711,12 @@ const TUNE = {
   dayZero: Date.UTC(2026, 9, 1),   // numéro du défi : #1 le 1er octobre 2026
 };
 function ppTrack(ev) { save.stats = save.stats || {}; save.stats[ev] = (save.stats[ev] || 0) + 1; writeSave(save); try { if (window.PP_TRACK) window.PP_TRACK(ev); } catch (e) {} }
-const ppUrl = () => location.origin + location.pathname;
+// les partages (PILE POIL, défi du jour) mènent au jeu avec le code du joueur : un nouveau venu est renvoyé vers le site vitrine
+const PP_SITE = 'https://pile-poil-jeu.netlify.app/';
+const ppRef = () => (typeof refQ === 'function' ? refQ('?') : '');
+const ppUrl = () => PP_SITE + (ppRef() || '?via=partage');
 async function ppShare({ text, file, title = 'PILE POIL' }) {
+  if (ppRef()) text += save.lang === 'en' ? '\n🎁 200 free coins with my link' : '\n🎁 200 pièces offertes avec mon lien';
   try {
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: `${text}\n${ppUrl()}`, title }); return 'shared'; }
     if (navigator.share) { await navigator.share({ text, url: ppUrl(), title }); return 'shared'; }
@@ -9826,7 +9847,7 @@ function poseImage(P) { // image 1080 × 1350, le format des réseaux
   x.textAlign = 'center'; x.font = `400 120px ${TF}`; x.lineWidth = 14; x.strokeStyle = '#4a2c00'; x.strokeText('PILE POIL !', 540, 150); x.fillStyle = '#ffc21a'; x.fillText('PILE POIL !', 540, 150);
   const where = P.zone && P.zone.name ? P.zone.name : '', reg = P.region === 'jp' ? 'Japon' : P.region === 'eg' ? 'Égypte' : 'France';
   x.font = '800 38px Inter, sans-serif'; x.fillStyle = '#fff'; x.fillText(`Niveau ${P.n} · ${reg}${where ? ' · ' + where : ''}`.slice(0, 52), 540, 1220);
-  x.font = '700 30px Inter, sans-serif'; x.fillStyle = '#ffd36a'; x.fillText(`Et toi, tu poses pile poil ? ${location.host}`, 540, 1280);
+  x.font = '700 30px Inter, sans-serif'; x.fillStyle = '#ffd36a'; x.fillText('Et toi, tu poses pile poil ? pilepoil.lovable.app', 540, 1280);
   return new Promise(res => o.toBlob(b => res(new File([b], 'pile-poil.png', { type: 'image/png' })), 'image/png'));
 }
 
@@ -9844,10 +9865,10 @@ drawRunEnd = (prev => function () {
 
 // ---------- branchements ----------
 // la photo est prise juste avant que le HUD et les boutons soient dessinés : on ne garde que le chantier
-hud = (prev => function (lvl) { const P = G.pose; if (P && !P.shot && G.t - P.t > .45 && G.screen === 'play') { const s = document.createElement('canvas'); s.width = W; s.height = H; s.getContext('2d').drawImage(cv, 0, 0); P.shot = s; } prev(lvl); })(hud);
+hud = (prev => function (lvl) { const P = G.pose; if (P && !P.shot && G.t - P.t > .45 && G.screen === 'play') { const s = document.createElement('canvas'); s.width = W; s.height = H; s.getContext('2d').drawImage(cv, 0, 0); P.shot = s; poseImage(P).then(f => { P.file = f; }).catch(() => {}); } prev(lvl); })(hud);
 drawTouch = (prev => function (lvl) { tutoUpdate(); prev(lvl); drawTuto(); drawTip(); poseChip(); })(drawTouch);
 act = (prev => function (id) {
-  if (id === 'poseShare' && G.pose && G.pose.shot) { sfx.click(); const P = G.pose; G.pose = null; ppTrack('share_pose'); poseImage(P).then(f => ppShare({ file: f, text: `J'ai posé PILE POIL au niveau ${P.n} 🎯 Tu fais mieux ?` })); return; }
+  if (id === 'poseShare' && G.pose && G.pose.shot) { sfx.click(); const P = G.pose; G.pose = null; ppTrack('share_pose'); const tx = `J'ai posé PILE POIL au niveau ${P.n} 🎯 Tu fais mieux ?`; if (P.file) ppShare({ file: P.file, text: tx }); else poseImage(P).then(f => ppShare({ file: f, text: tx })); return; }
   if (id === 'dailyShare') { sfx.click(); ppTrack('share_daily'); ppShare({ text: dailyText() }); return; }
   return prev(id);
 })(act);
@@ -10073,7 +10094,9 @@ function drawAvatarEditor() {
   const rowY = [y0 + 190, y0 + 330, y0 + 480, y0 + 660], X = x0 + 480;
   const opt = (id, x, y, sel, draw, lockG) => { const lk = lockG && g < lockG; ell(x, y, 38, 38, sel ? '#ffc21a' : 'rgba(255,255,255,.08)'); draw(x, y); if (lk) { ell(x, y, 34, 34, 'rgba(10,14,26,.7)'); icon('lock', x, y, 26, '#fff'); } if (hov(x - 40, y - 40, 80, 80) && lk) txt(`Grade ${GRADES[lockG][1]}`, x, y + 62, '#ffd447', 15, 900, 'center'); G.buttons.push({ id: lk ? 'avLock:' + lockG : id, x: x - 40, y: y - 40, w: 80, h: 80 }); };
   txt('TEINT', X, rowY[0] - 56, '#e6eef8', 20, 900); AV_SKIN.forEach((col, i) => opt('avS:' + i, X + 40 + i * 96, rowY[0], av.skin === i, (x, y) => ell(x, y, 30, 30, col)));
-  txt('CASQUE', X, rowY[1] - 56, '#e6eef8', 20, 900); AV_HELM.forEach(([col, lg2], i) => opt('avH:' + i, X + 40 + i * 88, rowY[1], av.helm === i, (x, y) => { c.fillStyle = col; c.beginPath(); c.ellipse(x, y + 8, 26, 22, 0, Math.PI, 0); c.fill(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1.5; c.stroke(); fillR(x - 32, y + 6, 64, 7, mixc(col, '#000000', .15)); }, lg2));
+  txt('CASQUE', X, rowY[1] - 56, '#e6eef8', 20, 900); { const sp = Math.min(88, 740 / Math.max(1, AV_HELM.length - 1)); AV_HELM.forEach(([col, lg2, rf], i) => { const x = X + 40 + i * sp, y = rowY[1], dh = (x, y) => { c.fillStyle = col; c.beginPath(); c.ellipse(x, y + 8, 26, 22, 0, Math.PI, 0); c.fill(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1.5; c.stroke(); fillR(x - 32, y + 6, 64, 7, mixc(col, '#000000', .15)); if (rf) { c.save(); c.translate(x, y - 2); icon('star', 0, 0, 16, rf === 'h_dore' ? '#7a4e00' : '#06402a'); c.restore(); } };
+    if (rf && !(save.refItems || []).includes(rf)) { ell(x, y, 38, 38, 'rgba(255,255,255,.08)'); dh(x, y); ell(x, y, 34, 34, 'rgba(10,14,26,.62)'); icon('lock', x, y, 24, '#fff'); if (hov(x - 40, y - 40, 80, 80)) txt('Parrainage', x, y + 62, '#3cf29b', 15, 900, 'center'); G.buttons.push({ id: 'avRef:' + rf, x: x - 40, y: y - 40, w: 80, h: 80 }); }
+    else opt('avH:' + i, x, y, av.helm === i, dh, lg2); }); }
   txt('ACCESSOIRE', X, rowY[2] - 56, '#e6eef8', 20, 900); AV_ACC.forEach(([id, n, lg2], i) => opt('avA:' + i, X + 40 + i * 120, rowY[2], av.acc === i, (x, y) => { const tmp = Object.assign({}, av, { acc: i }); c.save(); c.beginPath(); c.arc(x, y, 34, 0, 7); c.clip(); drawAvatar(x, y + 6, 40, tmp); c.restore(); }, lg2));
   AV_ACC.forEach(([, n], i) => txt(n, X + 40 + i * 120, rowY[2] + 62, '#9fb0d0', 14, 800, 'center'));
   txt('FOND', X, rowY[3] - 56, '#e6eef8', 20, 900); AV_BG.forEach(([a, b], i) => opt('avB:' + i, X + 40 + i * 96, rowY[3], av.bg === i, (x, y) => ell(x, y, 30, 30, lg(0, y - 30, 0, y + 30, [[0, a], [1, b]]))));
@@ -10682,7 +10705,7 @@ drawTitle = (prev => function () { prev(); amisChip(); })(drawTitle);
 
 // ---------- écran « Mes amis » ----------
 function frTabs() {
-  const d = FR.data, tabs = [['list', `Amis · ${d ? d.friends.length : 0}`], ['req', `Demandes · ${d ? d.req_in.length : 0}`], ['add', 'Ajouter +']];
+  const d = FR.data, tabs = [['list', `Amis · ${d ? d.friends.length : 0}`], ['req', `Demandes · ${d ? d.req_in.length : 0}`], ['add', 'Ajouter +'], ['parrain', 'Parrainage · +250']];
   let x = 470; tabs.forEach(([id, label]) => { c.font = '900 24px Inter'; const w = c.measureText(tr(label)).width + 56, on = FR.tab === id, hv = hov(x, 48, w, 56);
     rr(x, 48, w, 56, 28); c.fillStyle = on ? '#ffc21a' : hv ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.08)'; c.fill(); txt(label, x + w / 2, 85, on ? '#2a1a00' : '#fff', 24, 900, 'center');
     if (id === 'req' && d && d.req_in.length && !on) frBadge(x + w - 6, 52, d.req_in.length);
@@ -10708,7 +10731,7 @@ function drawFrList(d) {
   FR.page = Math.min(FR.page, pages - 1); frCard(x0, y0, w0, h0);
   if (!list.length) {
     T('Pas encore d\'amis', x0 + w0 / 2, y0 + 330, '#fff', 50, 'center'); txt('Envoie ton code ami ou ajoute quelqu\'un avec son code ou son pseudo.', x0 + w0 / 2, y0 + 386, PAL.sub, 24, 800, 'center');
-    frBtn('frTab:add', x0 + w0 / 2 - 220, y0 + 440, 440, 84, 'AJOUTER UN AMI', 'g');
+    frBtn('frTab:add', x0 + w0 / 2 - 460, y0 + 440, 440, 84, 'AJOUTER UN AMI', 'g'); frBtn('parrain', x0 + w0 / 2 + 20, y0 + 440, 440, 84, 'INVITER · +250', 'y');
   }
   list.slice(FR.page * rows, FR.page * rows + rows).forEach((f, i) => {
     const y = y0 + 20 + i * rh, on = frOnline(f), td = frTdWith(f.name), hv = hov(x0 + 10, y, w0 - 20, rh - 8);
@@ -11053,12 +11076,21 @@ if ((save.season || 1) < RESET_SEASON) {
 (function () {
   const PRIMES = { or: 300, argent: 200, bronze: 100 };
   let h; try { h = new URLSearchParams((location.hash || '').replace(/^#/, '')); } catch (e) { return; }
-  const tok = h.get('acc'), pm = h.get('permis');
-  if (!tok && !pm) return;
-  window.PP_ARRIVEE = true;
+  const tok = h.get('acc'), pm = h.get('permis'), pc = h.get('p');
+  if (pc) window.PP_REF = pc;   // code de parrainage transmis par le site
+  if (!tok && !pm && !pc) return;
+  if (tok || pm) window.PP_ARRIVEE = true;
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}   // le jeton ne reste pas dans l'adresse
-  const prime = () => {
+  // la prime n'est versée qu'une fois par compte : c'est le serveur qui tranche (tous appareils confondus)
+  const prime = async () => {
     if (!PRIMES[pm] || save.permisPrime) return;
+    if (typeof SB !== 'undefined' && SB && ACC.token) {
+      try {
+        const { data, error } = await SB.rpc('permis_claim', { p_token: ACC.token, p_mention: pm });
+        if (error) throw error;
+        if (!data || !data.ok) { save.permisPrime = save.permisPrime || pm; writeSave(save); setTimeout(() => toast(save.lang === 'en' ? 'Licence bonus already received on this account' : 'Prime du permis déjà reçue sur ce compte', '#ffb36b'), 1500); return; }
+      } catch (e) { if (!/schema cache|function/i.test(e.message || '')) return; }   // serveur pas à jour : contrôle local seulement
+    }
     save.permisPrime = pm; writeSave(save);
     setTimeout(() => {
       if (typeof giveCoins === 'function') giveCoins(PRIMES[pm], save.lang === 'en' ? 'crane licence bonus' : 'prime du permis de grutier');
@@ -11083,6 +11115,426 @@ if ((save.season || 1) < RESET_SEASON) {
     }
   })();
 })();
+
+// =====================================================================
+//  PILE POIL — PARRAINAGE
+//  Code de parrainage = code ami. Lien : pilepoil.lovable.app/?p=CODE (site) ou ?p=CODE sur le jeu.
+//  Filleul : +200 pièces + casque « Recrue » à l'inscription, coffre Duo (2 caisses) au niveau 10.
+//  Parrain : +250 pièces + 2 caisses par filleul arrivé au niveau 10 (20 filleuls payés max),
+//  et des récompenses exclusives par palier de filleuls actifs.
+//  Pas de bannière sur l'accueil : l'invitation apparaît là où le joueur en a besoin
+//  (pièces manquantes, objets exclusifs au garage, niveau 10, liens partagés, case Amis).
+// =====================================================================
+const REF_SITE = 'https://pilepoil.lovable.app';
+const REF_PRIME = 250, REF_CADEAU = 200, REF_MAX = 20;
+const REF_TIERS = [
+  { n: 1, id: 'sk_parrain', name: 'Peinture « Parrain »', ic: 'roller', col: '#3cf29b', skin: 'parrain' },
+  { n: 3, id: 'h_dore', name: 'Casque doré', ic: 'helmGold', col: '#ffc21a', helm: 'h_dore' },
+  { n: 5, id: 'u_casque', name: 'Casque de réserve offert', sub: '4 vies par checkpoint', ic: 'helmSpare', col: '#ff7f6e', upg: 'casque' },
+  { n: 10, id: 'sk_grueor', name: 'Grue d\'Or', ic: 'craneGold', col: '#ffd84f', skin: 'grueor' },
+  { n: 25, id: 't_legende', name: 'Titre « Légende du BTP »', ic: 'crown', col: '#c38bff', title: true },
+];
+// objets exclusifs : visibles (verrouillés) au garage et dans l'éditeur de personnage
+SKINS.push({ id: 'parrain', name: 'Parrain', col: '#19c28a', dark: '#0b6b4a', trolley: '#ffc21a', price: 0, ref: 1 },
+  { id: 'grueor', name: 'Grue d\'Or', col: '#e0a92a', dark: '#6b4300', trolley: '#1d2026', price: 0, ref: 10, fx: 'or' });
+AV_HELM.push(['#3cf29b', 0, 'h_recrue'], ['#ffcf2e', 0, 'h_dore']);
+const refHas = id => (save.refItems || []).includes(id);
+function refAdd(id) { save.refItems = [...new Set([...(save.refItems || []), id])]; }
+const refHelmIdx = id => AV_HELM.findIndex(h => h[2] === id);
+
+const REF = { data: null, err: '', busy: false, at: 0, from: 'title', queue: [], claiming: false };
+const REF_DEMO = !SB && /parrdemo/.test(location.search);
+const refReady = () => { const d = REF.data; return d ? Math.max(0, Math.min(d.actifs, REF_MAX) - d.payes) : 0; };
+const refCode = () => (REF.data && REF.data.code) || save.refCode || '';
+const refKey = () => refCode().replace('-', '');
+const REF_JEU = 'https://pile-poil-jeu.netlify.app/';
+// le lien mène au jeu : un joueur qui a déjà le jeu y reste, un nouveau est envoyé sur le site vitrine
+function refLink() { return `${REF_JEU}?p=${refKey()}`; }
+function refQ(sep) { const k = (ACC.token || REF_DEMO) && refKey(); return k ? `${sep}p=${k}` : ''; }
+function refText() { return save.lang === 'en' ? `Come play PILE POIL 🏗️ With my link you get 200 coins + an exclusive helmet:` : `Viens jouer à PILE POIL 🏗️ Avec mon lien tu reçois 200 pièces + un casque exclusif :`; }
+
+// ---------- serveur ou démo (?parrdemo) ----------
+const REFB = SB ? {
+  async call(fn, a) { const { data, error } = await SB.rpc(fn, Object.assign({ p_token: ACC.token }, a)); if (error) throw new Error(/schema cache|function/i.test(error.message) ? 'Le parrainage arrive très bientôt !' : error.message); return data; },
+  status() { return this.call('ref_status', {}); },
+  claim(code, dev) { return this.call('ref_claim', { p_code: code, p_dev: dev || null }); },
+  collect(pid) { return this.call('ref_collect', { p_pid: pid }); },
+  duo(pid) { return this.call('ref_duo', { p_pid: pid }); },
+} : {
+  _d() { try { return JSON.parse(localStorage.getItem('ppdemo_ref')) || null; } catch (e) { return null; } },
+  async status() {
+    const d = this._d() || { code: 'LUCA-4ZH', lvl: 23, parrain: null, duo_f: false, payes: 2,
+      filleuls: [{ name: 'Max_Grue', lvl: 23, paid: true, av: { helm: 1, bg: 2 } }, { name: 'Léa', lvl: 12, paid: true, av: { skin: 0, helm: 4, bg: 3 } }, { name: 'TomBTP', lvl: 11, paid: false, av: { helm: 2, skin: 3 } }, { name: 'Sarah.R', lvl: 6, paid: false, av: { helm: 5, bg: 4 } }, { name: 'Nono76', lvl: 2, paid: false, av: { helm: 3, skin: 2, bg: 1 } }] };
+    d.actifs = d.filleuls.filter(f => f.lvl >= 10).length; return d;
+  },
+  async claim() { return { st: 'ok', parrain: 'Lucas' }; },
+  async collect() { const d = await this.status(); let n = 0; d.filleuls.forEach(f => { if (f.lvl >= 10 && !f.paid && d.payes < REF_MAX) { f.paid = true; d.payes++; n++; } }); try { localStorage.setItem('ppdemo_ref', JSON.stringify(d)); } catch (e) {} return { n, status: d }; },
+  async duo() { return { ok: false }; },
+};
+const refOn = () => !!(SB ? ACC.token : REF_DEMO);
+
+async function refRefresh(force) {
+  if (!refOn() || REF.busy) return;
+  if (!force && Date.now() - REF.at < 90000) return;
+  REF.busy = true; REF.at = Date.now();
+  try { REF.data = await REFB.status(); REF.err = ''; refApply(REF.data); }
+  catch (e) { REF.err = e.message; }
+  REF.busy = false;
+}
+function refSaved() { writeSave(save); if (ACC.token && typeof schedulePush === 'function') { ACC.dirty = true; accStore(); schedulePush(1500); } }
+function refApply(d) {
+  let ch = false; const en = save.lang === 'en';
+  if (d.code && save.refCode !== d.code) { save.refCode = d.code; ch = true; }
+  // filleul : cadeau de bienvenue
+  if (d.parrain && !save.refRecrue) {
+    save.refRecrue = d.parrain; refAdd('h_recrue'); save.coins += REF_CADEAU; ch = true;
+    REF.queue.push({ title: en ? 'WELCOME TO THE CREW!' : 'BIENVENUE DANS L\'ÉQUIPE !', celeb: true,
+      lines: [en ? `${d.parrain} invited you` : `${d.parrain} t'a parrainé`, en ? '+200 coins and the « Recruit » helmet are yours.' : '+200 pièces et le casque « Recrue » sont à toi.', en ? 'You are now friends. Reach level 10: you both get a Duo chest!' : 'Vous êtes amis. Atteins le niveau 10 : coffre Duo pour vous deux !'],
+      yes: en ? 'WEAR THE HELMET' : 'METTRE LE CASQUE', onYes: () => { AV().helm = refHelmIdx('h_recrue'); writeSave(save); }, no: en ? 'LATER' : 'PLUS TARD' });
+  }
+  // filleul arrivé au niveau 10 : son coffre Duo
+  if (d.parrain && d.lvl >= 10 && !d.duo_f && !REF.duoAsked) {
+    REF.duoAsked = true;
+    REFB.duo(save.pid).then(r => { if (!r || !r.ok) return; d.duo_f = true; crRefreshSoon();
+      REF.queue.push({ title: en ? 'DUO CHEST!' : 'COFFRE DUO !', celeb: true, lines: [en ? 'Level 10 reached with your sponsor' : `Niveau 10 atteint, ${d.parrain} est fier de toi`, en ? '2 site crates are waiting on the home screen.' : '2 caisses du chantier t\'attendent sur l\'accueil.'], yes: 'OK', no: null }); }).catch(() => {});
+  }
+  // paliers du parrain
+  let last = null;
+  REF_TIERS.forEach(t => { if (d.actifs >= t.n && !refHas(t.id)) {
+    refAdd(t.id); ch = true; last = t;
+    if (t.skin && !save.skins.includes(t.skin)) save.skins.push(t.skin);
+    if (t.upg) { if (!save.upg.includes(t.upg)) save.upg.push(t.upg); else save.coins += 1000; }
+  } });
+  if (last) { const nx = REF_TIERS.find(t => t.n > d.actifs), canEq = last.skin || last.helm;
+    REF.queue.push({ title: en ? 'REWARD UNLOCKED!' : 'PALIER DÉBLOQUÉ !', celeb: true,
+      lines: [`${last.n} ${last.n > 1 ? 'filleuls actifs' : 'filleul actif'} · ${last.name}`, last.upg ? (save.upg.includes('casque') ? '4 vies par checkpoint en Carrière' : '') : en ? 'An exclusive item, impossible to buy.' : 'Un objet exclusif, introuvable en boutique.', nx ? `${en ? 'Next' : 'Prochain palier'} : ${nx.name} (${nx.n} filleuls)` : (en ? 'You unlocked everything!' : 'Tu as tout débloqué, chapeau !')].filter(Boolean),
+      yes: canEq ? (en ? 'EQUIP' : 'ÉQUIPER') : 'SUPER', no: canEq ? (en ? 'LATER' : 'PLUS TARD') : null,
+      onYes: () => { if (last.skin) save.skin = last.skin; if (last.helm) AV().helm = refHelmIdx(last.helm); writeSave(save); } }); }
+  if (ch) refSaved();
+}
+function crRefreshSoon() { try { if (typeof CRDB !== 'undefined') setTimeout(() => CRDB.status().then(s => { CR.st = s; }).catch(() => {}), 800); } catch (e) {} }
+function refShowQueue() { if (MO || !REF.queue.length || G.screen === 'play') return; const m = REF.queue.shift(); if (m.celeb) CELEB.at = performance.now(); modal(m); }
+async function refCollect() {
+  if (REF.busy) return; REF.busy = true;
+  try {
+    const r = await REFB.collect(save.pid); REF.data = r.status; REF.at = Date.now();
+    if (r.n > 0) { const en = save.lang === 'en'; save.coins += REF_PRIME * r.n; refSaved(); crRefreshSoon(); CELEB.at = performance.now(); tone(1568, .08, 'square', .03); tone(2093, .12, 'square', .03, .08);
+      modal({ title: en ? 'SPONSOR BONUS!' : 'PRIME DE PARRAIN !', lines: [`+${(REF_PRIME * r.n).toLocaleString('fr-FR')} ${en ? 'coins' : 'pièces'}`, `+${2 * r.n} ${en ? 'site crates (Duo chest)' : 'caisses du chantier (coffre Duo)'}`, r.n > 1 ? `${r.n} filleuls ont atteint le niveau 10` : (en ? 'Your friend reached level 10' : 'Ton filleul a atteint le niveau 10')], yes: 'SUPER', no: null }); }
+    refApply(REF.data);
+  } catch (e) { toast(e.message, '#ff6b5b'); }
+  REF.busy = false;
+}
+
+// ---------- partager son lien ----------
+// sur téléphone, partager ou copier doit partir du doigt levé (sinon le navigateur bloque)
+function onGesture(fn) {
+  let done = false; const go = () => { if (done) return; done = true; removeEventListener('pointerup', go, true); removeEventListener('click', go, true); try { fn(); } catch (e) {} };
+  addEventListener('pointerup', go, true); addEventListener('click', go, true); setTimeout(go, 1500);
+}
+function refCopy(s, msg) {
+  const ok = () => toast(msg, '#3cf29b');
+  const fb = () => { try { const t = document.createElement('textarea'); t.value = s; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(t); t.select(); t.setSelectionRange(0, s.length); const r = document.execCommand('copy'); t.remove(); if (r) ok(); else toast(s, '#6fb1ff'); } catch (e) { toast(s, '#6fb1ff'); } };
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(ok, fb); else fb(); } catch (e) { fb(); }
+}
+function refOpen(u) { const w = window.open(u, '_blank'); if (w) { try { w.opener = null; } catch (e) {} } else location.href = u; }
+const REF_SHARE = () => {   // boutons proposés selon l'appareil
+  const L = [['wa', 'WhatsApp', '#5ff2a8', '#17a764', '#06210f'], ['snap', 'Snapchat', '#fffc3a', '#e0d800', '#1d1a00'], ['insta', 'Instagram', '#f77737', '#c13584', '#fff']];
+  if (TOUCH) L.push(['sms', 'Messages', '#7ff59a', '#2fbf55', '#06210f']);
+  L.push(['copy', save.lang === 'en' ? 'Copy link' : 'Copier le lien', CARD.slate[0], CARD.slate[1], '#fff']);
+  if (navigator.share) L.push(['more', save.lang === 'en' ? 'Other apps' : 'Autres apps', CARD.slate[0], CARD.slate[1], '#fff']);
+  return L.slice(0, 6);
+};
+function refShare(how) {
+  const link = refLink(), text = refText(), all = `${text} ${link}`, en = save.lang === 'en';
+  ppTrack('ref_' + how);
+  if (how === 'wa') return refOpen('https://wa.me/?text=' + encodeURIComponent(all));
+  if (how === 'snap') return refOpen('https://www.snapchat.com/share?link=' + encodeURIComponent(link));
+  if (how === 'sms') { location.href = 'sms:?&body=' + encodeURIComponent(all); return; }
+  if (how === 'insta') {   // Instagram n'a pas de lien de partage : on copie le message puis on ouvre la feuille de partage (Instagram y figure)
+    refCopy(all, en ? 'Message copied: paste it in Instagram' : 'Message copié : colle-le dans Instagram');
+    if (navigator.share && TOUCH) navigator.share({ title: 'PILE POIL', text, url: link }).catch(() => {});
+    else refOpen('https://www.instagram.com/direct/inbox/');
+    return;
+  }
+  if (how === 'more' && navigator.share) { navigator.share({ title: 'PILE POIL', text, url: link }).catch(() => {}); return; }
+  refCopy(all, en ? 'Link copied: send it to your mates' : 'Lien copié : envoie-le à tes potes');
+}
+// rappels : jamais plus d'un tous les 3 jours (hors objets que le joueur touche lui-même)
+function refNudge() { if (Date.now() - (save.refNudgeAt || 0) < 3 * 864e5) return false; save.refNudgeAt = Date.now(); writeSave(save); return true; }
+// exclusivités : la fenêtre explique comment les obtenir
+function refExclu(name, n) {
+  const en = save.lang === 'en', a = REF.data ? REF.data.actifs : 0;
+  modal({ title: en ? 'SPONSOR EXCLUSIVE' : 'EXCLUSIVITÉ PARRAINAGE', lines: [name, en ? `Unlocked with ${n} active friend${n > 1 ? 's' : ''} invited (level 10).` : `Se débloque avec ${n} filleul${n > 1 ? 's' : ''} actif${n > 1 ? 's' : ''} (niveau 10).`, refOn() ? (en ? `You have ${a} so far.` : `Tu en as ${a} pour l'instant.`) : (en ? 'Invite a friend: +250 coins for you.' : 'Invite un pote : +250 pièces pour toi.')],
+    yes: en ? 'INVITE A FRIEND' : 'INVITER UN POTE', onYes: () => act('parrain'), no: en ? 'LATER' : 'PLUS TARD' });
+}
+
+// ---------- écran Parrainage ----------
+function refBtn(id, x, y, w, h, label, A, B, tc) {
+  const d = relief(x, y, w, h, A, B, h / 2, 6); txt(label, x + w / 2, y + h / 2 + 10 + d, tc, 28, 900, 'center'); G.buttons.push({ id, x, y, w, h: h + 6 });
+}
+// petites illustrations des récompenses (dessinées, pour qu'elles ressemblent vraiment à l'objet)
+function refHat(x, y, k, top, bot, star) {   // casque de chantier vu de face
+  c.fillStyle = lg(x - 30 * k, 0, x + 30 * k, 0, [[0, top], [.5, mixc(top, '#ffffff', .35)], [1, bot]]);
+  c.beginPath(); c.ellipse(x, y + 6 * k, 25 * k, 23 * k, 0, Math.PI, 0); c.fill();
+  rr(x - 34 * k, y + 4 * k, 68 * k, 9 * k, 4 * k); c.fillStyle = bot; c.fill();
+  fillR(x - 4 * k, y - 16 * k, 8 * k, 20 * k, mixc(top, '#ffffff', .45));
+  if (star) icon('star', x, y - 4 * k, 15 * k, star);
+}
+function refIcon(kind, x, y, ok) {
+  c.save(); if (!ok) c.globalAlpha = .42;
+  if (kind === 'roller') {   // rouleau de peinture couleur « Parrain »
+    const sk = SKINS.find(q => q.id === 'parrain');
+    c.strokeStyle = '#e8eef6'; c.lineWidth = 4; c.lineJoin = 'round'; c.beginPath(); c.moveTo(x + 22, y - 10); c.lineTo(x + 28, y - 10); c.lineTo(x + 28, y + 2); c.lineTo(x, y + 4); c.lineTo(x, y + 14); c.stroke();
+    rr(x - 5, y + 13, 10, 20, 4); c.fillStyle = '#2b3445'; c.fill();
+    rr(x - 26, y - 22, 50, 22, 8); c.fillStyle = lg(0, y - 22, 0, y, [[0, mixc(sk.col, '#ffffff', .35)], [1, sk.dark]]); c.fill();
+    fillR(x - 20, y - 18, 38, 4, 'rgba(255,255,255,.45)');
+  } else if (kind === 'helmGold') refHat(x, y + 4, 1, '#ffe27a', '#c98d00', '#9a6a00');
+  else if (kind === 'helmSpare') {   // casque blanc + « +1 vie »
+    refHat(x - 6, y + 6, .9, '#f4f7fb', '#a9b4c2');
+    ell(x + 22, y - 18, 15, 15, '#e0392b'); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.arc(x + 22, y - 18, 15, 0, 7); c.stroke(); txt('+1', x + 22, y - 12, '#fff', 15, 900, 'center');
+  } else if (kind === 'craneGold') {   // grue à tour dorée
+    const g = lg(0, y - 30, 0, y + 30, [[0, '#fff2a8'], [1, '#d99a00']]);
+    c.strokeStyle = g; c.fillStyle = g; c.lineWidth = 4; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - 10, y + 30); c.lineTo(x - 10, y - 22); c.moveTo(x - 2, y + 30); c.lineTo(x - 2, y - 22); c.stroke();
+    c.lineWidth = 2; c.beginPath(); for (let yy = y + 26; yy > y - 20; yy -= 9) { c.moveTo(x - 10, yy); c.lineTo(x - 2, yy - 9); } c.stroke();
+    c.lineWidth = 5; c.beginPath(); c.moveTo(x - 30, y - 22); c.lineTo(x + 32, y - 22); c.stroke();
+    c.lineWidth = 2; c.beginPath(); c.moveTo(x - 6, y - 36); c.lineTo(x - 30, y - 22); c.moveTo(x - 6, y - 36); c.lineTo(x + 30, y - 22); c.moveTo(x - 6, y - 36); c.lineTo(x - 6, y - 22); c.stroke();
+    fillR(x - 32, y - 20, 9, 10, '#9a6a00');
+    c.lineWidth = 1.5; c.strokeStyle = '#e6eef8'; c.beginPath(); c.moveTo(x + 22, y - 20); c.lineTo(x + 22, y + 2); c.stroke(); fillR(x + 16, y + 2, 12, 8, '#ffe27a');
+    c.lineCap = 'butt';
+  } else if (kind === 'crown') {   // couronne de la « Légende du BTP »
+    c.fillStyle = lg(0, y - 24, 0, y + 20, [[0, '#ffe27a'], [1, '#e09a00']]);
+    c.beginPath(); c.moveTo(x - 28, y + 16); c.lineTo(x - 30, y - 16); c.lineTo(x - 14, y - 2); c.lineTo(x, y - 24); c.lineTo(x + 14, y - 2); c.lineTo(x + 30, y - 16); c.lineTo(x + 28, y + 16); c.closePath(); c.fill();
+    fillR(x - 28, y + 10, 56, 8, '#c98d00');
+    [[-30, -16], [0, -24], [30, -16]].forEach(([dx, dy]) => ell(x + dx, y + dy, 5, 5, '#fff3c4'));
+    ell(x, y + 2, 6, 6, '#c38bff'); ell(x - 16, y + 6, 4, 4, '#ff5aa0'); ell(x + 16, y + 6, 4, 4, '#3cf29b');
+  }
+  c.restore();
+}
+function refNode(t, x, y, ok) {
+  if (ok) { withShadow(t.col, 28, 0, 0, () => ell(x, y, 50, 50, t.col)); ell(x, y, 46, 46, lg(0, y - 46, 0, y + 46, [[0, mixc(t.col, '#000000', .35)], [1, mixc(t.col, '#000000', .6)]])); }
+  else { ell(x, y, 50, 50, '#2f3d58'); ell(x, y, 46, 46, '#1a2338'); }
+  refIcon(t.ic, x, y, ok);
+  if (!ok) icon('lock', x + 34, y + 34, 22, '#9fb0d0');
+  if (ok) { ell(x + 36, y - 36, 15, 15, '#3cf29b'); ICN.check(x + 36, y - 35, '#06210f', .7); }
+}
+function drawParrain() {
+  screenBg(); fillR(0, 0, W, H, 'rgba(4,6,16,.45)'); navBar('paBack', 'PARRAINAGE');
+  const en = save.lang === 'en';
+  if (!SB && !REF_DEMO) { frCard(460, 260, 1000, 460); T('Invite tes potes', 960, 420, '#fff', 54, 'center'); txt('Le parrainage est disponible dans la version en ligne du jeu :', 960, 480, PAL.sub, 26, 800, 'center'); txt('pile-poil-jeu.netlify.app', 960, 520, PAL.yellow, 26, 900, 'center'); return; }
+  if (!refOn()) {
+    frCard(410, 200, 1100, 640);
+    REF_TIERS.slice(0, 4).forEach((t, i) => refNode(t, 960 - 240 + i * 160, 330, true));
+    T('Invite tes potes, gagne des exclus', 960, 500, '#fff', 52, 'center');
+    txt('Crée ton compte pour avoir ton lien de parrainage.', 960, 556, PAL.sub, 26, 800, 'center');
+    txt('Ton pote reçoit 200 pièces, toi 250 pièces + 2 caisses quand il atteint le niveau 10.', 960, 596, PAL.sub, 24, 800, 'center');
+    frBtn('account', 710, 680, 500, 88, 'CRÉER MON COMPTE', 'g'); return;
+  }
+  const d = REF.data;
+  if (!d) { txt(REF.err || 'Chargement…', 960, 520, REF.err ? '#ffd447' : PAL.sub, 30, 800, 'center'); if (REF.err) frBtn('paRetry', 810, 580, 300, 70, 'RÉESSAYER', 'k'); return; }
+  // ----- lien -----
+  frCard(60, 150, 860, 540);
+  txt('TON LIEN DE PARRAINAGE', 100, 206, PAL.sub, 20, 900);
+  rr(100, 228, 780, 124, 24); c.fillStyle = '#0b1220'; c.fill(); c.save(); c.setLineDash([14, 10]); rr(100, 228, 780, 124, 24); c.strokeStyle = PAL.yellow; c.lineWidth = 3; c.stroke(); c.restore();
+  T(d.code, 136, 302, PAL.yellow, 70); txt(refLink().replace('https://', ''), 138, 336, PAL.sub, 20, 800);
+  { const L = REF_SHARE(), cols = L.length > 4 ? 3 : 2, bw = (780 - (cols - 1) * 14) / cols;
+    L.forEach(([k, lab, A, B, tc], i) => refBtn('pa:' + k, 100 + (i % cols) * (bw + 14), 378 + Math.floor(i / cols) * 96, bw, 80, lab, A, B, tc)); }
+  [[100, 'rgba(60,242,155,.13)', PAL.green, en ? 'YOUR FRIEND GETS' : 'TON POTE REÇOIT', en ? '+200 + « Recruit » helmet' : '+200 + casque « Recrue »'], [500, 'rgba(255,194,26,.13)', PAL.yellow, en ? 'YOU GET (AT HIS LEVEL 10)' : 'TOI (À SON NIVEAU 10)', en ? '+250 + 2 crates' : '+250 + 2 caisses']].forEach(([x, bg, col, a, b]) => {
+    rr(x, 582, 380, 88, 18); c.fillStyle = bg; c.fill(); txt(a, x + 20, 614, col, 17, 900); coinIcon(x + 32, 646, 11); txt(b, x + 50, 654, '#fff', 22, 900); });
+  // ----- filleuls -----
+  frCard(950, 150, 910, 540);
+  txt(`${en ? 'MY FRIENDS INVITED' : 'MES FILLEULS'} · ${d.filleuls.length}`, 990, 206, PAL.sub, 20, 900);
+  if (d.payes) { coinIcon(1660 - 0, 199, 11); txt(`${(d.payes * REF_PRIME).toLocaleString('fr-FR')} ${en ? 'earned' : 'gagnées'}`, 1820, 206, PAL.yellow, 20, 900, 'right'); }
+  let y0 = 226; const rd = refReady();
+  if (rd) { const pu = 1 + Math.max(0, Math.sin(G.t * 4)) * .02; c.save(); c.translate(1405, 270); c.scale(pu, pu); c.translate(-1405, -270);
+    refBtn('paCollect', 990, 230, 830, 80, `${en ? 'COLLECT' : 'ENCAISSER'} +${(rd * REF_PRIME).toLocaleString('fr-FR')} ${en ? 'COINS' : 'PIÈCES'} + ${rd * 2} ${en ? 'CRATES' : 'CAISSES'}`, '#ffe066', '#ffa41a', '#2a1a00'); c.restore(); y0 = 326; }
+  const rows = Math.floor((672 - y0) / 72), list = d.filleuls;
+  if (!list.length) {
+    refNode(REF_TIERS[0], 1405, 360, false);
+    T(en ? 'Nobody yet' : 'Personne pour l\'instant', 1405, 470, '#fff', 40, 'center');
+    txt(en ? 'Your first active friend unlocks the « Sponsor » paint.' : 'Ton premier filleul actif débloque la peinture « Parrain ».', 1405, 512, PAL.sub, 22, 800, 'center');
+    txt(en ? 'Every link you share counts: duels, PILE POIL shots, daily challenge.' : 'Tous tes partages comptent : duels, PILE POIL, défi du jour.', 1405, 548, PAL.sub, 22, 800, 'center');
+  }
+  list.slice(0, rows).forEach((f, i) => {
+    const y = y0 + i * 72; if (i) fillR(990, y - 2, 830, 1, 'rgba(255,255,255,.08)');
+    frAv(1018, y + 34, 26, f.av); txt(f.name, 1060, y + 32, '#fff', 25, 900); txt(`${en ? 'Lvl' : 'Niv.'} ${f.lvl}`, 1060, y + 58, PAL.sub, 18, 800);
+    if (f.paid) txt(`✓ +${REF_PRIME}`, 1820, y + 44, PAL.green, 22, 900, 'right');
+    else if (f.lvl >= 10) txt(en ? 'BONUS READY' : 'PRIME PRÊTE', 1820, y + 44, PAL.yellow, 20, 900, 'right');
+    else { const k = clamp(f.lvl / 10, 0, 1), r = 10 - f.lvl; txt(`${r} niveau${r > 1 ? 'x' : ''} avant ta prime`, 1820, y + 32, PAL.yellow, 17, 800, 'right');
+      rr(1540, y + 44, 280, 10, 5); c.fillStyle = 'rgba(255,255,255,.1)'; c.fill(); rr(1540, y + 44, Math.max(10, 280 * k), 10, 5); c.fillStyle = PAL.yellow; c.fill(); }
+  });
+  if (list.length > rows) txt(`+ ${list.length - rows} ${en ? 'more' : list.length - rows > 1 ? 'autres' : 'autre'}`, 1405, 676, PAL.sub, 18, 800, 'center');
+  // ----- paliers -----
+  frCard(60, 720, 1800, 320);
+  txt(en ? 'SPONSOR REWARDS' : 'RÉCOMPENSES DE PARRAIN', 100, 774, PAL.sub, 20, 900);
+  T(en ? 'The more you invite, the more your crane shines' : 'Plus tu recrutes, plus ta grue brille', 100, 822, '#fff', 40);
+  const nx = REF_TIERS.find(t => t.n > d.actifs);
+  { const s = nx ? `${en ? 'NEXT' : 'PROCHAIN'} : ${nx.n - d.actifs} ${en ? 'MORE' : nx.n - d.actifs > 1 ? 'FILLEULS ACTIFS DE PLUS' : 'FILLEUL ACTIF DE PLUS'}` : (en ? 'ALL UNLOCKED' : 'TOUT EST DÉBLOQUÉ'); c.font = '900 18px Inter'; const w = c.measureText(s).width + 36; rr(1820 - w, 772, w, 40, 20); c.fillStyle = PAL.yellow; c.fill(); txt(s, 1820 - w / 2, 798, '#2a1a00', 18, 900, 'center'); }
+  const X = i => 300 + i * 330, ty = 900;
+  rr(X(0), ty - 6, X(4) - X(0), 12, 6); c.fillStyle = '#1d2840'; c.fill();
+  let p = 0; REF_TIERS.forEach((t, i) => { if (d.actifs >= t.n) p = i; else if (i && d.actifs > REF_TIERS[i - 1].n && p === i - 1) p = i - 1 + (d.actifs - REF_TIERS[i - 1].n) / (t.n - REF_TIERS[i - 1].n); });
+  if (d.actifs >= 1) { rr(X(0), ty - 6, Math.max(12, p * 330), 12, 6); c.fillStyle = lg(X(0), 0, X(4), 0, [[0, '#3cf29b'], [1, '#ffc21a']]); c.fill(); }
+  REF_TIERS.forEach((t, i) => { const ok = d.actifs >= t.n; refNode(t, X(i), ty, ok);
+    T(`${t.n} ${t.n > 1 ? 'filleuls' : 'filleul'}`, X(i), 990, ok ? t.col : PAL.sub, 28, 'center');
+    txt(t.name, X(i), 1020, ok ? '#fff' : '#8a95ad', 18, 800, 'center'); });
+  txt(en ? 'Paid when your friend reaches level 10 · 20 paid friends max · 1 device = 1 friend' : 'Prime versée quand ton filleul atteint le niveau 10  ·  20 filleuls payés maximum  ·  1 appareil = 1 filleul', 960, 1066, '#6f7d99', 17, 700, 'center');
+  if (d.parrain) txt(`${en ? 'Invited by' : 'Parrainé par'} ${d.parrain}`, 940, 82, PAL.green, 22, 900, 'right');
+  refShowQueue();
+}
+drawOnline = (prev => function () { if (G.screen === 'parrain') drawParrain(); else prev(); })(drawOnline);
+
+// ---------- incitations, sans encombrer l'accueil ----------
+drawTitle = (prev => function () {
+  prev();
+  if (refOn()) refRefresh(false);
+  refShowQueue();
+  // une seule fois : au retour sur l'accueil après avoir atteint le niveau 10
+  if (!MO && !save.refAsk10 && (save.maxLevel || 1) >= 10 && Date.now() - (save.refNudgeAt || 0) > 864e5 && TI.t0 !== null && G.t - TI.t0 > 1.5 && (SB || REF_DEMO)) {
+    save.refAsk10 = 1; save.refNudgeAt = Date.now(); writeSave(save); const en = save.lang === 'en';
+    modal({ title: en ? 'LEVEL 10, NICE!' : 'NIVEAU 10, BRAVO !', lines: [en ? 'You are now a real crane operator.' : 'Te voilà vrai grutier.', en ? 'Invite a friend: he gets 200 coins,' : 'Fais découvrir le jeu à un pote : il reçoit 200 pièces,', en ? 'you get 250 + 2 crates when he reaches level 10.' : 'toi 250 pièces + 2 caisses quand il arrive ici.'],
+      yes: en ? 'INVITE A FRIEND' : 'INVITER UN POTE', onYes: () => act('parrain'), no: en ? 'LATER' : 'PLUS TARD' });
+  }
+})(drawTitle);
+// la case « Amis » de l'accueil : petite pastille dorée quand une prime attend
+amisChip = (prev => function () {
+  prev(); const rd = refReady(); if (!rd || frTotalBadge()) return;
+  const b = G.buttons.find(q => q.id === 'friends'); if (!b) return;
+  const lab = `+${(rd * REF_PRIME).toLocaleString('fr-FR')}`, pu = 1 + Math.max(0, Math.sin(G.t * 5)) * .1; c.font = '900 22px Inter'; const bw = c.measureText(lab).width + 52;
+  c.save(); c.translate(b.x + b.w - 22, b.y + 2); c.scale(pu, pu); withShadow('rgba(255,170,0,.6)', 14, 0, 3, () => { rr(-bw / 2, -18, bw, 36, 18); c.fillStyle = '#ffb300'; c.fill(); }); rr(-bw / 2, -18, bw, 36, 18); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke(); coinIcon(-bw / 2 + 20, 0, 10); txt(lab, 10, 8, '#2a1a00', 22, 900, 'center'); c.restore();
+  fillR(b.x + 66, b.y + 42, b.w - 80, 22, 'rgba(18,26,48,.96)'); txt(save.lang === 'en' ? 'Sponsor bonus!' : 'Prime de parrain !', b.x + 72, b.y + 58, '#ffd447', 16, 800);
+})(amisChip);
+// profil : titre « Légende du BTP »
+drawProfile = (prev => function () {
+  prev(); if (!refHas('t_legende') || PF.edit) return;
+  c.font = '900 22px Inter'; const s = 'LÉGENDE DU BTP', w = c.measureText(s).width + 64, x = 1046 - w, y = 232;
+  rr(x, y, w, 44, 22); c.fillStyle = lg(0, y, 0, y + 44, [[0, '#d8b8ff'], [1, '#8a5cf0']]); c.fill(); icon('trophy', x + 26, y + 22, 22, '#fff'); txt(s, x + 42, y + 30, '#fff', 22, 900);
+})(drawProfile);
+
+// ---------- actions ----------
+act = (prev => function (id) {
+  if (MO) return prev(id);
+  if (id === 'parrain') { sfx.click(); if (G.screen !== 'parrain') REF.from = ['friends', 'garage', 'profile', 'shop'].includes(G.screen) ? G.screen : 'title'; G.screen = 'parrain'; refRefresh(true); return; }
+  if (id === 'paBack') { sfx.click(); G.screen = REF.from || 'title'; if (G.screen === 'friends') frRefresh(true); return; }
+  if (id === 'paRetry') { sfx.click(); REF.err = ''; refRefresh(true); return; }
+  if (id.startsWith('pa:')) { sfx.click(); const k = id.slice(3); onGesture(() => refShare(k)); return; }
+  // partages des autres écrans : exécutés au doigt levé pour que le téléphone les autorise
+  if (['frCopy', 'frShare', 'tdCopy', 'poseShare', 'dailyShare'].includes(id) && !REF.gest) { onGesture(() => { REF.gest = true; try { act(id); } finally { REF.gest = false; } }); return; }
+  if (id === 'paCollect') { sfx.click(); refCollect(); return; }
+  if (id === 'frTab:parrain') return act('parrain');
+  // une prime attend : la case Amis mène directement au parrainage
+  if (id === 'friends' && refReady() && !frTotalBadge()) { act('parrain'); REF.from = 'title'; return; }
+  let m;
+  if ((m = id.match(/^avRef:(\w+)$/))) { const n = (REF_TIERS.find(t => t.helm === m[1]) || {}).n; if (n) return refExclu('Casque doré', n); return modal({ title: 'CASQUE RECRUE', lines: ['Réservé aux joueurs parrainés par un pote.', 'Toi aussi, invite tes potes : ils le recevront !'], yes: 'INVITER UN POTE', onYes: () => act('parrain'), no: 'PLUS TARD' }); }
+  return prev(id);
+})(act);
+addEventListener('keydown', e => { if (e.key === 'Escape' && G.screen === 'parrain' && !MO) act('paBack'); });
+
+// ---------- arrivée avec un lien : ?p=CODE (site ou partage), ?ami=CODE ----------
+(function () {
+  const q = new URLSearchParams(location.search), raw = q.get('p') || window.PP_REF || q.get('ami') || '';
+  const k = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (k.length === 7 && !save.refDone && k !== (save.refCode || '').replace('-', '')) { save.refPending = k; writeSave(save); }
+})();
+setInterval(async () => {
+  if (!save.refPending || REF.claiming || !SB || !ACC.token) return;
+  REF.claiming = true; const k = save.refPending;
+  try { await REFB.claim(k, typeof STX !== 'undefined' ? STX.dev : null); save.refDone = 1; delete save.refPending; writeSave(save); refRefresh(true); }
+  catch (e) { delete save.refPending; save.refDone = 1; writeSave(save);
+    // joueur déjà inscrit : pas de cadeau de bienvenue, mais on les met en relation (demande d'ami)
+    if (/nouveaux comptes|l'un l'autre/.test(e.message) && typeof FRB !== 'undefined') FRB.add(k).then(r => toast(r.st === 'friends' ? `${r.name} est maintenant ton ami !` : `Demande d'ami envoyée à ${r.name}`, '#3cf29b')).catch(() => {});
+    else if (!/propre parrain|arrive très bientôt/.test(e.message)) toast(e.message, '#ffb36b'); }
+  REF.claiming = false;
+}, 3000);
+// accueil d'un nouveau joueur invité : on lui dit ce qui l'attend
+bienvenue = (prev => function () { prev(); if (MO && save.refPending && !ACC.name && MO.lines && !MO.refLine) { MO.refLine = 1; MO.lines = [...MO.lines, save.lang === 'en' ? 'Invited by a friend: create your account to get 200 coins!' : 'Invité par un pote : crée ton compte, 200 pièces offertes !']; } })(bienvenue);
+
+Object.assign(EN, {
+  'PARRAINAGE': 'INVITE FRIENDS', 'Invite tes potes': 'Invite your friends', 'Invite tes potes, gagne des exclus': 'Invite friends, win exclusives', 'CRÉER MON COMPTE': 'CREATE MY ACCOUNT', 'Parrainage': 'Invite', 'EXCLUSIVITÉ PARRAINAGE': 'SPONSOR EXCLUSIVE', 'INVITER UN POTE': 'INVITE A FRIEND', 'PLUS TARD': 'LATER',
+  'Peinture « Parrain »': '« Sponsor » paint', 'Casque doré': 'Golden helmet', 'Casque de réserve offert': 'Spare helmet for free', 'Titre « Légende du BTP »': '« Site Legend » title', 'Parrain': 'Sponsor', 'PARRAINAGE ': 'SPONSOR',
+});
+
+// ---------- GRUE D'OR : dorure qui brille, étincelles, panneau en lettres d'or ----------
+function goldStar(x, y, r, a) {   // étincelle à 4 branches
+  if (a <= 0) return; c.save(); c.globalAlpha = a; c.globalCompositeOperation = 'lighter'; c.fillStyle = '#fff6c8';
+  c.beginPath(); c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r); c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+  ell(x, y, r * .35, r * .35, 'rgba(255,255,255,.9)'); c.restore();
+}
+function goldShine(x0, y0, w, h, t, period = 3.2, bw = 140) {   // reflet qui balaie une zone
+  const k = (t % period) / period, sx = x0 - bw + k * (w + bw * 2);
+  c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip(); c.globalCompositeOperation = 'lighter';
+  c.fillStyle = lg(sx, 0, sx + bw, 0, [[0, 'rgba(255,240,170,0)'], [.5, 'rgba(255,244,190,.85)'], [1, 'rgba(255,240,170,0)']]);
+  c.beginPath(); c.moveTo(sx + bw * .35, y0); c.lineTo(sx + bw, y0); c.lineTo(sx + bw * .65, y0 + h); c.lineTo(sx, y0 + h); c.fill(); c.restore();
+}
+const GOLD_SPOTS = Array.from({ length: 22 }, (_, i) => ({ u: ((i * 0.618) % 1), v: (i * 0.37) % 1, ph: i * 1.7, sp: .8 + (i % 4) * .25, m: i % 3 === 0 }));
+// la grue mise en cache est « dorée » une fois pour toutes : reflets métalliques sur ses pièces peintes
+const GOLD = { jib: null, mast: null, buf: null };
+const isPaint = (r, g, b) => r > 120 && r >= g && g > b + 35 && r - b > 70;
+function goldify(k) {
+  const x = k.getContext('2d'), im = x.getImageData(0, 0, W, H), d = im.data, jt = TOWER.jt;
+  const jib = document.createElement('canvas'); jib.width = W; jib.height = 120; const jm = jib.getContext('2d').createImageData(W, 120);
+  const mast = document.createElement('canvas'); mast.width = 260; mast.height = H - jt; const mm = mast.getContext('2d').createImageData(260, H - jt);
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+    const o = (y * W + xx) * 4; if (d[o + 3] < 30 || !isPaint(d[o], d[o + 1], d[o + 2])) continue;
+    const f = .78 + .42 * (.5 + .5 * Math.sin((xx * .9 + y * .5) / 34)) ** 2;   // bandes claires / sombres = métal poli
+    d[o] = Math.min(255, d[o] * f * 1.02); d[o + 1] = Math.min(255, d[o + 1] * f * .9); d[o + 2] = Math.min(255, d[o + 2] * f * .55);
+    if (y >= jt - 20 && y < jt + 100) { const q = ((y - jt + 20) * W + xx) * 4; jm.data[q + 3] = 255; }
+    if (xx >= TOWER.mx - 60 && xx < TOWER.mx + 200 && y >= jt) { const q = ((y - jt) * 260 + xx - TOWER.mx + 60) * 4; mm.data[q + 3] = 255; }
+  }
+  x.putImageData(im, 0, 0); jib.getContext('2d').putImageData(jm, 0, 0); mast.getContext('2d').putImageData(mm, 0, 0);
+  GOLD.jib = jib; GOLD.mast = mast;
+}
+bakeTranche = (prev => function (t) {
+  const e = prev(t);
+  if (e && e.crane && save.skin === 'grueor' && !e.gold) { e.gold = true; try { goldify(e.crane); } catch (er) {} }
+  return e;
+})(bakeTranche);
+function goldSweep(mask, dx, dy, t, period, vertical) {   // reflet qui balaie uniquement les pièces dorées
+  if (!mask) return; const b = GOLD.buf || (GOLD.buf = document.createElement('canvas'));
+  if (b.width !== mask.width || b.height !== mask.height) { b.width = mask.width; b.height = mask.height; }
+  const x = b.getContext('2d'), L = vertical ? mask.height : mask.width, bw = vertical ? 260 : 300, k = (t % period) / period, p = -bw + k * (L + bw * 2);
+  x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, b.width, b.height); x.drawImage(mask, 0, 0); x.globalCompositeOperation = 'source-in';
+  const g = vertical ? x.createLinearGradient(0, p, 0, p + bw) : x.createLinearGradient(p, 0, p + bw, 0);
+  g.addColorStop(0, 'rgba(255,248,210,0)'); g.addColorStop(.5, 'rgba(255,248,210,.95)'); g.addColorStop(1, 'rgba(255,248,210,0)'); x.fillStyle = g; x.fillRect(0, 0, b.width, b.height);
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = .75; c.drawImage(b, dx, dy); c.restore();
+}
+function goldFxTower(t) {
+  const T = TOWER, jr = typeof towerJibEnd === 'function' ? towerJibEnd() : T.jibR, jt = T.jt;
+  goldSweep(GOLD.jib, 0, jt - 20, t, 2.8, false);
+  goldSweep(GOLD.mast, T.mx - 60, jt, t + 1.3, 2.8, true);
+  GOLD_SPOTS.forEach(p => {
+    const a = Math.max(0, Math.sin(t * p.sp * 2.2 + p.ph)) ** 4;
+    const x = p.m ? T.mx + 4 + p.v * 40 : T.jibL + p.u * (jr - T.jibL), y = p.m ? jt + 40 + p.u * (GY - jt - 120) : jt + p.v * 44;
+    goldStar(x, y, 11 + (p.ph % 3) * 4, a);
+  });
+}
+trolley = (prev => function (x, jt, col) {
+  const r = prev(x, jt, col);
+  if (save.skin === 'grueor' && c.canvas === cv && G.screen === 'play' && jt === TOWER.jt) { try { goldFxTower(G.t); } catch (e) {} }
+  return r;
+})(trolley);
+// panneau de l'entreprise : lettres d'or sur fond noir
+companySign = (prev => function (x, y, w) {
+  if (save.skin !== 'grueor') return prev(x, y, w);
+  rr(x, y, w, 20, 2); c.fillStyle = '#14100a'; c.fill(); c.strokeStyle = '#f7c531'; c.lineWidth = 1.5; c.stroke();
+  let fs = 13; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 8 && fs > 8) { fs--; c.font = `900 ${fs}px Inter`; }
+  txt(companyName(), x + w / 2, y + 15, '#ffd84f', fs, 900, 'center');
+})(companySign);
+// carte « Grue d'Or » au garage : elle brille aussi
+drawStyle = (prev => function () {
+  prev(); if (GA.skCat !== 'spe' || MO) return;
+  const list = SKINS.filter(sk => skCat(sk) === 'spe'), i = list.findIndex(q => q.id === 'grueor'); if (i < 0) return;
+  const x = 60 + i * 257, y = 262, w = 239, h = 150;
+  c.save(); rr(x, y, w, h, 18); c.clip(); goldShine(x, y, w, h, G.t, 2.6, 90); c.restore();
+  GOLD_SPOTS.slice(0, 6).forEach(p => goldStar(x + 20 + p.u * (w - 40), y + 14 + p.v * 60, 6, Math.max(0, Math.sin(G.t * p.sp * 2.2 + p.ph)) ** 6));
+})(drawStyle);
+// grue déjà équipée au lancement : on refait la mise en cache avec la dorure
+if (save.skin === 'grueor') setTimeout(() => { try { invalidateCrane(); } catch (e) {} }, 0);
+companySignBig = (prev => function (x, y, w) {
+  if (save.skin !== 'grueor') return prev(x, y, w);
+  rr(x, y - 50, w, 70, 8); c.fillStyle = '#14100a'; c.fill(); c.strokeStyle = '#e0a92a'; c.lineWidth = 4; c.stroke();
+  let fs = 44; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 40 && fs > 18) { fs--; c.font = `900 ${fs}px Inter`; }
+  c.save(); c.fillStyle = lg(0, y - 30, 0, y + 6, [[0, '#fff2a8'], [.5, '#ffc21a'], [1, '#b8860b']]); c.font = `900 ${fs}px Inter`; c.textAlign = 'center'; c.fillText(companyName(), x + w / 2, y + 2); c.restore();
+})(companySignBig);
 
 </script>
 </body></html>
