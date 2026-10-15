@@ -6273,7 +6273,11 @@ function helmetCracked(x, y, s, col = '#fff', acc = '#b3122b') {
 
 // ---------- serveur ----------
 const SVDB = SB ? {
-  async submit(n) { const { data, error } = await SB.rpc('survie_submit', { p_pid: save.pid, p_name: playerName() || ACC.name || 'Grutier', p_n: n }); if (error) throw new Error(error.message); return data; },
+  async submit(n) {   // pseudo protégé : le jeton du compte prouve que le pseudo est bien le sien
+    const a = { p_pid: save.pid, p_name: playerName() || ACC.name || 'Grutier', p_n: n };
+    let r = await SB.rpc('survie_submit2', Object.assign({ p_token: ACC.token || null }, a));
+    if (r.error && /schema cache|function/i.test(r.error.message)) r = await SB.rpc('survie_submit', a);
+    if (r.error) throw new Error(r.error.message); return r.data; },
   async top() { const { data, error } = await SB.rpc('survie_top'); if (error) throw new Error(error.message); return data || []; },
   async me() { const { data, error } = await SB.rpc('survie_me', { p_pid: save.pid }); if (error) throw new Error(error.message); return data || {}; },
 } : {
@@ -11535,6 +11539,179 @@ companySignBig = (prev => function (x, y, w) {
   let fs = 44; c.font = `900 ${fs}px Inter`; while (c.measureText(companyName()).width > w - 40 && fs > 18) { fs--; c.font = `900 ${fs}px Inter`; }
   c.save(); c.fillStyle = lg(0, y - 30, 0, y + 6, [[0, '#fff2a8'], [.5, '#ffc21a'], [1, '#b8860b']]); c.font = `900 ${fs}px Inter`; c.textAlign = 'center'; c.fillText(companyName(), x + w / 2, y + 2); c.restore();
 })(companySignBig);
+
+// =====================================================================
+//  PILE POIL — PAYS TERMINÉ : médaille d'or qui pend dans le coin de la carte
+//  du pays + bandeau « ✓ TERMINÉ · N ★ » sur l'écran « Choisis ta région »
+//  Un pays est terminé quand son niveau 50 est réussi.
+// =====================================================================
+const PAYS_CARTE = { rgFR: 'fr', rgJP: 'jp', rgEG: 'eg' };
+const paysFini = r => { const d = regData(r) || {}; return !!(((d.lvl || {})[50] || {}).s); };
+const paysEtoiles = r => Object.values((regData(r) || {}).lvl || {}).reduce((a, v) => a + (v.s || 0), 0);
+let PAYS_EN_COURS = null;
+function paysMedaille(x, y, s) {   // médaille d'or avec ruban bleu-rouge, légèrement balancée
+  c.save(); c.translate(x, y); c.rotate(Math.sin(G.t * 1.6) * .05); c.scale(s, s);
+  c.fillStyle = '#e0392b'; c.beginPath(); c.moveTo(-26, -70); c.lineTo(-6, -70); c.lineTo(10, -20); c.lineTo(-10, -20); c.fill();
+  c.fillStyle = '#1f5fbf'; c.beginPath(); c.moveTo(26, -70); c.lineTo(6, -70); c.lineTo(-10, -20); c.lineTo(10, -20); c.fill();
+  withShadow('rgba(0,0,0,.45)', 16, 0, 6, () => ell(0, 10, 42, 42, '#b07c00'));
+  ell(0, 8, 42, 42, lg(0, -34, 0, 50, [[0, '#fff2a8'], [.5, '#ffc21a'], [1, '#c98d00']])); ell(0, 8, 31, 31, 'rgba(160,100,0,.35)'); ell(0, 6, 29, 29, lg(0, -24, 0, 36, [[0, '#ffe27a'], [1, '#e0a400']]));
+  icon('star', 0, 7, 34, '#fff8d0');
+  const k = (G.t % 3) / 3; if (k < .25) { c.save(); c.beginPath(); c.arc(0, 8, 42, 0, 7); c.clip(); const sx = -60 + k * 4 * 120; c.fillStyle = lg(sx, 0, sx + 30, 0, [[0, 'rgba(255,255,255,0)'], [.5, 'rgba(255,255,255,.7)'], [1, 'rgba(255,255,255,0)']]); c.fillRect(sx, -40, 30, 100); c.restore(); }
+  c.restore();
+}
+// sur une carte terminée, la pastille « NIV. 50 » laisse la place à la médaille
+regionCard = (prev => function (id, x, w, title, sub, col, art, extra) {
+  const r = PAYS_CARTE[id], fini = r && paysFini(r);
+  PAYS_EN_COURS = fini ? id : null;
+  prev(id, x, w, title, sub, col, art, extra);
+  PAYS_EN_COURS = null;
+  if (!fini) return;
+  const y = 290, h = 640;
+  paysMedaille(x + w - 80, y + 70, 1.1);
+  const t = `✓ ${tr('TERMINÉ')}  ·  ${paysEtoiles(r)} ★`; c.font = '900 22px Inter'; const tw = c.measureText(t).width + 40;
+  rr(x + 40, y + h - 60, tw, 40, 20); c.fillStyle = '#ffc21a'; c.fill(); txt(t, x + 40 + tw / 2, y + h - 31, '#2a1a00', 22, 900, 'center');
+})(regionCard);
+crPill = (prev => function (xc, y, t, bg, fg, size) { if (PAYS_EN_COURS && G.screen === 'regions') return; return prev(xc, y, t, bg, fg, size); })(crPill);
+Object.assign(EN, { 'TERMINÉ': 'COMPLETED' });
+
+// =====================================================================
+//  PILE POIL — NOTIFICATIONS
+//  · demandées juste après la 1re caisse du jour ouverte (jamais au lancement)
+//  · 1 par jour maximum, jamais la nuit, plus rien si le joueur part (règles côté serveur)
+//  · Réglages > Notifications : un interrupteur par type + « Tout couper »
+//  Réglage propre à chaque appareil (save.notif est dans DEVICE_KEYS).
+// =====================================================================
+const NF = { open: false, busy: false, askPending: false, sw: null, msg: '' };
+const NF_TYPES = [
+  ['caisse', '🎁', 'Caisse du jour', "Seulement si tu n'as pas encore joué aujourd'hui"],
+  ['duel', '⚔️', 'Duels', "Quand c'est ton tour dans un duel"],
+  ['parrain', '💰', 'Parrainage', "Quand une prime de parrain t'attend"],
+  ['news', '🌍', 'Nouveautés', 'Nouveau pays ou nouvelle saison (rare)'],
+];
+const NF_DEF = { caisse: true, duel: true, parrain: true, news: false };
+const nfState = () => { if (!save.notif || typeof save.notif !== 'object') save.notif = { on: false, prefs: Object.assign({}, NF_DEF), ask: 0, n: 0 }; return save.notif; };
+const nfIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const nfStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const nfSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && typeof SB !== 'undefined' && !!SB;
+const nfDemo = () => /nfdemo/.test(location.search);
+const nfPerm = () => (typeof Notification !== 'undefined' ? Notification.permission : 'default');
+
+// le petit programme qui reçoit les notifications (il ne garde rien en mémoire : pas de vieille version du jeu)
+if (nfSupported() && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').then(r => { NF.sw = r; }).catch(() => {});
+}
+function nfKey(b64) { const p = '='.repeat((4 - b64.length % 4) % 4), s = atob((b64 + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...s].map(ch => ch.charCodeAt(0))); }
+
+async function nfEnable() {
+  const S = nfState(), en = save.lang === 'en';
+  if (nfDemo()) { S.on = true; writeSave(save); toast(en ? 'Notifications on ✓' : 'Notifications activées ✓', '#3cf29b'); return; }
+  if (!nfSupported()) return toast(nfIOS() && !nfStandalone() ? (en ? 'Install the game on your home screen first' : "Installe d'abord le jeu sur ton écran d'accueil") : (en ? 'Not available on this device' : 'Non disponible sur cet appareil'), '#ffb36b');
+  if (NF.busy) return; NF.busy = true;
+  try {
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') { toast(en ? 'Notifications blocked' : 'Notifications refusées : modifiable dans les réglages du téléphone', '#ffb36b'); return; }
+    const reg = NF.sw || await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const { data: key, error: ke } = await SB.rpc('push_public_key'); if (ke || !key) throw new Error('clé');
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: nfKey(key) });
+    const { error } = await SB.rpc('push_save', { p_pid: save.pid, p_sub: sub.toJSON(), p_prefs: S.prefs, p_token: ACC.token || null });
+    if (error) throw error;
+    S.on = true; writeSave(save); nfSeen(true);
+    toast(en ? 'Notifications on ✓' : 'Notifications activées ✓', '#3cf29b');
+  } catch (e) { toast(en ? 'Could not turn on notifications, try again later' : "Impossible d'activer les notifications, réessaie plus tard", '#ffb36b'); }
+  finally { NF.busy = false; }
+}
+async function nfAllOff() {
+  const S = nfState(); S.on = false; writeSave(save);
+  if (nfDemo() || !nfSupported()) return;
+  try { const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
+  try { await SB.rpc('push_off', { p_pid: save.pid }); } catch (e) {}
+}
+function nfPrefsPush() { const S = nfState(); writeSave(save); if (S.on && nfSupported() && !nfDemo()) SB.rpc('push_prefs', { p_pid: save.pid, p_prefs: S.prefs }).then(() => {}, () => {}); }
+// « le joueur a joué aujourd'hui » (+ ses duels) : une fois par jour suffit
+function nfSeen(force) {
+  const S = nfState(); if (!S.on || !nfSupported() || nfDemo()) return;
+  const d = todayKey(), duels = (typeof tdMine === 'function' ? tdMine() : []).map(e => e.token).filter(Boolean).slice(-30);
+  if (!force && S.seen === d && S.dn === duels.length) return;   // une fois par jour, ou dès qu'un nouveau duel commence
+  S.seen = d; S.dn = duels.length; writeSave(save);
+  SB.rpc('push_seen', { p_pid: save.pid, p_duels: duels, p_token: ACC.token || null }).then(() => {}, () => {});
+}
+startLevel = (prev => function (n) { prev(n); try { nfSeen(false); } catch (e) {} })(startLevel);
+setTimeout(() => { try { nfSeen(false); } catch (e) {} }, 5000);
+
+// ---------- la demande : juste après la première caisse du jour ouverte ----------
+function nfCanAsk() {
+  const S = nfState(); if (S.on || (!nfDemo() && nfPerm() === 'denied')) return false;
+  if (!(nfSupported() || nfDemo())) return false;
+  if ((S.n || 0) >= 2) return false;                                   // 2 propositions maximum
+  return Date.now() - (S.ask || 0) > 21 * 864e5;                        // et pas plus d'une toutes les 3 semaines
+}
+crTake = (prev => function () { const r = prev.apply(this, arguments); if (nfCanAsk()) NF.askPending = true; return r; })(crTake);
+function nfAsk() {
+  const S = nfState(), en = save.lang === 'en'; S.ask = Date.now(); S.n = (S.n || 0) + 1; writeSave(save);
+  modal({ title: en ? 'SHALL WE LET YOU KNOW?' : 'ON TE PRÉVIENT ?',
+    lines: [en ? 'Only when it matters:' : 'Juste quand ça vaut le coup :', en ? '🎁 your daily crate is ready' : '🎁 ta caisse du jour est prête', en ? "⚔️ it's your turn in a duel" : "⚔️ c'est ton tour dans un duel", en ? '💰 a sponsor bonus is waiting' : "💰 une prime de parrain t'attend", en ? '1 notification a day max · never at night' : '1 notification par jour maximum · jamais la nuit'],
+    yes: en ? 'YES, NOTIFY ME' : 'OUI, PRÉVIENS-MOI', no: en ? 'NOT NOW' : 'PAS MAINTENANT',
+    onYes: () => onGesture(() => nfEnable()) });
+}
+drawTitle = (prev => function () { prev(); if (NF.askPending && !MO && G.screen === 'title') { NF.askPending = false; nfAsk(); } })(drawTitle);
+
+// ---------- Réglages : le cadre NOTIFICATIONS + le panneau détaillé ----------
+drawSettings = (prev => function () {
+  prev();
+  G.buttons = G.buttons.filter(b => b.id !== 'notif');
+  const S = nfState(), en = save.lang === 'en', x = 980, y = 540, w = 830, h = 200;
+  rr(x, y, w, h, 24); c.fillStyle = '#0d1424'; c.fill(); panel(x, y, w, h, 'NOTIFICATIONS');
+  const ok = nfSupported() || nfDemo();
+  if (S.on) {
+    const nb = NF_TYPES.filter(([k]) => S.prefs[k]).length;
+    txt(en ? `On · ${nb} type${nb > 1 ? 's' : ''} active` : `Activées · ${nb} type${nb > 1 ? 's' : ''} sur 4`, x + 36, y + 110, '#3cf29b', 24, 900);
+    txt(en ? '1 a day max, between 9 am and 9 pm' : '1 par jour maximum, entre 9 h et 21 h', x + 36, y + 148, '#9fb7cf', 17, 700);
+    smallBtn('nfOpen', x + w - 300, y + 82, 260, 66, en ? 'MANAGE' : 'GÉRER', 'blue');
+  } else if (!ok) {
+    txt(nfIOS() && !nfStandalone() ? (en ? 'Install the game on your home screen' : "Installe le jeu sur ton écran d'accueil") : (en ? 'Not available on this device' : 'Non disponible sur cet appareil'), x + 36, y + 110, '#e6eef8', 22, 800);
+    txt(nfIOS() && !nfStandalone() ? (en ? 'iPhone only allows notifications for installed apps' : "Sur iPhone, les notifications marchent avec l'appli installée") : (en ? 'Try Chrome, Edge or Firefox' : 'Essaie avec Chrome, Edge ou Firefox'), x + 36, y + 148, '#9fb7cf', 17, 700);
+  } else if (nfPerm() === 'denied' && !nfDemo()) {
+    txt(en ? 'Blocked on this device' : 'Bloquées sur cet appareil', x + 36, y + 110, '#ffb36b', 22, 800);
+    txt(en ? "Allow them in your phone or browser settings" : 'Autorise-les dans les réglages du téléphone ou du navigateur', x + 36, y + 148, '#9fb7cf', 17, 700);
+  } else {
+    txt(en ? 'Daily crate, duels, sponsor bonus' : 'Caisse du jour, duels, primes de parrain', x + 36, y + 110, '#e6eef8', 22, 800);
+    txt(en ? '1 a day max · never at night' : '1 par jour maximum · jamais la nuit', x + 36, y + 148, '#9fb7cf', 17, 700);
+    smallBtn('nfOn', x + w - 300, y + 82, 260, 66, en ? 'TURN ON' : 'ACTIVER', 'go');
+  }
+  if (NF.open) drawNfPanel();
+})(drawSettings);
+function drawNfPanel() {
+  const S = nfState(), en = save.lang === 'en';
+  G.buttons = []; fillR(0, 0, W, H, 'rgba(4,6,16,.78)');
+  const x = 490, y = 140, w = 940, h = 800;
+  rr(x, y, w, h, 34); c.fillStyle = '#121a2c'; c.fill(); rr(x, y, w, h, 34); c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke();
+  T(en ? 'NOTIFICATIONS' : 'RÉGLAGES · NOTIFICATIONS', x + 50, y + 82, '#ffc21a', 46);
+  txt(en ? '1 a day max, between 9 am and 9 pm' : '1 par jour maximum, entre 9 h et 21 h', x + 52, y + 122, '#9fb7cf', 20, 700);
+  NF_TYPES.forEach(([k, e, t, d], i) => {
+    const ry = y + 160 + i * 116; if (i) fillR(x + 50, ry - 8, w - 100, 1, 'rgba(255,255,255,.08)');
+    txt(`${e}  ${tr(t)}`, x + 52, ry + 50, '#fff', 28, 900); txt(tr(d), x + 52, ry + 86, '#9fb7cf', 19, 700);
+    toggle('nfT:' + k, x + w - 150, ry + 28, !!S.prefs[k], false);
+  });
+  smallBtn('nfAll', x + 50, y + h - 116, 360, 70, en ? 'TURN ALL OFF' : 'TOUT COUPER', 'off'); G.buttons.push({ id: 'nfAll', x: x + 50, y: y + h - 116, w: 360, h: 70 });
+  smallBtn('nfClose', x + w - 410, y + h - 116, 360, 70, en ? 'DONE' : 'TERMINÉ', 'go');
+}
+act = (prev => function (id) {
+  if (MO) return prev(id);
+  let m;
+  if (id === 'nfOn') { sfx.click(); onGesture(() => nfEnable()); return; }
+  if (id === 'nfOpen') { sfx.click(); NF.open = true; return; }
+  if (id === 'nfClose') { sfx.click(); NF.open = false; return; }
+  if (id === 'nfAll') { sfx.click(); NF.open = false; nfAllOff(); toast(save.lang === 'en' ? 'Notifications off' : 'Notifications coupées', '#9fb7cf'); return; }
+  if ((m = id.match(/^nfT:(\w+)$/))) { sfx.click(); const S = nfState(); S.prefs[m[1]] = !S.prefs[m[1]]; nfPrefsPush(); if (!NF_TYPES.some(([k]) => S.prefs[k])) { NF.open = false; nfAllOff(); } return; }
+  if (id === 'setBack') NF.open = false;
+  return prev(id);
+})(act);
+addEventListener('keydown', e => { if (e.key === 'Escape' && NF.open) { NF.open = false; e.stopImmediatePropagation(); } }, true);
+
+Object.assign(EN, { 'Caisse du jour': 'Daily crate', 'Duels': 'Duels', 'Parrainage': 'Invite friends', 'Nouveautés': 'News',
+  "Seulement si tu n'as pas encore joué aujourd'hui": "Only if you haven't played today", "Quand c'est ton tour dans un duel": "When it's your turn in a duel",
+  "Quand une prime de parrain t'attend": 'When a sponsor bonus is waiting', 'Nouveau pays ou nouvelle saison (rare)': 'New country or season (rare)' });
 
 </script>
 </body></html>
