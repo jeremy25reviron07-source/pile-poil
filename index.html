@@ -10301,6 +10301,8 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
     else if (glyph === 'U') { px.moveTo(x, y - s); px.lineTo(x - s, y + s * .6); px.lineTo(x + s, y + s * .6); } else { px.moveTo(x, y + s); px.lineTo(x - s, y - s * .6); px.lineTo(x + s, y - s * .6); } px.fill(); px.restore(); }
   function draw() {
     requestAnimationFrame(draw); if (document.hidden) return; const W2 = pad.width, H2 = pad.height;
+    // sans manette sur les côtés, le fond ne change que toutes les 200 ms : inutile de le repeindre à chaque image
+    const padOn = window.SIDEPAD && G.screen === 'play' && !G.paused && B.power; if (!padOn && (draw.k = (draw.k || 0) + 1) % 12) return;
     px.fillStyle = '#0b1020'; px.fillRect(0, 0, W2, H2); px.save(); px.globalAlpha = .4; px.imageSmoothingEnabled = true; try { px.drawImage(window.ppAmb, 0, 0, W2, H2); } catch (e) {} px.restore();
     if (!window.SIDEPAD || G.screen !== 'play' || G.paused || !B.power) return;
     const g = window.GUT; px.fillStyle = 'rgba(8,12,24,.55)'; px.fillRect(0, 0, g.l * dpr, H2); px.fillRect(g.r * dpr, 0, W2 - g.r * dpr, H2);
@@ -11104,7 +11106,7 @@ finish = (prev => function (lvl, res) {
 //  PILE POIL — pages légales (mentions, conditions de vente, confidentialité)
 //  Le texte est injecté par build.py depuis build/legal_content.html ; le site a aussi legal.html
 // =====================================================================
-const LEGAL_HTML = "<p class=\"maj\">Derni\u00e8re mise \u00e0 jour : [DATE DE MISE EN LIGNE]</p>\n<nav class=\"sommaire\"><a href=\"#mentions\">Mentions l\u00e9gales</a> \u00b7 <a href=\"#cgv\">Conditions g\u00e9n\u00e9rales de vente</a> \u00b7 <a href=\"#confidentialite\">Confidentialit\u00e9</a></nav>\n\n<section id=\"mentions\">\n<h2>Mentions l\u00e9gales</h2>\n<h3>\u00c9diteur du jeu</h3>\n<p>PILE POIL est \u00e9dit\u00e9 par <b>[PR\u00c9NOM NOM]</b>, entrepreneur individuel (micro-entreprise), exer\u00e7ant sous le nom commercial \u00ab PILE POIL \u00bb.<br>\nAdresse : [ADRESSE DE DOMICILIATION]<br>\nSIRET : [NUM\u00c9RO SIRET]<br>\nContact : [E-MAIL DE CONTACT]<br>\nDirecteur de la publication : [PR\u00c9NOM NOM].<br>\nTVA non applicable, article 293 B du Code g\u00e9n\u00e9ral des imp\u00f4ts.</p>\n<h3>H\u00e9bergement</h3>\n<p>Site : [H\u00c9BERGEUR DU SITE, adresse].<br>\nComptes joueurs, scores et sauvegardes : Supabase Inc. (serveurs situ\u00e9s en Irlande, Union europ\u00e9enne).<br>\nPaiements : Stripe Payments Europe Ltd., 1 Grand Canal Street Lower, Dublin 2, Irlande.</p>\n<h3>Propri\u00e9t\u00e9 intellectuelle</h3>\n<p>Le jeu, ses graphismes, ses sons et ses musiques sont cr\u00e9\u00e9s pour PILE POIL. Toute reproduction sans autorisation est interdite. PILE POIL est n\u00e9 d'un projet p\u00e9dagogique r\u00e9alis\u00e9 au CESI de Saint-\u00c9tienne-du-Rouvray. Le CESI n'est pas l'\u00e9diteur du jeu et n'est pas responsable de son exploitation.</p>\n</section>\n\n<section id=\"cgv\">\n<h2>Conditions g\u00e9n\u00e9rales de vente</h2>\n<h3>1. Objet</h3>\n<p>Ces conditions s'appliquent aux achats de contenus num\u00e9riques propos\u00e9s dans la boutique du jeu PILE POIL : packs de pi\u00e8ces virtuelles et \u00e9l\u00e9ments cosm\u00e9tiques (peintures, tenues). Tout achat implique leur acceptation.</p>\n<h3>2. Produits et prix</h3>\n<p>Les packs, leur contenu et leur prix sont affich\u00e9s dans la boutique avant le paiement. Les prix sont indiqu\u00e9s en euros, toutes taxes comprises. TVA non applicable, article 293 B du CGI. Le jeu reste enti\u00e8rement gratuit et jouable sans achat.</p>\n<p>Les pi\u00e8ces sont une monnaie virtuelle utilisable uniquement dans le jeu. Elles n'ont aucune valeur mon\u00e9taire, ne sont ni remboursables en argent, ni \u00e9changeables, ni transf\u00e9rables \u00e0 un autre joueur.</p>\n<h3>3. Commande et paiement</h3>\n<p>Le paiement se fait par carte bancaire, Apple Pay ou Google Pay sur une page s\u00e9curis\u00e9e de Stripe. Aucune donn\u00e9e bancaire ne transite par le jeu ni n'est conserv\u00e9e par l'\u00e9diteur. Un re\u00e7u est envoy\u00e9 par Stripe \u00e0 l'adresse e-mail indiqu\u00e9e lors du paiement.</p>\n<h3>4. Livraison</h3>\n<p>Le contenu achet\u00e9 est cr\u00e9dit\u00e9 automatiquement, en g\u00e9n\u00e9ral en quelques secondes apr\u00e8s la confirmation du paiement, sur l'appareil ou le compte joueur utilis\u00e9. Si le contenu n'appara\u00eet pas sous 24 heures, \u00e9cris \u00e0 [E-MAIL DE CONTACT] avec ton re\u00e7u Stripe : il sera cr\u00e9dit\u00e9 ou rembours\u00e9.</p>\n<h3>5. Droit de r\u00e9tractation</h3>\n<p>Le contenu num\u00e9rique est fourni imm\u00e9diatement apr\u00e8s l'achat. Conform\u00e9ment \u00e0 l'article L221-28, 13\u00b0 du Code de la consommation, en confirmant l'achat tu demandes l'ex\u00e9cution imm\u00e9diate et tu reconnais renoncer \u00e0 ton droit de r\u00e9tractation de 14 jours. En cas d'erreur manifeste (achat en double, contenu non livr\u00e9), contacte [E-MAIL DE CONTACT] : la demande sera \u00e9tudi\u00e9e et, si elle est fond\u00e9e, rembours\u00e9e.</p>\n<h3>6. Mineurs</h3>\n<p>Un joueur mineur doit obtenir l'accord d'un parent ou d'un repr\u00e9sentant l\u00e9gal avant tout achat. Un parent peut demander le remboursement d'un achat fait sans son accord en \u00e9crivant \u00e0 [E-MAIL DE CONTACT] dans les 14 jours.</p>\n<h3>7. Disponibilit\u00e9 du jeu</h3>\n<p>L'\u00e9diteur fait son possible pour que le jeu reste accessible, mais ne peut garantir une disponibilit\u00e9 permanente. Les contenus achet\u00e9s restent attach\u00e9s au compte joueur. En cas d'arr\u00eat d\u00e9finitif du jeu, les joueurs seront pr\u00e9venus au moins 30 jours \u00e0 l'avance.</p>\n<h3>8. Comptes et triche</h3>\n<p>Un compte utilis\u00e9 pour tricher, contourner le paiement ou nuire aux autres joueurs peut \u00eatre suspendu. Les achats l\u00e9gitimes d'un compte suspendu par erreur sont r\u00e9tablis.</p>\n<h3>9. R\u00e9clamations et m\u00e9diation</h3>\n<p>Pour toute r\u00e9clamation : [E-MAIL DE CONTACT]. Une r\u00e9ponse est apport\u00e9e sous 7 jours. En cas de d\u00e9saccord persistant, tu peux recourir gratuitement au m\u00e9diateur de la consommation : [NOM DU M\u00c9DIATEUR], [SITE ET ADRESSE DU M\u00c9DIATEUR]. Tu peux aussi utiliser la plateforme europ\u00e9enne de r\u00e8glement des litiges en ligne.</p>\n<h3>10. Droit applicable</h3>\n<p>Ces conditions sont soumises au droit fran\u00e7ais. En cas de litige, et apr\u00e8s tentative de r\u00e9solution amiable, les tribunaux comp\u00e9tents sont ceux pr\u00e9vus par la loi.</p>\n</section>\n\n<section id=\"confidentialite\">\n<h2>Confidentialit\u00e9 et donn\u00e9es personnelles</h2>\n<h3>Responsable du traitement</h3>\n<p>[PR\u00c9NOM NOM], \u00e9diteur de PILE POIL, joignable \u00e0 [E-MAIL DE CONTACT].</p>\n<h3>Donn\u00e9es collect\u00e9es et utilisation</h3>\n<ul>\n<li><b>Sans compte</b> : la progression est enregistr\u00e9e sur ton appareil (stockage local du navigateur), avec un identifiant al\u00e9atoire de partie. Aucune donn\u00e9e n'identifie la personne.</li>\n<li><b>Compte joueur</b> (facultatif) : pseudo, mot de passe (stock\u00e9 chiffr\u00e9, jamais lisible) et sauvegarde de partie, pour retrouver ta progression sur plusieurs appareils.</li>\n<li><b>Classements et duels</b> : pseudo, scores et r\u00e9sultats, affich\u00e9s publiquement aux autres joueurs.</li>\n<li><b>Achats</b> : Stripe traite le paiement et l'adresse e-mail du re\u00e7u. L'\u00e9diteur re\u00e7oit uniquement la confirmation du paiement, le montant et l'identifiant de partie \u00e0 cr\u00e9diter.</li>\n</ul>\n<p>Ces donn\u00e9es servent uniquement \u00e0 faire fonctionner le jeu, les classements et la boutique. Elles ne sont ni vendues, ni lou\u00e9es, ni utilis\u00e9es pour de la publicit\u00e9.</p>\n<h3>Cookies</h3>\n<p>Le jeu n'utilise aucun cookie publicitaire ni outil de suivi. Seul le stockage local n\u00e9cessaire au fonctionnement du jeu (progression, r\u00e9glages) est utilis\u00e9. Aucun consentement n'est donc demand\u00e9.</p>\n<h3>Dur\u00e9e de conservation</h3>\n<p>Les comptes sont conserv\u00e9s tant qu'ils sont utilis\u00e9s, puis supprim\u00e9s apr\u00e8s 3 ans d'inactivit\u00e9. Les donn\u00e9es de paiement sont conserv\u00e9es par Stripe selon ses obligations l\u00e9gales (10 ans pour les pi\u00e8ces comptables).</p>\n<h3>Sous-traitants</h3>\n<p>Supabase (base de donn\u00e9es, serveurs en Irlande), Stripe (paiement) et [H\u00c9BERGEUR DU SITE]. Ces prestataires respectent le RGPD.</p>\n<h3>Tes droits</h3>\n<p>Tu peux demander l'acc\u00e8s, la rectification ou la suppression de tes donn\u00e9es, et la suppression de ton compte, en \u00e9crivant \u00e0 [E-MAIL DE CONTACT]. Tu peux aussi saisir la CNIL (cnil.fr).</p>\n</section>\n";
+const LEGAL_HTML = "<p class=\"maj\">Derni\u00e8re mise \u00e0 jour : [DATE DE MISE EN LIGNE]</p>\n<nav class=\"sommaire\"><a href=\"#mentions\">Mentions l\u00e9gales</a> \u00b7 <a href=\"#cgv\">Conditions g\u00e9n\u00e9rales de vente</a> \u00b7 <a href=\"#confidentialite\">Confidentialit\u00e9</a></nav>\n\n<section id=\"mentions\">\n<h2>Mentions l\u00e9gales</h2>\n<h3>\u00c9diteur du jeu</h3>\n<p>PILE POIL est \u00e9dit\u00e9 par <b>[PR\u00c9NOM NOM]</b>, entrepreneur individuel (micro-entreprise), exer\u00e7ant sous le nom commercial \u00ab PILE POIL \u00bb.<br>\nAdresse : [ADRESSE DE DOMICILIATION]<br>\nSIRET : [NUM\u00c9RO SIRET]<br>\nContact : <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a><br>\nDirecteur de la publication : [PR\u00c9NOM NOM].<br>\nTVA non applicable, article 293 B du Code g\u00e9n\u00e9ral des imp\u00f4ts.</p>\n<h3>H\u00e9bergement</h3>\n<p>Site : [H\u00c9BERGEUR DU SITE, adresse].<br>\nComptes joueurs, scores et sauvegardes : Supabase Inc. (serveurs situ\u00e9s en Irlande, Union europ\u00e9enne).<br>\nPaiements : Stripe Payments Europe Ltd., 1 Grand Canal Street Lower, Dublin 2, Irlande.</p>\n<h3>Propri\u00e9t\u00e9 intellectuelle</h3>\n<p>Le jeu, ses graphismes, ses sons et ses musiques sont cr\u00e9\u00e9s pour PILE POIL. Toute reproduction sans autorisation est interdite. PILE POIL est n\u00e9 d'un projet p\u00e9dagogique r\u00e9alis\u00e9 au CESI de Saint-\u00c9tienne-du-Rouvray. Le CESI n'est pas l'\u00e9diteur du jeu et n'est pas responsable de son exploitation.</p>\n</section>\n\n<section id=\"cgv\">\n<h2>Conditions g\u00e9n\u00e9rales de vente</h2>\n<h3>1. Objet</h3>\n<p>Ces conditions s'appliquent aux achats de contenus num\u00e9riques propos\u00e9s dans la boutique du jeu PILE POIL : packs de pi\u00e8ces virtuelles et \u00e9l\u00e9ments cosm\u00e9tiques (peintures, tenues). Tout achat implique leur acceptation.</p>\n<h3>2. Produits et prix</h3>\n<p>Les packs, leur contenu et leur prix sont affich\u00e9s dans la boutique avant le paiement. Les prix sont indiqu\u00e9s en euros, toutes taxes comprises. TVA non applicable, article 293 B du CGI. Le jeu reste enti\u00e8rement gratuit et jouable sans achat.</p>\n<p>Les pi\u00e8ces sont une monnaie virtuelle utilisable uniquement dans le jeu. Elles n'ont aucune valeur mon\u00e9taire, ne sont ni remboursables en argent, ni \u00e9changeables, ni transf\u00e9rables \u00e0 un autre joueur.</p>\n<h3>3. Commande et paiement</h3>\n<p>Le paiement se fait par carte bancaire, Apple Pay ou Google Pay sur une page s\u00e9curis\u00e9e de Stripe. Aucune donn\u00e9e bancaire ne transite par le jeu ni n'est conserv\u00e9e par l'\u00e9diteur. Un re\u00e7u est envoy\u00e9 par Stripe \u00e0 l'adresse e-mail indiqu\u00e9e lors du paiement.</p>\n<h3>4. Livraison</h3>\n<p>Le contenu achet\u00e9 est cr\u00e9dit\u00e9 automatiquement, en g\u00e9n\u00e9ral en quelques secondes apr\u00e8s la confirmation du paiement, sur l'appareil ou le compte joueur utilis\u00e9. Si le contenu n'appara\u00eet pas sous 24 heures, \u00e9cris \u00e0 <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a> avec ton re\u00e7u Stripe : il sera cr\u00e9dit\u00e9 ou rembours\u00e9.</p>\n<h3>5. Droit de r\u00e9tractation</h3>\n<p>Le contenu num\u00e9rique est fourni imm\u00e9diatement apr\u00e8s l'achat. Conform\u00e9ment \u00e0 l'article L221-28, 13\u00b0 du Code de la consommation, en confirmant l'achat tu demandes l'ex\u00e9cution imm\u00e9diate et tu reconnais renoncer \u00e0 ton droit de r\u00e9tractation de 14 jours. En cas d'erreur manifeste (achat en double, contenu non livr\u00e9), contacte <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a> : la demande sera \u00e9tudi\u00e9e et, si elle est fond\u00e9e, rembours\u00e9e.</p>\n<h3>6. Mineurs</h3>\n<p>Un joueur mineur doit obtenir l'accord d'un parent ou d'un repr\u00e9sentant l\u00e9gal avant tout achat. Un parent peut demander le remboursement d'un achat fait sans son accord en \u00e9crivant \u00e0 <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a> dans les 14 jours.</p>\n<h3>7. Disponibilit\u00e9 du jeu</h3>\n<p>L'\u00e9diteur fait son possible pour que le jeu reste accessible, mais ne peut garantir une disponibilit\u00e9 permanente. Les contenus achet\u00e9s restent attach\u00e9s au compte joueur. En cas d'arr\u00eat d\u00e9finitif du jeu, les joueurs seront pr\u00e9venus au moins 30 jours \u00e0 l'avance.</p>\n<h3>8. Comptes et triche</h3>\n<p>Un compte utilis\u00e9 pour tricher, contourner le paiement ou nuire aux autres joueurs peut \u00eatre suspendu. Les achats l\u00e9gitimes d'un compte suspendu par erreur sont r\u00e9tablis.</p>\n<h3>9. R\u00e9clamations et m\u00e9diation</h3>\n<p>Pour toute r\u00e9clamation : <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a>. Une r\u00e9ponse est apport\u00e9e sous 7 jours. En cas de d\u00e9saccord persistant, tu peux recourir gratuitement au m\u00e9diateur de la consommation : [NOM DU M\u00c9DIATEUR], [SITE ET ADRESSE DU M\u00c9DIATEUR]. Tu peux aussi utiliser la plateforme europ\u00e9enne de r\u00e8glement des litiges en ligne.</p>\n<h3>10. Droit applicable</h3>\n<p>Ces conditions sont soumises au droit fran\u00e7ais. En cas de litige, et apr\u00e8s tentative de r\u00e9solution amiable, les tribunaux comp\u00e9tents sont ceux pr\u00e9vus par la loi.</p>\n</section>\n\n<section id=\"confidentialite\">\n<h2>Confidentialit\u00e9 et donn\u00e9es personnelles</h2>\n<h3>Responsable du traitement</h3>\n<p>[PR\u00c9NOM NOM], \u00e9diteur de PILE POIL, joignable \u00e0 <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a>.</p>\n<h3>Donn\u00e9es collect\u00e9es et utilisation</h3>\n<ul>\n<li><b>Sans compte</b> : la progression est enregistr\u00e9e sur ton appareil (stockage local du navigateur), avec un identifiant al\u00e9atoire de partie. Aucune donn\u00e9e n'identifie la personne.</li>\n<li><b>Compte joueur</b> (facultatif) : pseudo, mot de passe (stock\u00e9 chiffr\u00e9, jamais lisible) et sauvegarde de partie, pour retrouver ta progression sur plusieurs appareils.</li>\n<li><b>Classements et duels</b> : pseudo, scores et r\u00e9sultats, affich\u00e9s publiquement aux autres joueurs.</li>\n<li><b>Achats</b> : Stripe traite le paiement et l'adresse e-mail du re\u00e7u. L'\u00e9diteur re\u00e7oit uniquement la confirmation du paiement, le montant et l'identifiant de partie \u00e0 cr\u00e9diter.</li>\n</ul>\n<p>Ces donn\u00e9es servent uniquement \u00e0 faire fonctionner le jeu, les classements et la boutique. Elles ne sont ni vendues, ni lou\u00e9es, ni utilis\u00e9es pour de la publicit\u00e9.</p>\n<h3>Cookies</h3>\n<p>Le jeu n'utilise aucun cookie publicitaire ni outil de suivi. Seul le stockage local n\u00e9cessaire au fonctionnement du jeu (progression, r\u00e9glages) est utilis\u00e9. Aucun consentement n'est donc demand\u00e9.</p>\n<h3>Dur\u00e9e de conservation</h3>\n<p>Les comptes sont conserv\u00e9s tant qu'ils sont utilis\u00e9s, puis supprim\u00e9s apr\u00e8s 3 ans d'inactivit\u00e9. Les donn\u00e9es de paiement sont conserv\u00e9es par Stripe selon ses obligations l\u00e9gales (10 ans pour les pi\u00e8ces comptables).</p>\n<h3>Sous-traitants</h3>\n<p>Supabase (base de donn\u00e9es, serveurs en Irlande), Stripe (paiement) et [H\u00c9BERGEUR DU SITE]. Ces prestataires respectent le RGPD.</p>\n<h3>Tes droits</h3>\n<p>Tu peux demander l'acc\u00e8s, la rectification ou la suppression de tes donn\u00e9es, et la suppression de ton compte, en \u00e9crivant \u00e0 <a href=\"mailto:pilepoil.jeu@gmail.com\">pilepoil.jeu@gmail.com</a>. Tu peux aussi saisir la CNIL (cnil.fr).</p>\n</section>\n";
 let LGO = null;
 function openLegal(anchor) {
   if (!LGO) {
@@ -12721,99 +12723,213 @@ drawWorkers = (prev => function (lvl) {
 })(drawWorkers);
 
 // =====================================================================
-//  PILE POIL — PERSONNAGE v2 : femmes et hommes, coupes, couleurs de cheveux, plus de teints et d'accessoires
+//  PILE POIL — PERSONNAGE v3 : homme ou femme, coupes et accessoires propres à chacun,
+//  barbes (homme), maquillage et bijoux (femme), sourcils, yeux colorés, 10 teints
 // =====================================================================
-AV_SKIN.push('#ffe3cc', '#3b2316', '#d9a07a', '#b97850');   // 10 teints (les anciens choix gardent leur numéro)
-const AV_HAIR = [['Court'], ['Rasé'], ['Mi-long'], ['Long'], ['Queue de cheval'], ['Chignon'], ['Tresse'], ['Bouclé'], ['Carré'], ['Couettes']];
+AV_SKIN.push('#ffe3cc', '#3b2316', '#d9a07a', '#b97850');   // 10 teints (les anciens gardent leur numéro)
 const AV_HCOL = ['#1c1410', '#3b2416', '#6b4423', '#8a3b1f', '#c2562a', '#d9b26a', '#eadfb8', '#9a9a9a', '#ff7ab8', '#3a7bd5'];
-AV_ACC.push(['bo', 'Boucles'], ['rou', 'Rousseur'], ['lev', 'Rouge à lèvres'], ['pie', 'Piercing']);
-const AV2 = () => { const a = AV(); if (a.g === undefined) { a.g = 0; a.hair = 0; a.hc = 1; a.v2 = 1; } return a; };
-function avHairBack(cx, cy, r, st, col) {
+const AV_EYE = [['#4a2c1a', 'Marron'], ['#7a5a2a', 'Noisette'], ['#3f7a4a', 'Vert'], ['#3a6fb0', 'Bleu'], ['#6f7a86', 'Gris']];
+const HAIR_H = [['court', 'Court'], ['rase', 'Rasé'], ['degrade', 'Dégradé'], ['milong', 'Mi-long'], ['boucle', 'Bouclé'], ['afro', 'Afro'], ['mulet', 'Mulet'], ['dreads', 'Dreadlocks']];
+const HAIR_F = [['long', 'Long lisse'], ['ondule', 'Long ondulé'], ['queue', 'Queue de cheval'], ['chignon', 'Chignon'], ['tresse', 'Tresse'], ['couettes', 'Couettes'], ['carre', 'Carré'], ['pixie', 'Court'], ['bouclef', 'Bouclé'], ['box', 'Tresses fines']];
+const BEARD = [['none', 'Rasé de près'], ['trois', '3 jours'], ['moust', 'Moustache'], ['bouc', 'Bouc'], ['courte', 'Barbe courte'], ['longue', 'Barbe longue'], ['collier', 'Collier']];
+const ACC_ALL = [['none', 'Aucun'], ['lun', 'Lunettes'], ['sol', 'Lunettes de soleil'], ['aud', 'Casque antibruit', 2], ['rou', 'Taches de rousseur'], ['nez', 'Piercing nez']];
+const ACC_F = [['bo', 'Boucles'], ['creoles', 'Créoles'], ['levres', 'Rouge à lèvres'], ['liner', 'Eye-liner']];
+const ACC_H = [['clou', 'Boucle d\'oreille'], ['cicatrice', 'Cicatrice']];
+const accList = g => g === 1 ? ACC_ALL.concat(ACC_F) : ACC_ALL.concat(ACC_H);
+// migration des anciens réglages (numéros) vers les nouveaux (noms)
+const AV3 = () => {
+  const a = AV(); if (a.v3) return a; const old = ['none', 'lun', 'sol', 'mou', 'bar', 'aud', 'bo', 'rou', 'levres', 'nez'][a.acc || 0] || 'none';
+  a.g = a.g || 0; a.hc = a.hc ?? 1; a.eye = a.eye ?? 0;
+  const hOld = a.hair ?? 0; a.hs = a.g ? ['pixie', 'pixie', 'carre', 'long', 'queue', 'chignon', 'tresse', 'bouclef', 'carre', 'couettes'][hOld] : ['court', 'rase', 'milong', 'milong', 'mulet', 'court', 'dreads', 'boucle', 'milong', 'court'][hOld];
+  a.bd = !a.g && old === 'mou' ? 'moust' : !a.g && old === 'bar' ? 'courte' : 'none'; a.ac = ['mou', 'bar'].includes(old) ? 'none' : (old === 'bo' && !a.g) ? 'clou' : (['bo', 'levres'].includes(old) && !a.g) ? 'none' : old; a.v3 = 1; return a;
+};
+
+// ---------- cheveux ----------
+function avStrands(cx, cy, r, side, len, wd, col, wavy) {   // mèche latérale (côté -1 / 1) qui descend sous le casque
+  c.fillStyle = col; c.beginPath(); c.moveTo(cx + side * r * .5, cy - r * .2);
+  if (wavy) { for (let i = 1; i <= 6; i++) { const y = cy - r * .2 + i * r * (len + .2) / 6; c.lineTo(cx + side * r * (.5 + wd + (i % 2 ? .05 : -.02)), y); } }
+  else c.quadraticCurveTo(cx + side * r * (.52 + wd), cy + r * len * .5, cx + side * r * (.46 + wd * .7), cy + r * len);
+  c.lineTo(cx + side * r * .33, cy + r * (len - .1)); c.quadraticCurveTo(cx + side * r * .37, cy + r * .12, cx + side * r * .32, cy - r * .2); c.closePath(); c.fill();
+}
+function avHairBack(cx, cy, r, hs, col) {   // derrière la tête et les épaules
   const dk = mixc(col, '#000000', .25); c.fillStyle = col;
-  if (st === 2) { c.beginPath(); c.ellipse(cx, cy + r * .2, r * .52, r * .5, 0, 0, 7); c.fill(); }
-  if (st === 3) { c.beginPath(); c.moveTo(cx - r * .52, cy - r * .1); c.quadraticCurveTo(cx - r * .62, cy + r * .7, cx - r * .4, cy + r * .95); c.lineTo(cx + r * .4, cy + r * .95); c.quadraticCurveTo(cx + r * .62, cy + r * .7, cx + r * .52, cy - r * .1); c.fill(); }
-  if (st === 4) { c.save(); c.translate(cx + r * .44, cy + r * .02); c.rotate(.35); c.beginPath(); c.ellipse(r * .1, r * .32, r * .14, r * .38, 0, 0, 7); c.fill(); c.restore(); fillR(cx + r * .36, cy - r * .06, r * .12, r * .1, '#e8402a'); }
-  if (st === 5) { ell(cx, cy - r * .02, r * .2, r * .18, col); ell(cx + r * .18, cy + r * .02, r * .16, r * .15, dk); }
-  if (st === 6) { for (let i = 0; i < 6; i++) ell(cx + r * .4 + Math.sin(i) * r * .03, cy + r * (.1 + i * .14), r * .1, r * .09, i % 2 ? col : dk); }
-  if (st === 7) { for (let i = 0; i < 12; i++) { const a = Math.PI * (.95 + i / 11 * 1.1); ell(cx + Math.cos(a) * r * .5, cy + r * .12 + Math.sin(a) * r * .1 + Math.abs(Math.cos(a)) * r * .2, r * .16, r * .16, i % 2 ? col : dk); } }
-  if (st === 8) { c.beginPath(); c.moveTo(cx - r * .52, cy - r * .12); c.lineTo(cx - r * .54, cy + r * .48); c.quadraticCurveTo(cx, cy + r * .56, cx + r * .54, cy + r * .48); c.lineTo(cx + r * .52, cy - r * .12); c.fill(); }
-  
+  if (hs === 'long' || hs === 'ondule' || hs === 'box') { c.beginPath(); c.moveTo(cx - r * .55, cy - r * .15); c.quadraticCurveTo(cx - r * .66, cy + r * .6, cx - r * .5, cy + r * 1); c.lineTo(cx + r * .5, cy + r * 1); c.quadraticCurveTo(cx + r * .66, cy + r * .6, cx + r * .55, cy - r * .15); c.fill(); }
+  if (hs === 'bouclef' || hs === 'afro') { const R = hs === 'afro' ? .62 : .58; for (let i = 0; i < 16; i++) { const a = Math.PI * (.9 + i / 15 * 1.2); ell(cx + Math.cos(a) * r * R, cy + r * .05 + Math.sin(a) * r * .14 + Math.abs(Math.cos(a)) * r * (hs === 'afro' ? .1 : .3), r * .17, r * .17, i % 2 ? col : dk); } }
+  if (hs === 'mulet' || hs === 'milong' || hs === 'carre') { c.beginPath(); c.ellipse(cx, cy + r * (hs === 'mulet' ? .4 : .22), r * .5, r * (hs === 'mulet' ? .5 : .4), 0, 0, 7); c.fill(); }
+  if (hs === 'queue') { c.save(); c.translate(cx + r * .46, cy + r * .02); c.rotate(.4); c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(r * .26, r * .4, r * .08, r * .82); c.quadraticCurveTo(-r * .06, r * .45, 0, 0); c.fill(); c.restore(); }
+  if (hs === 'chignon') { ell(cx + r * .3, cy - r * .06, r * .2, r * .17, col); ell(cx + r * .36, cy - r * .02, r * .12, r * .1, dk); }
+  if (hs === 'dreads') { for (let i = 0; i < 9; i++) { const x = cx - r * .5 + i * r * .125; c.strokeStyle = i % 2 ? col : dk; c.lineWidth = r * .1; c.lineCap = 'round'; c.beginPath(); c.moveTo(x, cy - r * .1); c.lineTo(x + (i - 4) * r * .02, cy + r * .75); c.stroke(); } c.lineCap = 'butt'; }
 }
-function avHairFront(cx, cy, r, st, col) {
-  if (st === 1) return;   // rasé : rien sous le casque
+function avHairFront(cx, cy, r, hs, col) {   // devant : tempes, mèches sur les épaules
   const dk = mixc(col, '#000000', .22); c.fillStyle = col;
-  const side = (len, wd, blunt) => [-1, 1].forEach(k => { c.beginPath(); c.moveTo(cx + k * r * .5, cy - r * .22); c.quadraticCurveTo(cx + k * r * (.5 + wd), cy + r * len * .5, cx + k * r * (.44 + wd * .6), cy + r * len); c.lineTo(cx + k * r * (blunt ? .3 : .36), cy + r * (len - (blunt ? 0 : .12))); c.quadraticCurveTo(cx + k * r * .36, cy + r * .1, cx + k * r * .3, cy - r * .2); c.closePath(); c.fill(); });
-  if (st === 0) side(.06, .02);
-  else if (st === 2) side(.48, .1);
-  else if (st === 3) side(.86, .14);
-  else if (st === 8) side(.4, .12, true);
-  else if (st === 7) { for (let i = 0; i < 5; i++) [-1, 1].forEach(k => ell(cx + k * r * (.46 + (i % 2) * .06), cy - r * .12 + i * r * .12, r * .12, r * .11, i % 2 ? col : dk)); }
-  else if (st === 9) { side(.12, .04); [-1, 1].forEach(k => { c.save(); c.translate(cx + k * r * .56, cy + r * .02); c.rotate(-k * .2); c.fillStyle = col; c.beginPath(); c.ellipse(0, r * .3, r * .12, r * .3, 0, 0, 7); c.fill(); c.restore(); fillR(cx + k * r * .56 - r * .07, cy - r * .02, r * .14, r * .07, '#ffd21a'); }); }
-  else side(.12, .04);
-  if (st === 2 || st === 3 || st === 8) { c.fillStyle = col; c.beginPath(); c.moveTo(cx - r * .4, cy - r * .2); c.quadraticCurveTo(cx - r * .1, cy - r * .02, cx + r * .12, cy - r * .2); c.fill(); }
+  if (hs === 'rase') { c.fillStyle = mixc(col, '#ffffff', .1); c.globalAlpha = .35; [-1, 1].forEach(k => fillR(cx + k * r * .38 - (k > 0 ? r * .08 : 0), cy - r * .2, r * .08, r * .16, col)); c.globalAlpha = 1; return; }
+  if (hs === 'court') { [-1, 1].forEach(k => avStrands(cx, cy, r, k, .06, .02, col)); }
+  if (hs === 'degrade') { [-1, 1].forEach(k => { avStrands(cx, cy, r, k, -.02, 0, col); c.globalAlpha = .45; fillR(cx + k * r * .36 - (k > 0 ? r * .06 : 0), cy - r * .04, r * .06, r * .1, col); c.globalAlpha = 1; }); }
+  if (hs === 'milong') [-1, 1].forEach(k => avStrands(cx, cy, r, k, .32, .08, col));
+  if (hs === 'boucle') [-1, 1].forEach(k => { for (let i = 0; i < 3; i++) ell(cx + k * r * (.46 + (i % 2) * .04), cy - r * .16 + i * r * .1, r * .1, r * .09, i % 2 ? col : dk); });
+  if (hs === 'mulet') [-1, 1].forEach(k => avStrands(cx, cy, r, k, .06, .02, col));
+  if (hs === 'dreads') [-1, 1].forEach(k => { for (let i = 0; i < 2; i++) { c.strokeStyle = i ? dk : col; c.lineWidth = r * .09; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx + k * r * (.44 + i * .07), cy - r * .14); c.lineTo(cx + k * r * (.5 + i * .08), cy + r * .62); c.stroke(); } c.lineCap = 'butt'; });
+  if (hs === 'long') [-1, 1].forEach(k => avStrands(cx, cy, r, k, .9, .14, col));
+  if (hs === 'ondule') [-1, 1].forEach(k => avStrands(cx, cy, r, k, .88, .14, col, true));
+  if (hs === 'box') [-1, 1].forEach(k => { for (let i = 0; i < 4; i++) { c.strokeStyle = i % 2 ? dk : col; c.lineWidth = r * .045; c.beginPath(); c.moveTo(cx + k * r * (.36 + i * .05), cy - r * .18); c.lineTo(cx + k * r * (.4 + i * .06), cy + r * .95); c.stroke(); } });
+  if (hs === 'carre') [-1, 1].forEach(k => avStrands(cx, cy, r, k, .4, .12, col));
+  if (hs === 'pixie') { [-1, 1].forEach(k => avStrands(cx, cy, r, k, .04, .02, col)); c.beginPath(); c.moveTo(cx - r * .42, cy - r * .2); c.quadraticCurveTo(cx - r * .15, cy - r * .02, cx + r * .1, cy - r * .2); c.fill(); }
+  if (hs === 'bouclef') [-1, 1].forEach(k => { for (let i = 0; i < 5; i++) ell(cx + k * r * (.46 + (i % 2) * .05), cy - r * .14 + i * r * .13, r * .11, r * .1, i % 2 ? col : dk); });
+  if (hs === 'queue' || hs === 'chignon') [-1, 1].forEach(k => avStrands(cx, cy, r, k, .1, .03, col));
+  if (hs === 'tresse') { [-1, 1].forEach(k => avStrands(cx, cy, r, k, .1, .03, col)); for (let i = 0; i < 7; i++) ell(cx - r * .44 + Math.sin(i * 1.3) * r * .02, cy + r * (.02 + i * .13), r * .085, r * .075, i % 2 ? col : dk); fillR(cx - r * .48, cy + r * .9, r * .08, r * .05, '#e8402a'); }
+  if (hs === 'couettes') [-1, 1].forEach(k => { avStrands(cx, cy, r, k, .1, .03, col); c.save(); c.translate(cx + k * r * .58, cy + r * .04); c.rotate(-k * .18); c.fillStyle = col; c.beginPath(); c.ellipse(0, r * .32, r * .12, r * .32, 0, 0, 7); c.fill(); c.restore(); fillR(cx + k * r * .58 - r * .07, cy - r * .02, r * .14, r * .07, '#ffd21a'); });
+  if (['long', 'ondule', 'carre', 'pixie', 'milong'].includes(hs)) { c.fillStyle = col; c.beginPath(); c.moveTo(cx - r * .4, cy - r * .2); c.quadraticCurveTo(cx - r * .12, cy - r * .04, cx + r * .1, cy - r * .2); c.fill(); }
 }
-drawAvatar = function (cx, cy, r, av = AV2()) {
-  const sk = AV_SKIN[av.skin] || AV_SKIN[1], hc = (AV_HELM[av.helm] || AV_HELM[0])[0], acc = (AV_ACC[av.acc] || AV_ACC[0])[0], bg = AV_BG[av.bg] || AV_BG[0], O = opLook();
-  const fem = av.g === 1, st = av.hair ?? (fem ? 3 : 0), hcol = AV_HCOL[av.hc ?? 1] || AV_HCOL[1];
+function avBeard(cx, cy, r, bd, col) {
+  if (!bd || bd === 'none') return;
+  if (bd === 'trois') { c.save(); c.globalAlpha = .28; c.fillStyle = col; c.beginPath(); c.moveTo(cx - r * .37, cy + r * .05); c.quadraticCurveTo(cx - r * .34, cy + r * .5, cx, cy + r * .54); c.quadraticCurveTo(cx + r * .34, cy + r * .5, cx + r * .37, cy + r * .05); c.lineTo(cx + r * .25, cy + r * .28); c.quadraticCurveTo(cx, cy + r * .36, cx - r * .25, cy + r * .28); c.closePath(); c.fill(); c.restore(); return; }
+  c.fillStyle = col;
+  if (bd === 'courte' || bd === 'longue') { const L = bd === 'longue' ? .78 : .58; c.beginPath(); c.moveTo(cx - r * .39, cy + r * .02); c.quadraticCurveTo(cx - r * .38, cy + r * L, cx, cy + r * (L + .04)); c.quadraticCurveTo(cx + r * .38, cy + r * L, cx + r * .39, cy + r * .02); c.lineTo(cx + r * .27, cy + r * .2); c.quadraticCurveTo(cx, cy + r * .36, cx - r * .27, cy + r * .2); c.closePath(); c.fill(); }
+  if (bd === 'collier') { c.lineWidth = r * .07; c.strokeStyle = col; c.beginPath(); c.moveTo(cx - r * .39, cy + r * .02); c.quadraticCurveTo(cx - r * .36, cy + r * .5, cx, cy + r * .54); c.quadraticCurveTo(cx + r * .36, cy + r * .5, cx + r * .39, cy + r * .02); c.stroke(); }
+  if (bd === 'bouc') { c.beginPath(); c.ellipse(cx, cy + r * .43, r * .12, r * .11, 0, 0, 7); c.fill(); }
+  if (bd === 'moust' || bd === 'bouc' || bd === 'courte' || bd === 'longue') { c.beginPath(); c.ellipse(cx - r * .08, cy + r * .21, r * .11, r * .045, -.2, 0, 7); c.ellipse(cx + r * .08, cy + r * .21, r * .11, r * .045, .2, 0, 7); c.fill(); }
+}
+
+// ---------- portrait ----------
+drawAvatar = function (cx, cy, r, av) {
+  av = av ? Object.assign({}, av) : AV3(); if (!av.v3) { const keep = save.av; save.av = av; try { av = Object.assign({}, AV3()); } finally { save.av = keep; } }
+  const fem = av.g === 1, sk = AV_SKIN[av.skin] || AV_SKIN[1], hc = (AV_HELM[av.helm] || AV_HELM[0])[0], bg = AV_BG[av.bg] || AV_BG[0], O = opLook();
+  const hs = av.hs || (fem ? 'long' : 'court'), col = AV_HCOL[av.hc ?? 1] || AV_HCOL[1], ac = av.ac || 'none', eye = (AV_EYE[av.eye] || AV_EYE[0])[0], skd = mixc(sk, '#000000', .14);
   c.save(); c.beginPath(); c.arc(cx, cy, r, 0, 7); c.clip(); fillR(cx - r, cy - r, r * 2, r * 2, lg(0, cy - r, 0, cy + r, [[0, bg[0]], [1, bg[1]]]));
-  avHairBack(cx, cy, r, st, hcol);
-  c.fillStyle = O.jacket || '#23324d'; c.beginPath(); c.ellipse(cx, cy + r * 1.02, r * (fem ? .78 : .86), r * .52, 0, Math.PI, 0); c.fill(); fillR(cx - r * .86, cy + r * .74, r * 1.72, r * .08, O.stripe || '#ffd21a');
-  fillR(cx - r * .13, cy + r * .32, r * .26, r * .22, sk);
-  const fw = fem ? .37 : .4; ell(cx, cy + r * .1, r * fw, r * (fem ? .42 : .44), sk); ell(cx - r * (fw + .0), cy + r * .12, r * .07, r * .11, sk); ell(cx + r * fw, cy + r * .12, r * .07, r * .11, sk);
-  ell(cx - r * .15, cy + r * .06, r * .045, r * .055, '#1a1a1a'); ell(cx + r * .15, cy + r * .06, r * .045, r * .055, '#1a1a1a');
-  if (fem) { [-1, 1].forEach(k => ell(cx + k * r * .15 + k * r * .03, cy + r * .03, r * .02, r * .02, '#1a1a1a')); ell(cx - r * .24, cy + r * .2, r * .06, r * .035, 'rgba(255,120,120,.35)'); ell(cx + r * .24, cy + r * .2, r * .06, r * .035, 'rgba(255,120,120,.35)'); }
-  const lips = acc === 'lev' ? '#c4304a' : fem ? '#b5585e' : '#6a3a2a'; c.strokeStyle = lips; c.lineWidth = Math.max(1.5, r * (acc === 'lev' ? .05 : .035)); c.lineCap = 'round'; c.beginPath(); c.arc(cx, cy + r * .2, r * .12, .3, Math.PI - .3); c.stroke(); c.lineCap = 'butt';
-  if (acc === 'rou') for (let i = 0; i < 7; i++) ell(cx + (i % 2 ? 1 : -1) * r * (.18 + (i % 3) * .05), cy + r * (.13 + (i % 2) * .03), r * .012, r * .012, '#a8643a');
-  if (acc === 'bar') { c.fillStyle = hcol; c.beginPath(); c.moveTo(cx - r * .38, cy + r * .08); c.quadraticCurveTo(cx - r * .36, cy + r * .58, cx, cy + r * .6); c.quadraticCurveTo(cx + r * .36, cy + r * .58, cx + r * .38, cy + r * .08); c.quadraticCurveTo(cx, cy + r * .44, cx - r * .38, cy + r * .08); c.fill(); }
-  if (acc === 'mou' || acc === 'bar') { c.fillStyle = hcol; c.beginPath(); c.ellipse(cx - r * .08, cy + r * .19, r * .1, r * .045, -.2, 0, 7); c.ellipse(cx + r * .08, cy + r * .19, r * .1, r * .045, .2, 0, 7); c.fill(); }
-  if (acc === 'lun' || acc === 'sol') { const dark = acc === 'sol'; c.strokeStyle = '#1a1a1a'; c.lineWidth = Math.max(1.5, r * .035); [-1, 1].forEach(k => { c.beginPath(); c.ellipse(cx + k * r * .16, cy + r * .06, r * .12, r * .1, 0, 0, 7); if (dark) { c.fillStyle = '#14181f'; c.fill(); } c.stroke(); }); ln(cx - r * .04, cy + r * .05, cx + r * .04, cy + r * .05, '#1a1a1a', Math.max(1.5, r * .03)); }
-  if (acc === 'bo') [-1, 1].forEach(k => { ell(cx + k * fw * r, cy + r * .26, r * .035, r * .035, '#ffd447'); });
-  if (acc === 'pie') ell(cx + r * .1, cy + r * .2, r * .022, r * .022, '#dfe5ea');
-  avHairFront(cx, cy, r, st, hcol);
-  c.fillStyle = lg(cx - r * .5, 0, cx + r * .5, 0, [[0, mixc(hc, '#ffffff', .25)], [1, mixc(hc, '#000000', .18)]]); c.beginPath(); c.ellipse(cx, cy - r * .16, r * .5, r * .42, 0, Math.PI, 0); c.fill();
-  fillR(cx - r * .62, cy - r * .2, r * 1.24, r * .1, mixc(hc, '#000000', .12)); fillR(cx - r * .05, cy - r * .56, r * .1, r * .38, mixc(hc, '#ffffff', .3));
-  if (acc === 'aud') [-1, 1].forEach(k => ell(cx + k * r * .44, cy + r * .1, r * .1, r * .16, '#e8402a'));
+  avHairBack(cx, cy, r, hs, col);
+  // épaules, cou
+  c.fillStyle = O.jacket || '#23324d'; c.beginPath(); c.ellipse(cx, cy + r * 1.04, r * (fem ? .76 : .9), r * .54, 0, Math.PI, 0); c.fill(); fillR(cx - r * .9, cy + r * .74, r * 1.8, r * .08, O.stripe || '#ffd21a');
+  fillR(cx - r * (fem ? .11 : .14), cy + r * .3, r * (fem ? .22 : .28), r * .24, skd);
+  // visage : mâchoire plus carrée pour les hommes, plus fine pour les femmes
+  const fw = fem ? .36 : .4; c.fillStyle = sk; c.beginPath(); c.moveTo(cx - r * fw, cy - r * .12);
+  if (fem) { c.quadraticCurveTo(cx - r * fw, cy + r * .4, cx, cy + r * .52); c.quadraticCurveTo(cx + r * fw, cy + r * .4, cx + r * fw, cy - r * .12); }
+  else { c.lineTo(cx - r * fw, cy + r * .26); c.quadraticCurveTo(cx - r * .3, cy + r * .5, cx, cy + r * .53); c.quadraticCurveTo(cx + r * .3, cy + r * .5, cx + r * fw, cy + r * .26); c.lineTo(cx + r * fw, cy - r * .12); }
+  c.closePath(); c.fill(); ell(cx - r * fw, cy + r * .12, r * .07, r * .11, sk); ell(cx + r * fw, cy + r * .12, r * .07, r * .11, sk);
+  if (ac === 'cicatrice') { c.strokeStyle = mixc(sk, '#7a3a2a', .5); c.lineWidth = Math.max(1, r * .02); c.beginPath(); c.moveTo(cx + r * .2, cy - r * .04); c.lineTo(cx + r * .27, cy + r * .14); c.stroke(); }
+  // sourcils
+  c.strokeStyle = mixc(col, '#000000', .2); c.lineCap = 'round'; c.lineWidth = Math.max(1.5, r * (fem ? .028 : .045));
+  [-1, 1].forEach(k => { c.beginPath(); c.moveTo(cx + k * r * .07, cy - r * .02); c.quadraticCurveTo(cx + k * r * .16, cy - r * (fem ? .07 : .05), cx + k * r * .25, cy - r * (fem ? .02 : .03)); c.stroke(); });
+  // yeux (blanc, iris, pupille quand le portrait est assez grand)
+  [-1, 1].forEach(k => { const ex = cx + k * r * .15, ey = cy + r * .06; if (r > 30) { ell(ex, ey, r * .07, r * .05, '#ffffff'); ell(ex, ey, r * .042, r * .045, eye); ell(ex, ey, r * .02, r * .02, '#111'); ell(ex - r * .012, ey - r * .015, r * .01, r * .01, '#fff'); } else ell(ex, ey, r * .045, r * .055, '#1a1a1a');
+    if (ac === 'liner' || fem) { c.strokeStyle = '#1a1a1a'; c.lineWidth = Math.max(1, r * (ac === 'liner' ? .025 : .014)); c.beginPath(); c.moveTo(ex - r * .07, ey - r * .02); c.quadraticCurveTo(ex, ey - r * .065, ex + r * .07, ey - r * .02); if (ac === 'liner') c.lineTo(ex + k * r * .1, ey - r * .05); c.stroke(); } });
+  // nez, joues, bouche
+  c.strokeStyle = skd; c.lineWidth = Math.max(1, r * .025); c.beginPath(); c.moveTo(cx, cy + r * .08); c.quadraticCurveTo(cx + r * .04, cy + r * .16, cx - r * .01, cy + r * .18); c.stroke();
+  if (fem || ac === 'rou') { ell(cx - r * .23, cy + r * .2, r * .06, r * .035, 'rgba(255,120,120,.3)'); ell(cx + r * .23, cy + r * .2, r * .06, r * .035, 'rgba(255,120,120,.3)'); }
+  if (ac === 'rou') for (let i = 0; i < 9; i++) ell(cx + (i % 2 ? 1 : -1) * r * (.16 + (i % 3) * .05), cy + r * (.12 + (i % 3) * .025), r * .012, r * .012, '#a8643a');
+  const lip = ac === 'levres' ? '#c4304a' : fem ? '#c06a6e' : mixc(sk, '#6a3a2a', .5);
+  if (fem || ac === 'levres') { c.fillStyle = lip; c.beginPath(); c.moveTo(cx - r * .1, cy + r * .28); c.quadraticCurveTo(cx, cy + r * .25, cx + r * .1, cy + r * .28); c.quadraticCurveTo(cx, cy + r * .36, cx - r * .1, cy + r * .28); c.fill(); }
+  else { c.strokeStyle = lip; c.lineWidth = Math.max(1.5, r * .03); c.beginPath(); c.arc(cx, cy + r * .2, r * .11, .4, Math.PI - .4); c.stroke(); }
+  c.lineCap = 'butt';
+  if (!fem) avBeard(cx, cy, r, av.bd, col);
+  if (ac === 'nez') ell(cx + r * .045, cy + r * .17, r * .016, r * .016, '#e8edf2');
+  if (ac === 'lun' || ac === 'sol') { const dark = ac === 'sol'; c.strokeStyle = '#1a1a1a'; c.lineWidth = Math.max(1.5, r * .03); [-1, 1].forEach(k => { c.beginPath(); c.ellipse(cx + k * r * .16, cy + r * .06, r * .12, r * .095, 0, 0, 7); if (dark) { c.fillStyle = 'rgba(20,24,31,.92)'; c.fill(); } c.stroke(); }); ln(cx - r * .04, cy + r * .05, cx + r * .04, cy + r * .05, '#1a1a1a', Math.max(1.5, r * .03)); }
+  avHairFront(cx, cy, r, hs, col);
+  if (ac === 'bo') [-1, 1].forEach(k => ell(cx + k * fw * r, cy + r * .24, r * .03, r * .03, '#ffd447'));
+  if (ac === 'creoles') [-1, 1].forEach(k => { c.strokeStyle = '#ffd447'; c.lineWidth = Math.max(1.2, r * .02); c.beginPath(); c.arc(cx + k * fw * r, cy + r * .3, r * .06, 0, 7); c.stroke(); });
+  if (ac === 'clou') ell(cx - fw * r, cy + r * .22, r * .025, r * .025, '#dfe5ea');
+  // casque
+  c.fillStyle = lg(cx - r * .5, 0, cx + r * .5, 0, [[0, mixc(hc, '#ffffff', .25)], [1, mixc(hc, '#000000', .18)]]); c.beginPath(); c.ellipse(cx, cy - r * .16, r * .52, r * .42, 0, Math.PI, 0); c.fill();
+  fillR(cx - r * .64, cy - r * .2, r * 1.28, r * .1, mixc(hc, '#000000', .12)); fillR(cx - r * .05, cy - r * .56, r * .1, r * .38, mixc(hc, '#ffffff', .3));
+  if (ac === 'aud') [-1, 1].forEach(k => { ell(cx + k * r * .44, cy + r * .1, r * .1, r * .16, '#e8402a'); ln(cx + k * r * .44, cy - r * .06, cx + k * r * .44, cy - r * .2, '#2b2f36', Math.max(2, r * .04)); });
   c.restore(); c.strokeStyle = '#ffc21a'; c.lineWidth = Math.max(2, r * .07); c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
 };
-// ---------- éditeur à onglets ----------
-const AVT = [['face', 'Visage'], ['hair', 'Cheveux'], ['acc', 'Accessoires'], ['helm', 'Casque'], ['bg', 'Fond']];
+
+// ---------- éditeur à onglets (les choix dépendent du genre) ----------
 drawAvatarEditor = function () {
-  fillR(0, 0, W, H, 'rgba(4,6,16,.78)'); const x0 = 230, y0 = 100, w = 1460, h = 880, av = AV2(), g = gradeOf(); PF.tab = PF.tab || 'face';
+  fillR(0, 0, W, H, 'rgba(4,6,16,.78)'); const x0 = 200, y0 = 90, w = 1520, h = 900, av = AV3(), g = gradeOf(), fem = av.g === 1;
+  const tabs = [['face', 'Visage'], ['hair', 'Cheveux'], fem ? ['bijoux', 'Maquillage & bijoux'] : ['beard', 'Barbe'], ['acc', 'Accessoires'], ['helm', 'Casque'], ['bg', 'Fond']];
+  if (!tabs.some(t => t[0] === PF.tab)) PF.tab = 'face';
   rr(x0, y0, w, h, 34); c.fillStyle = '#121a2e'; c.fill(); c.strokeStyle = 'rgba(255,194,26,.5)'; c.lineWidth = 3; c.stroke();
-  T('MON PERSONNAGE', x0 + 60, y0 + 84, '#ffc21a', 46); drawAvatar(x0 + 240, y0 + 420, 170, av); txt('La tenue se change au Garage', x0 + 240, y0 + 650, '#9fb0d0', 18, 800, 'center');
-  const X = x0 + 500; let tx = X;
-  AVT.forEach(([id, n]) => { c.font = '900 22px Inter'; const tw = c.measureText(n).width + 44, on = PF.tab === id; rr(tx, y0 + 130, tw, 50, 25); c.fillStyle = on ? '#ffc21a' : 'rgba(255,255,255,.08)'; c.fill(); txt(n, tx + tw / 2, y0 + 163, on ? '#2a1a00' : '#e6eef8', 22, 900, 'center'); G.buttons.push({ id: 'avT:' + id, x: tx, y: y0 + 130, w: tw, h: 50 }); tx += tw + 12; });
-  const opt = (id, x, y, sel, draw, lockG) => { const lk = lockG && g < lockG; ell(x, y, 40, 40, sel ? '#ffc21a' : 'rgba(255,255,255,.08)'); draw(x, y); if (lk) { ell(x, y, 36, 36, 'rgba(10,14,26,.7)'); icon('lock', x, y, 26, '#fff'); } G.buttons.push({ id: lk ? 'avLock:' + lockG : id, x: x - 42, y: y - 42, w: 84, h: 84 }); };
-  const mini = (patch) => (x, y) => { c.save(); c.beginPath(); c.arc(x, y, 36, 0, 7); c.clip(); drawAvatar(x, y + 4, 40, Object.assign({}, av, patch)); c.restore(); };
-  const grid = (items, y, per, sp, fn) => items.forEach((it, i) => fn(it, i, X + 46 + (i % per) * sp, y + Math.floor(i / per) * 140));
-  const Y = y0 + 280;
+  T('MON PERSONNAGE', x0 + 60, y0 + 84, '#ffc21a', 46); drawAvatar(x0 + 250, y0 + 430, 180, av); txt('La tenue se change au Garage', x0 + 250, y0 + 670, '#9fb0d0', 18, 800, 'center');
+  const X = x0 + 520; let tx = X;
+  tabs.forEach(([id, n]) => { c.font = '900 21px Inter'; const tw = c.measureText(n).width + 40, on = PF.tab === id; rr(tx, y0 + 130, tw, 50, 25); c.fillStyle = on ? '#ffc21a' : 'rgba(255,255,255,.08)'; c.fill(); txt(n, tx + tw / 2, y0 + 163, on ? '#2a1a00' : '#e6eef8', 21, 900, 'center'); G.buttons.push({ id: 'avT:' + id, x: tx, y: y0 + 130, w: tw, h: 50 }); tx += tw + 10; });
+  const opt = (id, x, y, sel, draw, lockG) => { const lk = lockG && g < lockG; ell(x, y, 44, 44, sel ? '#ffc21a' : 'rgba(255,255,255,.08)'); draw(x, y); if (lk) { ell(x, y, 40, 40, 'rgba(10,14,26,.7)'); icon('lock', x, y, 26, '#fff'); } G.buttons.push({ id: lk ? 'avLock:' + lockG : id, x: x - 46, y: y - 46, w: 92, h: 92 }); };
+  const mini = patch => (x, y) => { c.save(); c.beginPath(); c.arc(x, y, 40, 0, 7); c.clip(); drawAvatar(x, y + 6, 46, Object.assign({}, av, patch)); c.restore(); };
+  const grid = (items, y, per, sp, fn) => items.forEach((it, i) => fn(it, i, X + 50 + (i % per) * sp, y + Math.floor(i / per) * 150));
+  const Y = y0 + 290, lab = (s, y) => txt(s, X, y, '#e6eef8', 20, 900), cap = (s, x, y) => txt(s, x, y + 66, '#9fb0d0', 15, 800, 'center');
   if (PF.tab === 'face') {
-    txt('PERSONNAGE', X, Y - 50, '#e6eef8', 20, 900);
-    [['Homme', 0], ['Femme', 1]].forEach(([n, v], i) => { const bx = X + i * 230; rr(bx, Y - 30, 210, 120, 22); c.fillStyle = av.g === v ? 'rgba(255,194,26,.22)' : 'rgba(255,255,255,.06)'; c.fill(); if (av.g === v) { c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke(); } mini({ g: v, hair: v ? 3 : 0 })(bx + 60, Y + 30); txt(n, bx + 150, Y + 40, '#fff', 24, 900, 'center'); G.buttons.push({ id: 'avG:' + v, x: bx, y: Y - 30, w: 210, h: 120 }); });
-    txt('TEINT', X, Y + 170, '#e6eef8', 20, 900); const ord = AV_SKIN.map((col, i) => [col, i]).sort((p, q) => { const L = h => parseInt(h.slice(1, 3), 16) + parseInt(h.slice(3, 5), 16) + parseInt(h.slice(5, 7), 16); return L(q[0]) - L(p[0]); }); grid(ord, Y + 240, 10, 92, ([col, i], k, x, y) => opt('avS:' + i, x, y, av.skin === i, (x2, y2) => ell(x2, y2, 30, 30, col)));
+    lab('JE SUIS', Y - 50);
+    [['Un homme', 0], ['Une femme', 1]].forEach(([n, v], i) => { const bx = X + i * 260; rr(bx, Y - 30, 240, 120, 22); c.fillStyle = av.g === v ? 'rgba(255,194,26,.22)' : 'rgba(255,255,255,.06)'; c.fill(); if (av.g === v) { c.strokeStyle = '#ffc21a'; c.lineWidth = 3; c.stroke(); } mini({ g: v, hs: v ? 'long' : 'court', bd: 'none', ac: 'none' })(bx + 62, Y + 30); txt(n, bx + 165, Y + 40, '#fff', 23, 900, 'center'); G.buttons.push({ id: 'avG:' + v, x: bx, y: Y - 30, w: 240, h: 120 }); });
+    lab('TEINT', Y + 160); const L = h2 => parseInt(h2.slice(1, 3), 16) + parseInt(h2.slice(3, 5), 16) + parseInt(h2.slice(5, 7), 16);
+    grid(AV_SKIN.map((col, i) => [col, i]).sort((p, q) => L(q[0]) - L(p[0])), Y + 230, 10, 92, ([col, i], k, x, y) => opt('avS:' + i, x, y, av.skin === i, (x2, y2) => ell(x2, y2, 30, 30, col)));
+    lab('YEUX', Y + 340); grid(AV_EYE, Y + 410, 5, 150, ([col, n], i, x, y) => { opt('avE:' + i, x, y, (av.eye || 0) === i, (x2, y2) => { ell(x2, y2, 26, 18, '#fff'); ell(x2, y2, 14, 15, col); ell(x2, y2, 6, 6, '#111'); }); cap(n, x, y); });
   } else if (PF.tab === 'hair') {
-    txt('COUPE', X, Y - 50, '#e6eef8', 20, 900); grid(AV_HAIR, Y + 10, 5, 170, ([n], i, x, y) => { opt('avR:' + i, x, y, (av.hair ?? 0) === i, mini({ hair: i })); txt(n, x, y + 62, '#9fb0d0', 15, 800, 'center'); });
-    txt('COULEUR', X, Y + 330, '#e6eef8', 20, 900); grid(AV_HCOL, Y + 400, 10, 90, (col, i, x, y) => opt('avC:' + i, x, y, (av.hc ?? 1) === i, (x2, y2) => ell(x2, y2, 28, 28, col)));
-  } else if (PF.tab === 'acc') {
-    txt('ACCESSOIRE', X, Y - 50, '#e6eef8', 20, 900); grid(AV_ACC, Y + 10, 5, 170, ([id, n, lg2], i, x, y) => { opt('avA:' + i, x, y, av.acc === i, mini({ acc: i }), lg2); txt(n, x, y + 62, '#9fb0d0', 15, 800, 'center'); });
+    lab('COUPE', Y - 50); grid(fem ? HAIR_F : HAIR_H, Y + 10, 5, 170, ([id, n], i, x, y) => { opt('avR:' + id, x, y, av.hs === id, mini({ hs: id })); cap(n, x, y); });
+    lab('COULEUR', Y + 330); grid(AV_HCOL, Y + 400, 10, 90, (col, i, x, y) => opt('avC:' + i, x, y, (av.hc ?? 1) === i, (x2, y2) => ell(x2, y2, 28, 28, col)));
+  } else if (PF.tab === 'beard') {
+    lab('BARBE ET MOUSTACHE', Y - 50); grid(BEARD, Y + 10, 5, 170, ([id, n], i, x, y) => { opt('avD:' + id, x, y, (av.bd || 'none') === id, mini({ bd: id })); cap(n, x, y); });
+    txt('La barbe prend la couleur de tes cheveux', X, Y + 330, '#9fb0d0', 18, 800);
+  } else if (PF.tab === 'bijoux' || PF.tab === 'acc') {
+    const list = PF.tab === 'bijoux' ? [['none', 'Aucun']].concat(ACC_F) : accList(av.g).filter(a => !ACC_F.some(f => f[0] === a[0]));
+    lab(PF.tab === 'bijoux' ? 'MAQUILLAGE ET BIJOUX' : 'ACCESSOIRE', Y - 50); grid(list, Y + 10, 5, 170, ([id, n, lg2], i, x, y) => { opt('avA:' + id, x, y, (av.ac || 'none') === id, mini({ ac: id }), lg2); cap(n, x, y); });
   } else if (PF.tab === 'helm') {
-    txt('CASQUE', X, Y - 50, '#e6eef8', 20, 900);
+    lab('CASQUE', Y - 50);
     grid(AV_HELM, Y + 10, 6, 140, ([col, lg2, rf], i, x, y) => { const dh = (x2, y2) => { c.fillStyle = col; c.beginPath(); c.ellipse(x2, y2 + 8, 26, 22, 0, Math.PI, 0); c.fill(); fillR(x2 - 32, y2 + 6, 64, 7, mixc(col, '#000000', .15)); if (rf) icon('star', x2, y2 - 2, 16, '#06402a'); };
-      if (rf && !(save.refItems || []).includes(rf)) { ell(x, y, 40, 40, 'rgba(255,255,255,.08)'); dh(x, y); ell(x, y, 36, 36, 'rgba(10,14,26,.62)'); icon('lock', x, y, 24, '#fff'); G.buttons.push({ id: 'avRef:' + rf, x: x - 40, y: y - 40, w: 80, h: 80 }); }
+      if (rf && !(save.refItems || []).includes(rf)) { ell(x, y, 44, 44, 'rgba(255,255,255,.08)'); dh(x, y); ell(x, y, 40, 40, 'rgba(10,14,26,.62)'); icon('lock', x, y, 24, '#fff'); G.buttons.push({ id: 'avRef:' + rf, x: x - 44, y: y - 44, w: 88, h: 88 }); }
       else opt('avH:' + i, x, y, av.helm === i, dh, lg2); });
   } else {
-    txt('FOND', X, Y - 50, '#e6eef8', 20, 900); grid(AV_BG, Y + 10, 6, 140, ([a, b], i, x, y) => opt('avB:' + i, x, y, av.bg === i, (x2, y2) => ell(x2, y2, 30, 30, lg(0, y2 - 30, 0, y2 + 30, [[0, a], [1, b]]))));
+    lab('FOND', Y - 50); grid(AV_BG, Y + 10, 6, 140, ([a, b], i, x, y) => opt('avB:' + i, x, y, av.bg === i, (x2, y2) => ell(x2, y2, 30, 30, lg(0, y2 - 30, 0, y2 + 30, [[0, a], [1, b]]))));
   }
   button('avDone', x0 + w - 380, y0 + h - 120, 320, 84, 'VALIDER', '#3cf29b', '#17a764', '#06210f');
 };
 act = (prev => function (id) {
-  let m;
+  let m; const a = () => AV3();
   if ((m = id.match(/^avT:(\w+)$/))) { sfx.click(); PF.tab = m[1]; return; }
-  if ((m = id.match(/^av([GRC]):(\d+)$/))) { sfx.click(); const a = AV2(); const k = { G: 'g', R: 'hair', C: 'hc' }[m[1]]; a[k] = +m[2]; if (k === 'g') { a.hair = a.g ? 3 : 0; if (a.g && (a.acc === 3 || a.acc === 4)) a.acc = 0; } writeSave(save); return; }
+  if ((m = id.match(/^avG:(\d)$/))) { sfx.click(); const v = a(); v.g = +m[1]; v.hs = v.g ? 'long' : 'court'; v.bd = 'none'; if (!accList(v.g).some(x => x[0] === v.ac)) v.ac = 'none'; PF.tab = 'face'; writeSave(save); return; }
+  if ((m = id.match(/^avR:(\w+)$/))) { sfx.click(); a().hs = m[1]; writeSave(save); return; }
+  if ((m = id.match(/^avD:(\w+)$/))) { sfx.click(); a().bd = m[1]; writeSave(save); return; }
+  if ((m = id.match(/^avA:(\w+)$/))) { sfx.click(); a().ac = m[1]; writeSave(save); return; }
+  if ((m = id.match(/^avC:(\d+)$/))) { sfx.click(); a().hc = +m[1]; writeSave(save); return; }
+  if ((m = id.match(/^avE:(\d+)$/))) { sfx.click(); a().eye = +m[1]; writeSave(save); return; }
   return prev(id);
 })(act);
-Object.assign(EN, { 'Visage': 'Face', 'Cheveux': 'Hair', 'Accessoires': 'Accessories', 'Casque': 'Helmet', 'Fond': 'Background', 'PERSONNAGE': 'CHARACTER', 'Homme': 'Man', 'Femme': 'Woman', 'TEINT': 'SKIN', 'COUPE': 'STYLE', 'COULEUR': 'COLOUR',
-  'Court': 'Short', 'Rasé': 'Shaved', 'Mi-long': 'Mid-length', 'Long': 'Long', 'Queue de cheval': 'Ponytail', 'Chignon': 'Bun', 'Tresse': 'Braid', 'Bouclé': 'Curly', 'Carré': 'Bob', 'Couettes': 'Pigtails', 'Boucles': 'Earrings', 'Rousseur': 'Freckles', 'Rouge à lèvres': 'Lipstick', 'Piercing': 'Piercing' });
+Object.assign(EN, { 'Visage': 'Face', 'Cheveux': 'Hair', 'Barbe': 'Beard', 'Maquillage & bijoux': 'Make-up & jewellery', 'Accessoires': 'Accessories', 'Casque': 'Helmet', 'Fond': 'Background', 'JE SUIS': 'I AM', 'Un homme': 'A man', 'Une femme': 'A woman', 'TEINT': 'SKIN', 'YEUX': 'EYES', 'COUPE': 'STYLE', 'COULEUR': 'COLOUR', 'BARBE ET MOUSTACHE': 'BEARD AND MOUSTACHE', 'MAQUILLAGE ET BIJOUX': 'MAKE-UP AND JEWELLERY', 'ACCESSOIRE': 'ACCESSORY', 'La barbe prend la couleur de tes cheveux': 'Your beard uses your hair colour',
+  'Marron': 'Brown', 'Noisette': 'Hazel', 'Vert': 'Green', 'Bleu': 'Blue', 'Gris': 'Grey', 'Court': 'Short', 'Rasé': 'Shaved', 'Dégradé': 'Fade', 'Mi-long': 'Mid-length', 'Bouclé': 'Curly', 'Afro': 'Afro', 'Mulet': 'Mullet', 'Dreadlocks': 'Dreadlocks', 'Long lisse': 'Long straight', 'Long ondulé': 'Long wavy', 'Queue de cheval': 'Ponytail', 'Chignon': 'Bun', 'Tresse': 'Braid', 'Couettes': 'Pigtails', 'Carré': 'Bob', 'Tresses fines': 'Box braids',
+  'Rasé de près': 'Clean-shaven', '3 jours': 'Stubble', 'Moustache': 'Moustache', 'Bouc': 'Goatee', 'Barbe courte': 'Short beard', 'Barbe longue': 'Long beard', 'Collier': 'Chinstrap', 'Aucun': 'None', 'Lunettes': 'Glasses', 'Lunettes de soleil': 'Sunglasses', 'Casque antibruit': 'Ear defenders', 'Taches de rousseur': 'Freckles', 'Piercing nez': 'Nose stud', 'Boucles': 'Earrings', 'Créoles': 'Hoops', 'Rouge à lèvres': 'Lipstick', 'Eye-liner': 'Eyeliner', 'Boucle d\'oreille': 'Earring', 'Cicatrice': 'Scar' });
+
+// =====================================================================
+//  PILE POIL — TÉLÉPHONES ANDROID (Samsung…) : moins de mémoire, moins de calcul
+//  Les plantages venaient surtout de la mémoire graphique : ~150 à 210 Mo d'images
+//  gardées en permanence (décors de chaque tranche, niveaux en cache, calques inutilisés).
+//  Sur iPhone ça passe, sur beaucoup d'Android le navigateur (ou le téléphone) lâche.
+// =====================================================================
+const PP_LOWMEM = (TOUCH && !IOS) || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+window.PP_LOWMEM = PP_LOWMEM;
+// libère tout de suite la mémoire d'une image hors écran (sans attendre le ramasse-miettes)
+function ppFree(cnv) { try { if (cnv && cnv.width > 1) { cnv.width = 1; cnv.height = 1; } } catch (e) {} }
+
+// 1. calque de brouillard jamais utilisé (2320 × 1080) : libéré pour tout le monde
+ppFree(FOG);
+
+if (PP_LOWMEM) {
+  // 2. calques rares alloués seulement quand on en a besoin
+  ppFree(CAB);   // cabine du niveau Master
+  buildMaster = (prev => function (lvl) { if (CAB.width < W) { CAB.width = W; CAB.height = H; } return prev(lvl); })(buildMaster);
+  if (typeof DK !== 'undefined') {   // nuit noire des chantiers hantés
+    ppFree(DK);
+    mechDark = (prev => function (lvl) { if (DK.width < 1920) { DK.width = 1920; DK.height = 1080; } return prev(lvl); })(mechDark);
+  }
+  // 3. décors de tranche : on ne garde que la tranche en cours et la suivante (au lieu des 5)
+  bakeTranche = (prev => function (t) {
+    const e = prev(t);
+    for (const k in CACHE) { const kk = +k; if (kk !== t && kk !== t + 1) delete CACHE[k]; }   // le niveau en cours garde sa propre référence
+    return e;
+  })(bakeTranche);
+  // 4. décors de niveau : 2 en mémoire au lieu de 3 ou plus (Japon et Égypte n'en retiraient jamais)
+  bakeLevel = (prev => function (n) {
+    const e = prev(n);
+    if (LCACHE.size > 2) for (const k of [...LCACHE.keys()]) { if (LCACHE.size <= 2) break; if (k !== n && k !== n + 1 && k !== G.level) LCACHE.delete(k); }
+    return e;
+  })(bakeLevel);
+  // 5. halos lumineux coupés dès le départ ; ils reviennent tout seuls si le téléphone est fluide
+  window.LOWFX = true;
+}
+
+// 6. son : le moteur audio s'arrête quand l'appli passe en arrière-plan (batterie, chauffe)
+document.addEventListener('visibilitychange', () => {
+  const a = AU && AU.ctx; if (!a) return;
+  try { if (document.hidden) { if (a.state === 'running') { a.suspend(); AU.ppPaused = true; } } else if (AU.ppPaused) { AU.ppPaused = false; a.resume(); } } catch (e) {}
+});
 
 </script>
 </body></html>
