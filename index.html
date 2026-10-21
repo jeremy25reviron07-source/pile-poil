@@ -3499,7 +3499,7 @@ drawBoard = function () {
       if (medal) ell(x + 46, yy - 8, 17, 17, medal);
       txt(String(rank), x + 46, yy, medal ? '#1a1300' : '#9fb7cf', 20, 900, 'center');
       txt(s.name, x + 84, yy, '#fff', 24, 800);
-      txt(s.level >= 50 ? 'MASTER ✓' : `${s.level}/50`, x + w - 260, yy, s.level >= 50 ? '#3cf29b' : '#9fb7cf', 20, 800, 'right');
+      { const pg = Math.max(s.prog || 0, s.level || 0), done = (s.prog || 0) >= 51; txt(done ? 'MASTER ✓' : pg >= 50 ? 'MASTER' : `${pg}/50`, x + w - 260, yy, done ? '#3cf29b' : pg >= 50 ? '#ffd447' : '#9fb7cf', 20, 800, 'right'); }
       txt(s.score.toLocaleString('fr-FR'), x + w - 30, yy, '#fff', 24, 900, 'right');
     });
     if (pages > 1) {
@@ -12971,6 +12971,40 @@ document.addEventListener('visibilitychange', () => {
   if (typeof askPay === 'function') askPay = (prev => function (o) { try { ev('buy', null); } catch (e) {} return prev.apply(this, arguments); })(askPay);
   let lastScr = null; setInterval(() => { if (G.screen !== lastScr) { if (G.screen === 'shop') ev('shop', null); lastScr = G.screen; } }, 500);
   window.ppTrack = ev;
+})();
+
+// =====================================================================
+//  PILE POIL — CLASSEMENT : la colonne « Niveau » montre la progression du joueur
+//  dans le pays (niveau le plus haut atteint, « MASTER ✓ » quand le pays est terminé),
+//  et non plus le niveau où il a fait son meilleur score.
+// =====================================================================
+(function () {
+  if (typeof SB === 'undefined' || !SB) return;
+  // lecture : on ajoute la progression ; si la colonne n'existe pas encore, on garde l'ancien affichage
+  DB.career = (prev => async function (reg = 'fr') {
+    if (!DB.noProg) { const { data, error } = await SB.from('career_reg').select('name,score,level,prog').eq('region', reg).order('score', { ascending: false }).limit(100); if (!error) return data; DB.noProg = true; }
+    return prev(reg);
+  })(DB.career);
+  // envoi : 51 = Master réussi, sinon le niveau le plus haut débloqué dans le pays
+  const progOf = r => (typeof paysFini === 'function' && paysFini(r)) ? 51 : Math.min(50, (regData(r) || {}).maxLevel || 1);
+  let busy = false;
+  async function sendProg() {
+    const name = playerName(); if (busy || !name || name.length < 2) return; busy = true;
+    try {
+      save.progSent = save.progSent || {};
+      for (const r of ['fr', 'jp', 'eg']) {
+        const p = progOf(r); if (p <= (save.progSent[r] || 0)) continue;
+        const { data, error } = await SB.rpc('set_progress', { p_name: name, p_token: (typeof ACC !== 'undefined' && ACC.token) || null, p_region: r, p_prog: p });
+        if (error) { if (/set_progress|schema cache|function/i.test(error.message || '')) break; continue; }
+        if (data > 0) { save.progSent[r] = p; writeSave(save); }   // ligne trouvée et mise à jour
+      }
+    } catch (e) {}
+    busy = false;
+  }
+  sendCareer = (prev => async function () { const r = await prev.apply(this, arguments); sendProg(); return r; })(sendCareer);
+  setTimeout(sendProg, 8000);
+  let prevScr = G.screen;
+  setInterval(() => { if (G.screen !== prevScr) { if (prevScr === 'play') setTimeout(sendProg, 2500); prevScr = G.screen; } }, 700);
 })();
 
 </script>
