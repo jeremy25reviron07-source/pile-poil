@@ -12931,5 +12931,47 @@ document.addEventListener('visibilitychange', () => {
   try { if (document.hidden) { if (a.state === 'running') { a.suspend(); AU.ppPaused = true; } } else if (AU.ppPaused) { AU.ppPaused = false; a.resume(); } } catch (e) {}
 });
 
+// =====================================================================
+//  PILE POIL — SUIVI ANONYME DES JOUEURS
+//  D'où viennent les joueurs (TikTok, partage, site…), quels chantiers ils tentent,
+//  où ils échouent, s'ils reviennent les jours suivants.
+//  Aucune donnée personnelle : un identifiant d'appareil tiré au hasard, rien d'autre.
+//  Envoi groupé (toutes les 20 s et quand l'appli passe en arrière-plan).
+// =====================================================================
+(function () {
+  const C = window.PP_CONFIG || {}; if (!C.url || !C.key || (typeof DEMO !== 'undefined' && DEMO)) return;
+  const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
+  let did = ls('pp_did'); if (!did) { did = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, '').slice(0, 24); ls('pp_did', did); }
+  // source : ?src=… > ?via=/?p= (partage, parrainage) > site d'où l'on arrive ; la première source est gardée
+  const q = new URLSearchParams(location.search), ref = (document.referrer || '').toLowerCase();
+  let src = q.get('src') || (q.get('via') ? 'partage' : q.get('p') ? 'parrainage' : '') ||
+    (/tiktok/.test(ref) ? 'tiktok' : /instagram/.test(ref) ? 'instagram' : /facebook|fb\./.test(ref) ? 'facebook' : /snapchat/.test(ref) ? 'snapchat' : /lovable|pilepoil/.test(ref) ? 'site' : /itch\.io/.test(ref) ? 'itch' : /google|bing|qwant|duckduckgo/.test(ref) ? 'recherche' : '');
+  if (!src && (navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches))) src = 'appli';
+  src = (src || 'direct').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 30) || 'direct';
+  const first = ls('pp_src') || (ls('pp_src', src), src);
+  const Q = [];
+  const reg = () => (G.mode === 'hw' ? 'hw' : window.REGION || 'fr');
+  function ev(e, lvl) { if (Q.length < 200) Q.push({ did, src: first, ev: e, reg: reg(), lvl: lvl == null ? null : Math.max(0, Math.min(999, lvl | 0)), mode: String(G.mode || '').slice(0, 12) }); }
+  function flush(keep) {
+    if (!Q.length) return; const body = JSON.stringify(Q.splice(0, Q.length));
+    try { fetch(C.url + '/rest/v1/track', { method: 'POST', keepalive: !!keep, headers: { apikey: C.key, Authorization: 'Bearer ' + C.key, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body }).catch(() => {}); } catch (e) {}
+  }
+  setInterval(flush, 20000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(true); });
+  addEventListener('pagehide', () => flush(true));
+  // ouverture du jeu (une fois par chargement) : sert à calculer le retour à J+1, J+7
+  ev('open', null); setTimeout(flush, 4000);
+  // chantier lancé / réussi / raté
+  startLevel = (prev => function (n) { const r = prev.apply(this, arguments); try { if (!G.replay || G.mode !== 'career') ev('start', n); } catch (e) {} return r; })(startLevel);
+  finish = (prev => function (lvl, res) {
+    try { if (lvl && lvl.phase !== 'done') ev(res === 'worker' ? 'worker' : (res === 'miss' || res === 'out') ? 'fail' : 'win', G.level); } catch (e) {}
+    return prev.apply(this, arguments);
+  })(finish);
+  // boutique : ouverture et clic sur un pack (le paiement lui-même est suivi par Stripe)
+  if (typeof askPay === 'function') askPay = (prev => function (o) { try { ev('buy', null); } catch (e) {} return prev.apply(this, arguments); })(askPay);
+  let lastScr = null; setInterval(() => { if (G.screen !== lastScr) { if (G.screen === 'shop') ev('shop', null); lastScr = G.screen; } }, 500);
+  window.ppTrack = ev;
+})();
+
 </script>
 </body></html>
