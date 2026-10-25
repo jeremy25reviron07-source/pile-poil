@@ -12325,7 +12325,9 @@ const HW_REW = [
 ];
 function hwSave() { return save.hw || (save.hw = { lvl: {} }); }
 function hwStars() { return Object.values(hwSave().lvl).reduce((a, v) => a + (v || 0), 0); }
-function hwNext() { const l = hwSave().lvl; for (let k = 1; k <= HW.N; k++) if (!l[k]) return k; return HW.N; }
+// chantier en cours de la nuit (11 = nuit terminée) ; les anciennes sauvegardes repartent du premier chantier sans étoile
+function hwAt() { const H = hwSave(); if (H.at == null) { H.at = HW.N + 1; for (let k = 1; k <= HW.N; k++) if (!H.lvl[k]) { H.at = k; break; } } if (H.lives == null) H.lives = 3; return H.at; }
+function hwNext() { return Math.min(hwAt(), HW.N); }
 function hwMenuRow() {
   if (!hwActive()) return null; const d = hwDaysLeft(), st = hwStars(), done = Object.keys(hwSave().lvl).length;
   return ['hwOpen', 'hw', 'pumpkin', 'HALLOWEEN', done ? `${done}/10 chantiers · ${st} ★` : '10 chantiers hantés · cadeaux exclusifs', d <= 1 ? 'DERNIER JOUR' : `J-${d}`];
@@ -12370,12 +12372,12 @@ function drawHwMap() {
   const d = hwDaysLeft(); txt(`Événement limité · encore ${d} jour${d > 1 ? 's' : ''} · récompenses exclusives`, 960, 248, '#e9d6ff', 28, 800, 'center');
   // chemin de 10 citrouilles (2 rangées)
   rr(100, 300, 1040, 660, 34); c.fillStyle = 'rgba(20,8,36,.72)'; c.fill(); c.strokeStyle = 'rgba(255,140,40,.35)'; c.lineWidth = 3; c.stroke();
-  txt('10 CHANTIERS DE NUIT', 150, 360, '#ff9a3a', 26, 900); txt(`${hwStars()} / 30 ★`, 1090, 360, '#ffd447', 28, 900, 'right');
+  txt('10 CHANTIERS DE NUIT', 150, 360, '#ff9a3a', 26, 900); if (hwAt() <= HW.N) { const lv = hwSave().lives; txt('VIES', 560, 360, 'rgba(233,214,255,.75)', 22, 900); for (let i = 0; i < 3; i++) pumpkin(640 + i * 50, 340, 40, 34, i < lv, i < lv); } txt(`${hwStars()} / 30 ★`, 1090, 360, '#ffd447', 28, 900, 'right');
   const nxt = hwNext(), L0 = hwSave().lvl;
   const pos = k => { const r = k <= 5 ? 0 : 1, i = r ? 10 - k : k - 1; return [220 + i * 200, 500 + r * 270]; };
   c.strokeStyle = 'rgba(255,154,58,.35)'; c.lineWidth = 8; c.setLineDash([16, 14]); c.beginPath(); for (let k = 1; k <= 10; k++) { const [x, y] = pos(k); k === 1 ? c.moveTo(x, y) : k === 6 ? c.quadraticCurveTo(1150, 635, x, y) : c.lineTo(x, y); } c.stroke(); c.setLineDash([]);
   for (let k = 1; k <= 10; k++) {
-    const [x, y] = pos(k), st = L0[k] || 0, cur = k === nxt && !L0[k], lock = k > nxt;
+    const [x, y] = pos(k), st = L0[k] || 0, cur = k === hwAt(), lock = k > nxt;
     if (cur) { const pr = (t % 1.6) / 1.6; c.strokeStyle = `rgba(255,214,77,${.8 * (1 - pr)})`; c.lineWidth = 5; c.beginPath(); c.arc(x, y, 70 + pr * 26, 0, 7); c.stroke(); }
     c.save(); if (lock) c.globalAlpha = .35; pumpkin(x, y - 56, cur ? 132 : 112, cur ? 112 : 96, !lock, !lock); c.restore();
     if (lock) icon('lock', x, y - 6, 34, 'rgba(255,255,255,.7)');
@@ -12395,7 +12397,7 @@ function drawHwMap() {
     txt(r.name, 1350, y + 54, '#fff', 25, 900); txt(r.sub, 1350, y + 88, 'rgba(233,214,255,.8)', 20, 700);
     rr(1660, y + 38, 110, 44, 22); c.fillStyle = got ? '#3cf29b' : 'rgba(0,0,0,.35)'; c.fill(); if (got) txt('✓ OBTENU', 1715, y + 68, '#06210f', 18, 900, 'center'); else { icon('star', 1688, y + 60, 20, '#ffd447'); txt(String(r.st), 1722, y + 68, '#fff', 22, 900, 'center'); }
   });
-  iconBtn('hwPlay', 1210, 836, 580, 100, 'play', L0[nxt] ? 'REJOUER' : `JOUER · CHANTIER ${nxt}`, PAL.gold[0], PAL.gold[1], '#2a1a00', 40);
+  iconBtn('hwPlay', 1210, 836, 580, 100, 'play', hwAt() > HW.N ? 'REJOUER' : `JOUER · CHANTIER ${nxt}`, PAL.gold[0], PAL.gold[1], '#2a1a00', 40);
 }
 
 function skeletonSit(x, y, t) {   // squelette assis sur la flèche, qui salue
@@ -12491,17 +12493,17 @@ function hwPill(x, y, label, val, col) { c.font = '900 24px Inter'; const w = c.
 //  10 chantiers, 8 mécaniques, sauvegarde séparée, récompenses exclusives
 //  Mode à part (G.mode = 'hw') : ne touche jamais à la carrière ni à l'économie.
 // =====================================================================
-const HWC = [
-  { n: 5, wind: 0, load: 'citrouille', hole: null, title: 'Le portail du manoir', tip: 'Pose la citrouille dans la fouille' },
-  { n: 7, wind: 3, swing: 1.5, load: 'coffin', hole: 'grave', mech: 'zombie', title: 'Le cercueil', tip: 'Si ça secoue trop, le zombie se réveille !' },
-  { n: 9, wind: 4, load: 'cauldron', hole: 'fire', mech: 'potion', title: 'Le chaudron de la sorcière', tip: 'Chaque balancement renverse la potion · 70 % pour 3 ★' },
-  { n: 11, wind: 0, load: 'cage', hole: 'crypt', mech: 'float', title: 'La cage à fantôme', tip: 'Le fantôme tire vers le ciel : la charge vole plus loin' },
-  { n: 12, wind: 4, load: 'tomb', hole: 'slots', mech: 'slots', title: 'Les tombes qui bougent', tip: 'Une seule tombe est ouverte : elles changent toutes les 3 s' },
-  { n: 13, wind: 0, load: 'lantern', hole: 'potion', mech: 'dark', title: 'Noir total', tip: 'Seule ta lanterne éclaire · les éclairs montrent le trou' },
-  { n: 15, wind: 5, load: 'candy', hole: 'web', mech: 'web', title: 'La toile géante', tip: 'Vise le centre de la toile, sinon tu restes collé' },
-  { n: 17, wind: 6, load: 'boss', hole: 'potion', mech: 'bats', title: 'La nuée de chauves-souris', tip: 'La nuée pousse ta charge : attends qu\'elle passe' },
-  { n: 19, wind: 10, gust: 14, holeK: .85, load: 'citrouille', hole: null, mech: 'storm', title: 'Le grand vent de minuit', tip: 'Rafales et orage : choisis ton moment' },
-  { n: 20, wind: 8, gust: 10, swing: 1.35, holeK: .75, load: 'boss', hole: 'big', mech: 'boss', title: 'BOSS · La citrouille du siècle', tip: 'Fantôme, chauves-souris, orage… et minuit qui sonne' },
+const HWC = [   // difficulté qui monte vraiment : du niveau 10 au niveau 46 de la carrière
+  { n: 10, wind: 2, load: 'citrouille', hole: null, title: 'Le portail du manoir', tip: 'Pose la citrouille dans la fouille' },
+  { n: 16, wind: 5, swing: 1.5, load: 'coffin', hole: 'grave', mech: 'zombie', title: 'Le cercueil', tip: 'Si ça secoue trop, le zombie se réveille !' },
+  { n: 20, wind: 6, load: 'cauldron', hole: 'fire', mech: 'potion', title: 'Le chaudron de la sorcière', tip: 'Chaque balancement renverse la potion · 70 % pour 3 ★' },
+  { n: 24, wind: 3, load: 'cage', hole: 'crypt', mech: 'float', title: 'La cage à fantôme', tip: 'Le fantôme tire vers le ciel : la charge vole plus loin' },
+  { n: 28, wind: 6, load: 'tomb', hole: 'slots', mech: 'slots', title: 'Les tombes qui bougent', tip: 'Une seule tombe est ouverte : elles changent toutes les 3 s' },
+  { n: 31, wind: 2, load: 'lantern', hole: 'potion', mech: 'dark', title: 'Noir total', tip: 'Seule ta lanterne éclaire · les éclairs montrent le trou' },
+  { n: 34, wind: 8, load: 'candy', hole: 'web', mech: 'web', title: 'La toile géante', tip: 'Vise le centre de la toile, sinon tu restes collé' },
+  { n: 38, wind: 9, load: 'boss', hole: 'potion', mech: 'bats', title: 'La nuée de chauves-souris', tip: 'La nuée pousse ta charge : attends qu\'elle passe' },
+  { n: 42, wind: 12, gust: 16, holeK: .92, load: 'citrouille', hole: null, mech: 'storm', title: 'Le grand vent de minuit', tip: 'Rafales et orage : choisis ton moment' },
+  { n: 46, wind: 10, gust: 12, swing: 1.35, holeK: .9, load: 'boss', hole: 'big', mech: 'boss', title: 'BOSS · La citrouille du siècle', tip: 'Fantôme, chauves-souris, orage… et minuit qui sonne' },
 ];
 Object.assign(LOADS, {
  hw_coffin: { name: 'Cercueil', r: .42, t: .9, sw: 1, wd: 1 }, hw_cauldron: { name: 'Chaudron de potion', r: .9, t: 1.2, sw: 1, wd: 1 }, hw_cage: { name: 'Cage à fantôme', r: 1.3, t: .4, sw: 1, wd: 1 },
@@ -12513,7 +12515,8 @@ const hwCur = () => HWC[clamp(HW.cur || 1, 1, 10) - 1];
 // ---------- entrer / sortir de l'événement (mode séparé) ----------
 hwStart = function (k) {
   if (typeof setRegion === 'function' && window.REGION !== 'fr') setRegion('fr');
-  G.hwRun = true; HW.cur = k; LCACHE.clear(); G.mode = 'hw'; G.replay = false; G.runSeed = 0; G.lives = 3; G.score = 0; G.hwTries = 0; startLevel(HWC[k - 1].n); G.screen = 'play';
+  const H = hwSave(); G.hwFree = k !== hwAt();   // chantier déjà réussi : entraînement libre, sans toucher aux vies de la nuit
+  G.hwRun = true; HW.cur = k; LCACHE.clear(); G.mode = 'hw'; G.replay = false; G.runSeed = 0; G.lives = G.hwFree ? 3 : Math.max(1, H.lives || 3); G.score = 0; G.hwTries = 0; startLevel(HWC[k - 1].n); G.screen = 'play';
 };
 hwStop = function () { if (G.hwRun) { G.hwRun = false; G.mode = 'career'; LCACHE.clear(); } };
 act = (prev => function (id) {
@@ -12623,9 +12626,22 @@ hudPhone = (prev => function (lvl) { prev(lvl); if (!lvl || !lvl.hw) return;
 afterResult = (prev => function () {
   if (!G.hwRun) return prev();
   const r = L.result, ok = r === 'in' || r === 'perfect', k = HW.cur, P = hwCur();
-  if (!ok) { G.hwTries = (G.hwTries || 0) + 1; G.lives = 3; startLevel(P.n); G.screen = 'play'; return; }
-  let st = r === 'perfect' ? 3 : (G.hwTries || 0) === 0 ? 2 : 1; if (P.mech === 'potion' && L.hwS && L.hwS.potion < 70) st = Math.min(st, 2);
+  if (!ok) {
+    G.hwTries = (G.hwTries || 0) + 1;
+    if (G.hwFree) { G.lives = 3; startLevel(P.n); G.screen = 'play'; return; }
+    const H = hwSave(); H.lives = Math.max(0, G.lives);
+    if (G.lives > 0) { writeSave(save); startLevel(P.n); G.screen = 'play'; return; }
+    // plus de vies : la nuit reprend au dernier point de passage (chantier 1 ou 6) ; les étoiles et récompenses restent
+    const cp = k >= 6 ? 6 : 1; H.at = cp; H.lives = 3; writeSave(save); hwStop(); G.screen = 'hwmap';
+    if (typeof modal === 'function') modal({ title: 'NUIT PERDUE', lines: ['Plus de vies : la nuit reprend au chantier ' + cp + '.', 'Tes étoiles et tes récompenses sont gardées.', 'Astuce : un lâcher PILE POIL te rend une vie.'], yes: 'REPRENDRE', onYes: () => hwStart(cp), no: 'CARTE', onNo: () => {} });
+    return;
+  }
+  let st = (G.hwTries || 0) === 0 ? (r === 'perfect' ? 3 : 2) : 1; if (P.mech === 'potion' && L.hwS && L.hwS.potion < 70) st = Math.min(st, 2);
   const H = hwSave(), had = H.lvl[k] || 0, first = !had; H.lvl[k] = Math.max(had, st);
+  if (!G.hwFree) {   // la nuit avance, les vies restantes passent au chantier suivant (un PILE POIL rend une vie)
+    if (r === 'perfect' && G.lives < 3) { G.lives++; setTimeout(() => toast('🎃 PILE POIL : +1 vie', '#3cf29b'), 600); }
+    H.lives = G.lives; H.at = Math.max(hwAt(), k + 1);
+  }
   let coins = (first ? 20 : 0) + Math.max(0, st - had) * 5; if (coins) save.coins += coins;
   const S = hwStars(); HW_REW.forEach(rw => { if (S >= rw.st && !(H.rew || (H.rew = [])).includes(rw.id)) { H.rew.push(rw.id); hwGive(rw); } });
   writeSave(save); hwStop(); G.screen = 'hwmap';
@@ -12652,7 +12668,7 @@ act = (prev => function (id) {
   return prev(id);
 })(act);
 // textes anglais
-Object.assign(EN, { 'RÉCOMPENSE HALLOWEEN': 'HALLOWEEN REWARD', 'Y ALLER': 'GO', 'OUVERTE': 'OPEN', 'FERMÉE': 'CLOSED', '⚠ CHAUVES-SOURIS': '⚠ BATS' });
+Object.assign(EN, { 'NUIT PERDUE': 'NIGHT LOST', 'REPRENDRE': 'RESUME', 'CARTE': 'MAP', 'VIES': 'LIVES', 'Tes étoiles et tes récompenses sont gardées.': 'Your stars and rewards are kept.', 'Astuce : un lâcher PILE POIL te rend une vie.': 'Tip: a PILE POIL drop gives you a life back.', 'RÉCOMPENSE HALLOWEEN': 'HALLOWEEN REWARD', 'Y ALLER': 'GO', 'OUVERTE': 'OPEN', 'FERMÉE': 'CLOSED', '⚠ CHAUVES-SOURIS': '⚠ BATS' });
 
 // =====================================================================
 //  PILE POIL — CORRECTIONS (20/10)
@@ -13005,6 +13021,59 @@ document.addEventListener('visibilitychange', () => {
   setTimeout(sendProg, 8000);
   let prevScr = G.screen;
   setInterval(() => { if (G.screen !== prevScr) { if (prevScr === 'play') setTimeout(sendProg, 2500); prevScr = G.screen; } }, 700);
+})();
+
+// =====================================================================
+//  PILE POIL — VERSION PLATEFORMES DE JEUX (CrazyGames, Poki…)
+//  Ajouté seulement dans la version plateformes (build.py → plateformes/).
+//  Règles des plateformes : pas de connexion externe, pas d'achats, pas de liens
+//  vers un autre site, pas d'installation d'appli. Tout reste sur l'appareil.
+// =====================================================================
+(function () {
+  if (!window.PP_PLATFORM) return;
+  // partages (lien vers notre site) : coupés
+  try { TUNE.poseShare = false; TUNE.dailyShare = false; } catch (e) {}
+  // écrans et boutons qui menaient hors du jeu ou vers un achat
+  const OFF = ['shop', 'account', 'friends', 'parrain', 'pwaInstall', 'legalCgv', 'poseShare', 'dailyShare', 'frShare', 'frCopy', 'tdCopy', 'notif', 'nfOn', 'nfAsk'];
+  const offRe = /^(ref|pa|nf|ac)[A-Z]/;
+  act = (prev => function (id) {
+    if (OFF.includes(id) || offRe.test(id)) {
+      if (id === 'shop') { sfx.click(); toast(tr('Gagne des pièces en jouant : chantiers, épreuves, caisses et roue !'), '#ffc21a'); }
+      return;
+    }
+    return prev.apply(this, arguments);
+  })(act);
+  // si un écran interdit s'ouvre quand même (lien, ancienne sauvegarde) : retour à l'accueil
+  setInterval(() => { if (['shop', 'friends', 'fchat', 'parrain', 'profileAcc'].includes(G.screen)) G.screen = 'title'; }, 300);
+  // pas de case « Amis » (comptes en ligne) sur l'accueil
+  if (typeof amisChip === 'function') amisChip = function () {};
+  // pièces sans le « + » de la boutique
+  coinChip = function (x, y, alignRight) {
+    c.font = '900 30px Inter'; const label = save.coins.toLocaleString('fr-FR'), w = c.measureText(label).width + 96, X = alignRight ? x - w : x;
+    chip(X, y, w, 72); coinIcon(X + 40, y + 36, 18); txt(label, X + 68, y + 47, PAL.text, 30, 900); return X;
+  };
+  // premier lancement : entraînement ou menu (pas de connexion à un compte)
+  bienvenue = function () {
+    if (typeof modal !== 'function') return lancerTuto();
+    const en = save.lang === 'en';
+    modal({ title: en ? 'WELCOME TO PILE POIL!' : 'BIENVENUE SUR PILE POIL !',
+      lines: [en ? 'You are the crane operator.' : 'Tu es le grutier.', en ? 'A 1-minute practice site teaches you the controls.' : 'Un chantier d\'entraînement d\'une minute t\'apprend les commandes.', en ? 'Your progress is saved on this device.' : 'Ta progression est sauvegardée sur cet appareil.'],
+      yes: en ? 'PLAY PRACTICE' : 'JOUER L\'ENTRAÎNEMENT', onYes: lancerTuto,
+      no: en ? 'GO TO MENU' : 'ALLER AU MENU', onNo: () => { save.tuto = 1; writeSave(save); } });
+  };
+  // missions : pas de mission « duel » (les duels demandent un compte en ligne)
+  try { MISSION_POOL.easy = MISSION_POOL.easy.filter(m => m.id !== 'turn1'); } catch (e) {}
+  // réglages : à la place du compte joueur et des notifications, la sauvegarde sur l'appareil
+  window.ppPlatSettings = function () {
+    panel(980, 140, 830, 600, 'SAUVEGARDE');
+    txt('Ta progression est enregistrée automatiquement', 1016, 236, '#e6eef8', 24, 800);
+    txt('sur cet appareil : pièces, grues, records, étoiles.', 1016, 272, '#e6eef8', 24, 800);
+    txt('Joue sur le même navigateur pour la retrouver.', 1016, 326, '#9fb7cf', 19, 700);
+    rr(1016, 400, 758, 290, 24); c.fillStyle = 'rgba(255,194,26,.1)'; c.fill();
+    T(save.lang === 'en' ? 'EVERY DAY' : 'CHAQUE JOUR', 1050, 456, '#ffc21a', 34);
+    [['🎁', 'La caisse du jour'], ['📅', 'Le défi du jour : même tirage pour tous'], ['✅', '3 missions et leurs pièces'], ['🏗️', 'De nouveaux chantiers à débloquer']].forEach(([e, t], i) => txt(e + '  ' + tr(t), 1050, 512 + i * 46, '#e6eef8', 22, 800));
+  };
+  try { Object.assign(EN, { 'Gagne des pièces en jouant : chantiers, épreuves, caisses et roue !': 'Earn coins by playing: sites, challenges, crates and the wheel!', 'SAUVEGARDE': 'SAVE', 'Ta progression est enregistrée automatiquement': 'Your progress is saved automatically', 'sur cet appareil : pièces, grues, records, étoiles.': 'on this device: coins, cranes, records, stars.', 'Joue sur le même navigateur pour la retrouver.': 'Play on the same browser to keep it.', 'La caisse du jour': 'The daily crate', 'Le défi du jour : même tirage pour tous': 'The daily challenge: same draw for everyone', '3 missions et leurs pièces': '3 missions and their coins', 'De nouveaux chantiers à débloquer': 'New sites to unlock', 'Statistiques enregistrées sur cet appareil': 'Stats saved on this device' }); } catch (e) {}
 })();
 
 </script>
