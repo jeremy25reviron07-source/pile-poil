@@ -4431,7 +4431,7 @@ function askPay(o) {
   const link = SHOP_LINKS[o.id];
   if (!SHOP_OPEN || !link || DEMO) return shopBientot();
   modal({ title: `${o.name.toUpperCase()} · ${o.euros}`, lines: [`${o.coins.toLocaleString('fr-FR')} pièces${o.item ? ' + peinture Chrome exclusive' : ''}`, 'Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay).', 'Contenu numérique livré tout de suite : tu renonces au délai', 'de rétractation de 14 jours. Mineur ? Demande l\'accord d\'un parent.'], yes: `PAYER ${o.euros}`, no: 'ANNULER',
-    onYes: () => { const u = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(save.pid); location.href = u; } });
+    onYes: () => { const u = link + (link.includes('?') ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(save.pid); if (window.top !== window) { const w = window.open(u, '_blank'); if (w) return; } location.href = u; } });
 }
 async function claimPurchases(manual) {
   if (!SB) { if (manual) toast('Boutique indisponible en mode démo', '#ffb36b'); return 0; }
@@ -13116,6 +13116,17 @@ EN_RX.unshift([/^Étape « (.+) » terminée · checkpoint (\d+)$/, (m, a, b) =>
     T(save.lang === 'en' ? 'EVERY DAY' : 'CHAQUE JOUR', 1050, 456, '#ffc21a', 34);
     [['🎁', 'La caisse du jour'], ['📅', 'Le défi du jour : même tirage pour tous'], ['✅', '3 missions et leurs pièces'], ['🏗️', 'De nouveaux chantiers à débloquer']].forEach(([e, t], i) => txt(e + '  ' + tr(t), 1050, 512 + i * 46, '#e6eef8', 22, 800));
   };
+  // CrazyGames : signaler les moments de jeu (gameplayStart / gameplayStop) et les grands succès (happytime)
+  (function () {
+    let playing = false, lastScr = '';
+    const sdk = () => { try { const S = window.PP_CG; return S && S.game ? S.game : null; } catch (e) { return null; } };
+    setInterval(() => {
+      const g = sdk(); if (!g) return;
+      const now = G.screen === 'play' && !G.paused && !MO;
+      if (now !== playing) { playing = now; try { now ? g.gameplayStart() : g.gameplayStop(); } catch (e) {} }
+      if (G.screen !== lastScr) { if (G.screen === 'victory') { try { g.happytime(); } catch (e) {} } lastScr = G.screen; }
+    }, 200);
+  })();
   try { Object.assign(EN, { 'Gagne des pièces en jouant : chantiers, épreuves, caisses et roue !': 'Earn coins by playing: sites, challenges, crates and the wheel!', 'SAUVEGARDE': 'SAVE', 'Ta progression est enregistrée automatiquement': 'Your progress is saved automatically', 'sur cet appareil : pièces, grues, records, étoiles.': 'on this device: coins, cranes, records, stars.', 'Joue sur le même navigateur pour la retrouver.': 'Play on the same browser to keep it.', 'La caisse du jour': 'The daily crate', 'Le défi du jour : même tirage pour tous': 'The daily challenge: same draw for everyone', '3 missions et leurs pièces': '3 missions and their coins', 'De nouveaux chantiers à débloquer': 'New sites to unlock', 'Statistiques enregistrées sur cet appareil': 'Stats saved on this device' }); } catch (e) {}
 })();
 
