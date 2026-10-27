@@ -10203,7 +10203,10 @@ const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform 
 const STANDALONE = () => navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || (window.matchMedia && matchMedia('(display-mode: fullscreen)').matches);
 let PWA_PROMPT = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); PWA_PROMPT = e; });
-const canInstall = () => !STANDALONE() && (IOS || PWA_PROMPT) && location.protocol === 'https:';
+const ANDROID = /Android/i.test(navigator.userAgent);
+// navigateurs intégrés (TikTok, Instagram, Facebook, LinkedIn, Snapchat…) : impossible d'installer depuis là
+const INAPP = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|LinkedInApp|BytedanceWebview|musical_ly|TikTok|Snapchat|Line\/|MicroMessenger|Twitter|Pinterest|; wv\)/i.test(navigator.userAgent);
+const canInstall = () => !STANDALONE() && (IOS || ANDROID || PWA_PROMPT) && location.protocol === 'https:';
 // pastille « Installer » sur l'accueil, à côté des missions
 drawTitle = (prev => function () {
   prev();
@@ -10217,14 +10220,31 @@ drawTitle = (prev => function () {
 act = (prev => function (id) {
   if (id === 'pwaInstall') {
     sfx.click();
-    if (PWA_PROMPT) { PWA_PROMPT.prompt(); PWA_PROMPT.userChoice.finally(() => { PWA_PROMPT = null; }); return; }
+    if (PWA_PROMPT && !INAPP) { PWA_PROMPT.prompt(); PWA_PROMPT.userChoice.finally(() => { PWA_PROMPT = null; }); return; }
+    const copy = () => { try { navigator.clipboard.writeText(location.origin + location.pathname).then(() => toast('Lien copié ✓', '#2bd67b'), () => {}); } catch (e) {} };
+    if (INAPP && IOS) return modal({ title: 'OUVRE LE JEU DANS SAFARI', lines: ['1. Touche ··· (ou la boussole) en haut ou en bas de l\'écran.', '2. Choisis « Ouvrir dans Safari » ou « Ouvrir dans le navigateur ».', '3. Dans Safari : Partager → « Sur l\'écran d\'accueil ».'], yes: 'COPIER LE LIEN', no: 'FERMER', onYes: copy });
+    if (INAPP) return modal({ title: 'OUVRE LE JEU DANS CHROME', lines: ['1. Touche ⋮ ou ··· en haut à droite de l\'écran.', '2. Choisis « Ouvrir dans Chrome » ou « Ouvrir dans le navigateur ».', '3. Dans Chrome : menu ⋮ → « Ajouter à l\'écran d\'accueil ».'], yes: 'COPIER LE LIEN', no: 'FERMER', onYes: copy });
+    if (ANDROID) return modal({ title: 'INSTALLER PILE POIL', lines: ['1. Touche le menu ⋮ du navigateur (en haut ou en bas).', '2. Choisis « Ajouter à l\'écran d\'accueil » ou « Installer l\'application ».', '3. Lance PILE POIL depuis l\'icône : plein écran.'], yes: 'COMPRIS', no: null });
     return modal({ title: 'INSTALLER PILE POIL', lines: ['1. Dans Safari, touche le bouton Partager (le carré avec une flèche).', '2. Choisis « Sur l\'écran d\'accueil », puis « Ajouter ».', '3. Lance PILE POIL depuis l\'icône : plein écran, sans barre Safari.'], yes: 'COMPRIS', no: null });
   }
   return prev(id);
 })(act);
 // petit rappel une seule fois, à la 3e ouverture sur iPhone
-try { if (IOS && !STANDALONE()) { const k = 'pp_open_count', n = (+localStorage.getItem(k) || 0) + 1; localStorage.setItem(k, n); if (n === 3) setTimeout(() => toast('Astuce : installe PILE POIL sur ton écran d\'accueil (bouton Installer)', '#ffc21a'), 4000); } } catch (e) {}
-Object.assign(EN, { 'Installer': 'Install', "l'application": 'the app', 'INSTALLER PILE POIL': 'INSTALL PILE POIL', 'COMPRIS': 'GOT IT', '1. Dans Safari, touche le bouton Partager (le carré avec une flèche).': '1. In Safari, tap the Share button (square with an arrow).', "2. Choisis « Sur l'écran d'accueil », puis « Ajouter ».": '2. Choose “Add to Home Screen”, then “Add”.', "3. Lance PILE POIL depuis l'icône : plein écran, sans barre Safari.": '3. Open PILE POIL from the icon: full screen, no Safari bar.', "Astuce : installe PILE POIL sur ton écran d'accueil (bouton Installer)": 'Tip: install PILE POIL on your home screen (Install button)' });
+try { if (INAPP && !STANDALONE() && !window.PP_PLATFORM && (IOS || ANDROID)) setTimeout(() => toast(IOS ? 'Pour installer le jeu : ouvre-le dans Safari (bouton Installer)' : 'Pour installer le jeu : ouvre-le dans Chrome (bouton Installer)', '#ffc21a'), 3500); } catch (e) {}
+try { if (IOS && !INAPP && !STANDALONE()) { const k = 'pp_open_count', n = (+localStorage.getItem(k) || 0) + 1; localStorage.setItem(k, n); if (n === 3) setTimeout(() => toast('Astuce : installe PILE POIL sur ton écran d\'accueil (bouton Installer)', '#ffc21a'), 4000); } } catch (e) {}
+Object.assign(EN, { 'Installer': 'Install', "l'application": 'the app', 'INSTALLER PILE POIL': 'INSTALL PILE POIL', 'COMPRIS': 'GOT IT', '1. Dans Safari, touche le bouton Partager (le carré avec une flèche).': '1. In Safari, tap the Share button (square with an arrow).', "2. Choisis « Sur l'écran d'accueil », puis « Ajouter ».": '2. Choose “Add to Home Screen”, then “Add”.', "3. Lance PILE POIL depuis l'icône : plein écran, sans barre Safari.": '3. Open PILE POIL from the icon: full screen, no Safari bar.', "Astuce : installe PILE POIL sur ton écran d'accueil (bouton Installer)": 'Tip: install PILE POIL on your home screen (Install button)',
+  'OUVRE LE JEU DANS SAFARI': 'OPEN THE GAME IN SAFARI', 'OUVRE LE JEU DANS CHROME': 'OPEN THE GAME IN CHROME', 'COPIER LE LIEN': 'COPY LINK', 'FERMER': 'CLOSE', 'Lien copié ✓': 'Link copied ✓',
+  "1. Touche ··· (ou la boussole) en haut ou en bas de l'écran.": '1. Tap ··· (or the compass) at the top or bottom of the screen.',
+  '2. Choisis « Ouvrir dans Safari » ou « Ouvrir dans le navigateur ».': '2. Choose “Open in Safari” or “Open in browser”.',
+  "3. Dans Safari : Partager → « Sur l'écran d'accueil ».": '3. In Safari: Share → “Add to Home Screen”.',
+  "1. Touche ⋮ ou ··· en haut à droite de l'écran.": '1. Tap ⋮ or ··· at the top right of the screen.',
+  '2. Choisis « Ouvrir dans Chrome » ou « Ouvrir dans le navigateur ».': '2. Choose “Open in Chrome” or “Open in browser”.',
+  "3. Dans Chrome : menu ⋮ → « Ajouter à l'écran d'accueil ».": '3. In Chrome: menu ⋮ → “Add to Home screen”.',
+  '1. Touche le menu ⋮ du navigateur (en haut ou en bas).': '1. Tap the browser menu ⋮ (top or bottom).',
+  "2. Choisis « Ajouter à l'écran d'accueil » ou « Installer l'application ».": '2. Choose “Add to Home screen” or “Install app”.',
+  "3. Lance PILE POIL depuis l'icône : plein écran.": '3. Open PILE POIL from the icon: full screen.',
+  'Pour installer le jeu : ouvre-le dans Safari (bouton Installer)': 'To install the game, open it in Safari (Install button)',
+  'Pour installer le jeu : ouvre-le dans Chrome (bouton Installer)': 'To install the game, open it in Chrome (Install button)' });
 
 // =====================================================================
 //  IPHONE : cadrage exact, aucun zoom parasite, fluidité
