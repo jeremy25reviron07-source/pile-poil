@@ -13046,6 +13046,128 @@ document.addEventListener('visibilitychange', () => {
 })();
 
 // =====================================================================
+//  PILE POIL — VIE ET RÉCOMPENSES : charge dorée, pose PILE POIL plus marquante,
+//  rafales annoncées, oiseaux et hélicoptère dans le ciel, feux d'artifice aux checkpoints
+// =====================================================================
+const VIE = { coins: [], fw: [], cpT: -1, lastScr: '' };
+const vieEN = () => save.lang === 'en';
+
+// ---------- charge dorée ----------
+// 1 chance sur 6 à partir du niveau 4 : PILE POIL dessus = points ×2 et +10 pièces
+startLevel = (prev => function (n) {
+  prev(n);
+  try {
+    VIE.coins = []; if (!L) return; L.gold = false; L.vieT = 0;
+    if (n >= 4 && !G.replay && !G.tuto && !L.tuto && L.C && L.C.crane !== 'crawler' && Math.random() < 1 / 6) L.gold = true;
+    L.vieGust = !!(L.gust || (L.C && Math.abs(L.C.wind || 0) >= 18));
+  } catch (e) {}
+})(startLevel);
+drawLoad = (prev => function (lvl, x, y, rot) {
+  if (!lvl || !lvl.gold) return prev(lvl, x, y, rot);
+  const w = lvl.loadW, h = lvl.loadH, t = G.t || 0;
+  // halo doré derrière la charge
+  c.save(); c.globalAlpha = .55 + Math.sin(t * 4) * .15; withShadow('rgba(255,200,60,.95)', 40, 0, 0, () => { rr(x - w / 2 - 4, y - 4, w + 8, h + 8, 10); c.fillStyle = 'rgba(255,205,80,.5)'; c.fill(); }); c.restore();
+  prev(lvl, x, y, rot);
+  // teinte or + reflet qui balaie la charge
+  c.save(); rr(x - w / 2, y, w, h, 6); c.clip();
+  c.globalCompositeOperation = 'color'; c.fillStyle = '#ffc23a'; c.fillRect(x - w / 2, y, w, h);
+  c.globalCompositeOperation = 'overlay'; c.fillStyle = 'rgba(255,215,90,.55)'; c.fillRect(x - w / 2, y, w, h);
+  c.globalCompositeOperation = 'lighter'; const sx = x - w / 2 + ((t * 160) % (w + 160)) - 80;
+  const g = c.createLinearGradient(sx - 40, 0, sx + 40, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, 'rgba(255,250,220,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(x - w / 2, y, w, h); c.restore();
+  // étincelles
+  for (let i = 0; i < 4; i++) { const a = t * 2 + i * 1.7, px = x + Math.cos(a * 1.3) * w * .55, py = y + h / 2 + Math.sin(a) * h * .7, s = 5 + 4 * Math.abs(Math.sin(t * 6 + i));
+    c.save(); c.translate(px, py); c.fillStyle = 'rgba(255,248,210,.95)'; c.beginPath(); c.moveTo(0, -s); c.lineTo(s * .25, -s * .25); c.lineTo(s, 0); c.lineTo(s * .25, s * .25); c.lineTo(0, s); c.lineTo(-s * .25, s * .25); c.lineTo(-s, 0); c.lineTo(-s * .25, -s * .25); c.closePath(); c.fill(); c.restore(); }
+})(drawLoad);
+
+// ---------- résultat : bonus or + pièces qui volent vers le score ----------
+finish = (prev => function (lvl, res) {
+  prev(lvl, res);
+  try {
+    if (res !== 'perfect' && res !== 'in') return;
+    const tx = lvl.target ? lvl.target.x + lvl.target.w / 2 : 960, ty = GY - 30;
+    if (res === 'perfect') { burst(tx, ty - 20, 30, { a0: -Math.PI, spread: Math.PI, sp: 520, life: .9, r: 5, w: lvl.loadW, col: 'rgba(255,236,150,', g: 600, drag: 1.4 }); for (let i = 0; i < 6; i++) VIE.coins.push({ x: tx + (Math.random() - .5) * lvl.loadW, y: ty - 40, t: -i * .07 }); }
+    if (lvl.gold && res === 'perfect') {
+      const n = G.level, mult = Math.min(3, 1 + (G.combo - 1) * .5), pts = Math.round(150 * n * mult);
+      G.score += pts; save.coins = (save.coins || 0) + 10; writeSave(save);
+      for (let i = 0; i < 10; i++) VIE.coins.push({ x: tx + (Math.random() - .5) * lvl.loadW, y: ty - 60, t: -.4 - i * .06, gold: true });
+      burst(tx, ty - 30, 46, { a0: -Math.PI, spread: Math.PI, sp: 700, life: 1.2, r: 6, w: lvl.loadW, col: 'rgba(255,200,60,', g: 500, drag: 1.2 });
+      G.msg = { title: vieEN() ? 'GOLDEN PILE POIL!' : 'PILE POIL EN OR !', sub: (vieEN() ? 'Points ×2 · ' : 'Points ×2 · ') + '+' + pts.toLocaleString('fr-FR') + (vieEN() ? ' pts · +10 coins' : ' pts · +10 pièces'), col: '#ffc21a', t: 0 };
+      [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, .22, 'triangle', .08, .25 + i * .06));
+    } else if (lvl.gold && res === 'in') {
+      FX.pops.push({ text: vieEN() ? 'Gold load: not PILE POIL, no bonus' : 'Charge dorée : pas PILE POIL, pas de bonus', x: tx, y: GY - 120, t: 0, col: '#ffd447' });
+    }
+  } catch (e) {}
+})(finish);
+
+// ---------- ciel vivant : vols d'oiseaux et hélicoptère ----------
+function vieBirds(t) {
+  const cyc = 26, k = t % cyc; if (k > 14) return; const bx = -200 + k * 170, by = 210 + Math.sin(t * .3) * 30;
+  c.save(); c.strokeStyle = 'rgba(40,42,50,.75)'; c.lineWidth = 2.6; c.lineCap = 'round';
+  for (let i = 0; i < 9; i++) { const row = Math.ceil(i / 2), side = i % 2 ? 1 : -1, x = bx - row * 26, y = by + side * row * 16 + Math.sin(t * 3 + i) * 3, fl = Math.sin(t * 13 + i * 1.7) * 6;
+    c.beginPath(); c.moveTo(x - 11, y - fl); c.quadraticCurveTo(x - 5, y - 4, x, y); c.quadraticCurveTo(x + 5, y - 4, x + 11, y - fl); c.stroke(); }
+  c.restore();
+}
+function vieHeli(t) {
+  const cyc = 47, k = t % cyc; if (k > 12) return; const x = W + 200 - k * 190, y = 250 + Math.sin(k * .8) * 18;
+  c.save(); c.translate(x, y); c.rotate(-.06);
+  c.fillStyle = '#c8321e'; c.beginPath(); c.ellipse(0, 0, 34, 17, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#1f2f40'; c.beginPath(); c.ellipse(-14, -3, 15, 10, 0, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#c8321e'; c.lineWidth = 7; c.beginPath(); c.moveTo(26, -2); c.lineTo(78, -10); c.stroke();
+  c.fillStyle = '#2a2a2e'; c.fillRect(74, -26, 7, 20);
+  c.strokeStyle = 'rgba(30,30,34,.85)'; c.lineWidth = 3; c.beginPath(); c.moveTo(-16, 20); c.lineTo(20, 20); c.moveTo(-8, 17); c.lineTo(-8, 20); c.moveTo(12, 17); c.lineTo(12, 20); c.stroke();
+  const sp = Math.abs(Math.sin(t * 40)); c.strokeStyle = 'rgba(25,25,30,.6)'; c.lineWidth = 3; c.beginPath(); c.moveTo(-60 * sp, -22); c.lineTo(60 * sp, -22); c.stroke(); c.fillStyle = 'rgba(40,40,46,.12)'; c.beginPath(); c.ellipse(0, -22, 62, 4, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = (t * 2 | 0) % 2 ? '#ff3b2b' : 'rgba(255,59,43,.2)'; c.beginPath(); c.arc(0, 17, 3, 0, 7); c.fill();
+  c.restore();
+}
+drawCityBack = (prev => function (lvl) {
+  prev(lvl);
+  try { const C = lvl.C || {}; if (C.night || C.tod === 'nuit' || C.rain === 'forte') return; const t = G.t || 0; vieBirds(t); vieHeli(t + 17); } catch (e) {}
+})(drawCityBack);
+
+// ---------- par-dessus le niveau : rafales, annonces, pièces ----------
+drawLevel = (prev => function (lvl) {
+  prev(lvl);
+  try {
+    const dt = 1 / 60; lvl.vieT = (lvl.vieT || 0) + dt; const C = lvl.C || {}, wind = C.wind || 0, t = G.t || 0;
+    // traits de vent quand ça souffle
+    if (Math.abs(wind) >= 12) { const k = Math.min(1, (Math.abs(wind) - 10) / 25), dir = Math.sign(wind); c.save(); c.strokeStyle = `rgba(255,255,255,${(.18 + k * .22).toFixed(2)})`; c.lineWidth = 2;
+      for (let i = 0; i < 10; i++) { const y = 170 + ((i * 83) % 520), len = 90 + (i % 3) * 50, x = ((t * (420 + i * 30) * dir + i * 380) % (W + 400) + W + 400) % (W + 400) - 200; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + len * .5 * dir, y - 6, x + len * dir, y + 2); c.stroke(); } c.restore(); }
+    // annonces de début de niveau
+    const ann = lvl.gold ? [vieEN() ? 'GOLDEN LOAD' : 'CHARGE DORÉE', vieEN() ? 'PILE POIL = points ×2 + 10 coins' : 'PILE POIL = points ×2 + 10 pièces', '#ffc21a'] : lvl.vieGust ? [vieEN() ? 'GUSTS!' : 'RAFALES !', (vieEN() ? 'Wind ' : 'Vent ') + Math.round(Math.abs(lvl.windBase || wind)) + ' km/h · ' + (vieEN() ? 'the load will swing' : 'la charge va balancer'), '#ff8a3c'] : null;
+    const at = lvl.vieT - 2.2; if (ann && at > 0 && at < 2.6 && lvl.phase === 'hang' && !G.msg) { const a = Math.min(1, at * 4, (2.6 - at) * 3), sc = 1 + Math.max(0, .25 - at) * 1.2, y = 470;
+      c.save(); c.globalAlpha = a; c.translate(960, y); c.scale(sc, sc); c.font = '900 76px Inter'; const tw = c.measureText(ann[0]).width;
+      withShadow('rgba(0,0,0,.45)', 18, 0, 6, () => { rr(-tw / 2 - 40, -70, tw + 80, 150, 30); c.fillStyle = 'rgba(12,16,26,.82)'; c.fill(); });
+      c.strokeStyle = ann[2]; c.lineWidth = 3; rr(-tw / 2 - 40, -70, tw + 80, 150, 30); c.stroke();
+      txt(ann[0], 0, 10, ann[2], 76, 900, 'center'); txt(ann[1], 0, 56, '#e6eef8', 24, 800, 'center'); c.restore(); }
+    // pièces qui volent vers le score
+    const sx = 1700, sy = 95 - (window.CROP || 0);
+    VIE.coins = VIE.coins.filter(p => { p.t += dt; if (p.t < 0) return true; const k = Math.min(1, p.t / .8), e = k * k * (3 - 2 * k), x = p.x + (sx - p.x) * e, y = p.y + (sy - p.y) * e - Math.sin(k * Math.PI) * 160;
+      if (typeof coinIcon === 'function') coinIcon(x, y, p.gold ? 16 : 13); else ell(x, y, 13, 13, '#ffc21a'); return k < 1; });
+  } catch (e) {}
+})(drawLevel);
+
+// ---------- checkpoint : feux d'artifice, confettis, foule ----------
+function vieFirework(x, y, col) { const n = 70; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, s = 260 + Math.random() * 160; VIE.fw.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1.4 + Math.random() * .5, t: 0, col }); }
+  try { tone(90 + Math.random() * 40, .35, 'sawtooth', .05); tone(2400, .08, 'triangle', .03, .05); } catch (e) {} }
+function vieParty(key, on) {
+  if (VIE.lastScr !== key) { VIE.cpT = 0; VIE.fw = []; VIE.conf = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: -Math.random() * 600, v: 120 + Math.random() * 160, r: Math.random() * 6, c: ['#ffc21a', '#3cf29b', '#ff4fa0', '#29c7ff', '#ffffff'][Math.random() * 5 | 0] })); }
+  VIE.lastScr = key; if (!on) return;
+  const dt = 1 / 60; VIE.cpT += dt; const cols = ['#ffc21a', '#3cf29b', '#ff4fa0', '#29c7ff', '#ff8a3c'];
+  if (VIE.cpT < 4.5 && Math.floor(VIE.cpT / .5) !== Math.floor((VIE.cpT - dt) / .5)) vieFirework(220 + Math.random() * 1480, 130 + Math.random() * 280, cols[Math.random() * 5 | 0]);
+  c.save(); c.globalCompositeOperation = 'lighter';
+  VIE.fw = VIE.fw.filter(p => { p.t += dt; p.vy += 260 * dt; p.vx *= 1 - dt * 1.4; p.vy *= 1 - dt * 1.4; p.x += p.vx * dt; p.y += p.vy * dt; const a = Math.max(0, 1 - p.t / p.life);
+    c.globalAlpha = a; c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, 3.2, 0, 7); c.fill(); c.globalAlpha = a * .35; c.beginPath(); c.arc(p.x, p.y, 8, 0, 7); c.fill(); return a > 0; });
+  c.restore();
+  if (VIE.cpT < 7) for (const q of VIE.conf) { q.y += q.v * dt; q.r += dt * 6; c.save(); c.translate(q.x + Math.sin(q.r) * 14, q.y); c.rotate(q.r); c.fillStyle = q.c; c.fillRect(-7, -3.5, 14, 7); c.restore(); }
+}
+drawCheckpoint = (prev => function () { prev(); try { vieParty('checkpoint', G.level > 1); } catch (e) {} })(drawCheckpoint);
+// la roue de prime d'un checkpoint (« CHANTIER LIVRÉ ! ») : feux d'artifice à l'arrivée
+drawWheel = (prev => function () { prev(); try { vieParty('wheel', !!(typeof WH !== 'undefined' && WH.cp)); } catch (e) {} })(drawWheel);
+// on mémorise l'écran courant pour relancer la fête au prochain checkpoint
+setInterval(() => { try { if (G.screen !== 'checkpoint' && G.screen !== 'wheel') VIE.lastScr = G.screen; } catch (e) {} }, 250);
+
+// =====================================================================
 //  PILE POIL — CORRECTIONS DE LA VÉRIFICATION COMPLÈTE (octobre 2026)
 // =====================================================================
 // 1. le bandeau de présentation du chantier (Tokyo, Le Caire, Halloween…) disparaît dès que la charge est lâchée :
@@ -13116,8 +13238,10 @@ EN_RX.unshift([/^Étape « (.+) » terminée · checkpoint (\d+)$/, (m, a, b) =>
     chip(X, y, w, 72); coinIcon(X + 40, y + 36, 18); txt(label, X + 68, y + 47, PAL.text, 30, 900); return X;
   };
   // premier lancement : entraînement ou menu (pas de connexion à un compte)
+  // plateformes : on joue tout de suite (chantier d'entraînement guidé), sans fenêtre d'accueil
   bienvenue = function () {
-    if (typeof modal !== 'function') return lancerTuto();
+    if (typeof lancerTuto === 'function') return lancerTuto();
+    if (typeof modal !== 'function') return;
     const en = save.lang === 'en';
     modal({ title: en ? 'WELCOME TO PILE POIL!' : 'BIENVENUE SUR PILE POIL !',
       lines: [en ? 'You are the crane operator.' : 'Tu es le grutier.', en ? 'A 1-minute practice site teaches you the controls.' : 'Un chantier d\'entraînement d\'une minute t\'apprend les commandes.', en ? 'Your progress is saved on this device.' : 'Ta progression est sauvegardée sur cet appareil.'],
@@ -13136,6 +13260,44 @@ EN_RX.unshift([/^Étape « (.+) » terminée · checkpoint (\d+)$/, (m, a, b) =>
     T(save.lang === 'en' ? 'EVERY DAY' : 'CHAQUE JOUR', 1050, 456, '#ffc21a', 34);
     [['🎁', 'La caisse du jour'], ['📅', 'Le défi du jour : même tirage pour tous'], ['✅', '3 missions et leurs pièces'], ['🏗️', 'De nouveaux chantiers à débloquer']].forEach(([e, t], i) => txt(e + '  ' + tr(t), 1050, 512 + i * 46, '#e6eef8', 22, 800));
   };
+  // ---------- PUBS (CrazyGames, Poki, GameDistribution) ----------
+  const AD = () => window.PP_AD || null, EN_ = () => save.lang === 'en';
+  const today = () => new Date().toISOString().slice(0, 10);
+  const adLeft = () => { const a = save.adDay || {}; return a.d === today() ? Math.max(0, 8 - (a.n || 0)) : 8; };
+  const adUse = () => { const a = save.adDay && save.adDay.d === today() ? save.adDay : { d: today(), n: 0 }; a.n++; save.adDay = a; writeSave(save); };
+  const AD_COINS = 50;
+  // pièces : bouton vidéo « +50 » à la place du « + » de la boutique
+  const coinChip0 = coinChip;
+  coinChip = function (x, y, alignRight) {
+    if (!AD() || !adLeft()) return coinChip0(x, y, alignRight);
+    c.font = '900 30px Inter'; const label = save.coins.toLocaleString('fr-FR'), w = c.measureText(label).width + 210, X = alignRight ? x - w : x;
+    chip(X, y, w, 72); coinIcon(X + 40, y + 36, 18); txt(label, X + 68, y + 47, PAL.text, 30, 900);
+    relief(X + w - 128, y + 12, 116, 48, PAL.play[0], PAL.play[1], 24, 4); txt('▶ +' + AD_COINS, X + w - 70, y + 45, '#fff', 24, 900, 'center');
+    G.buttons.push({ id: 'adCoins', x: X + w - 132, y, w: 132, h: 72 }); return X;
+  };
+  // fin de partie : une vie de secours contre une vidéo (1 fois par checkpoint)
+  drawGameOver = (prev => function () {
+    prev(); if (!AD() || MO || G.replay || G.adCont) return;
+    const w = 600, h = 90, x = 960 - w / 2, y = 935;
+    withShadow('rgba(255,194,26,.4)', 24, 0, 6, () => { rr(x, y, w, h, 48); c.fillStyle = lg(0, y, 0, y + h, [[0, '#ffd447'], [1, '#f0a400']]); c.fill(); });
+    txt(EN_() ? '▶  WATCH A VIDEO · +1 LIFE' : '▶  REGARDER UNE VIDÉO · +1 VIE', 960, y + 57, '#2a1a00', 30, 900, 'center');
+    G.buttons.push({ id: 'adCont', x, y, w, h });
+  })(drawGameOver);
+  gotoCheckpointScreen = (prev => function (n) { G.adCont = false; return prev(n); })(gotoCheckpointScreen);
+  let adFirst = false, adLast = 0, adPlayed = 0, adWasPlay = false;
+  setInterval(() => { const p = G.screen === 'play'; if (adWasPlay && !p) adPlayed++; adWasPlay = p; }, 300);
+  act = (prev => function (id) {
+    const A = AD();
+    if (A && id === 'adCoins') { A.rewarded(() => { save.coins += AD_COINS; adUse(); writeSave(save); sfx.perfect(); toast(`+${AD_COINS} ` + (EN_() ? 'coins' : 'pièces'), '#ffd447'); }); adLast = Date.now(); return; }
+    if (A && id === 'adCont' && G.screen === 'gameover') { A.rewarded(() => { G.adCont = true; G.lives = 1; startLevel(G.level); G.screen = 'play'; toast(EN_() ? 'Extra life!' : 'Vie de secours !', '#3cf29b'); }); adLast = Date.now(); return; }
+    // pub entre les parties : toujours sur un clic, jamais en jeu, au plus toutes les 2 minutes
+    if (A && G.screen !== 'play' && !MO) {
+      if (!adFirst && window.PP_PLATFORM === 'gamedistribution') { adFirst = true; adLast = Date.now(); A.mid(); }
+      else if (adPlayed > 0 && Date.now() - adLast > 120000) { adPlayed = 0; adLast = Date.now(); A.mid(); }
+    }
+    return prev(id);
+  })(act);
+  try { Object.assign(EN, {}); } catch (e) {}
   // CrazyGames : signaler les moments de jeu (gameplayStart / gameplayStop) et les grands succès (happytime)
   (function () {
     let playing = false, lastScr = '';
