@@ -13549,22 +13549,20 @@ finish = (prev => function (lvl, res) {
 })(finish);
 // encart « Nouveau bâtiment » : pendant la partie (toast) puis sur les écrans d'étape et l'accueil
 function viThumb(it, x, y, maxW, maxH) { const s = VI.img[it.id]; if (!s || !s.im.complete || !s.im.naturalWidth) return; const sc = Math.min(maxH / s.im.naturalHeight, maxW / s.im.naturalWidth, 1.3); c.drawImage(s.im, x - s.ox * sc, y - s.oy * sc, s.im.naturalWidth * sc, s.im.naturalHeight * sc); }
-function viToast() { const q = VI.newB; if (!q || MO) return; const age = G.t - q.t0; if (age < .9 || age > 4.6) return; const it = VPLAN.items.find(i => i.n === q.n); if (!it) return;
-  const p = Math.min(1, (age - .9) / .35, (4.6 - age) / .35), x = 740, y = 290 - (1 - p) * 30, w = 440, h = 120; c.globalAlpha = Math.max(0, p);
-  c.save(); rr(x, y, w, h, 22); c.fillStyle = 'rgba(12,18,32,.92)'; c.fill(); c.strokeStyle = PAL.yellow; c.lineWidth = 3; c.stroke();
-  c.save(); rr(x + 10, y + 10, 120, 100, 16); c.clip(); c.fillStyle = 'rgba(255,255,255,.06)'; c.fillRect(x + 10, y + 10, 120, 100); viThumb(it, x + 70, y + 100, 110, 86); c.restore();
-  txt(viEN() ? 'NEW IN YOUR CITY' : 'NOUVEAU DANS TA VILLE', x + 146, y + 48, PAL.yellow, 20, 900); txt(viKindName(it.k), x + 146, y + 84, PAL.text, 26, 900); c.restore(); c.globalAlpha = 1; }
+// pendant la partie : petite pastille discrète en bas à gauche (2,5 s)
+function viToast() { const q = VI.newB; if (!q || MO) return; const age = G.t - q.t0; if (age < .9 || age > 3.6) return; const it = VPLAN.items.find(i => i.n === q.n); if (!it) return;
+  const p = Math.max(0, Math.min(1, (age - .9) / .3, (3.6 - age) / .3)), x = 140, y = 992 + (1 - p) * 20, w = 330, h = 52;
+  c.save(); c.globalAlpha = p; rr(x, y, w, h, h / 2); c.fillStyle = 'rgba(12,18,32,.85)'; c.fill(); c.strokeStyle = 'rgba(255,194,26,.7)'; c.lineWidth = 2; c.stroke();
+  icon('build', x + 30, y + h / 2, 24, PAL.yellow); txt((viEN() ? '+1 building · ' : '+1 bâtiment · ') + viKindName(it.k), x + 54, y + 34, PAL.text, 19, 800); c.restore(); }
+// checkpoint : simple bouton sous « Commencer »
 function viNewCard() {
   const L2 = save.villeNew || []; if (!L2.length || MO || !['checkpoint', 'victory'].includes(G.screen)) return;
-  if (G.screen === 'title' && typeof MI !== 'undefined' && (MI.open || MI.slide > 0)) return;
   const it = VPLAN.items.find(i => i.n === L2[L2.length - 1]); if (!it) return;
-  const P = VI.cardPos && VI.cardPos[G.screen] || { checkpoint: [160, 952], title: [VI.titleX || 560, 952], victory: [440, 952] }[G.screen], x = P[0], y = P[1], w = 1040, h = 104;
-  c.save(); rr(x, y, w, h, 24); c.fillStyle = 'rgba(12,18,32,.94)'; c.fill(); c.strokeStyle = PAL.yellow; c.lineWidth = 3; c.stroke();
-  c.save(); rr(x + 10, y + 8, 260, h - 16, 16); c.clip(); c.fillStyle = 'rgba(255,255,255,.06)'; c.fillRect(x + 10, y + 8, 260, h - 16);
-  const show = L2.slice(-3).map(n => VPLAN.items.find(i => i.n === n)).filter(Boolean); show.forEach((q, k) => viThumb(q, x + 140 + (k - (show.length - 1) / 2) * 82, y + h - 12, show.length > 1 ? 80 : 220, h - 22)); c.restore();
-  txt(L2.length > 1 ? (viEN() ? L2.length + ' NEW BUILDINGS!' : L2.length + ' NOUVEAUX BÂTIMENTS !') : (viEN() ? 'NEW BUILDING!' : 'NOUVEAU BÂTIMENT !'), x + 294, y + 44, PAL.yellow, 24, 900);
-  txt(viKindName(it.k) + (L2.length > 1 ? (viEN() ? ' and more' : ' et d\'autres') : ''), x + 294, y + 80, PAL.text, 22, 800);
-  c.restore(); iconBtn('viNew:' + it.n, x + w - 300, y + 22, 276, 60, null, viEN() ? 'SEE MY CITY' : 'VOIR MA VILLE', PAL.gold[0], PAL.gold[1], '#2a1a00', 24);
+  const lab = (viEN() ? '+' + L2.length + (L2.length > 1 ? ' buildings' : ' building') + ' · See my city' : '+' + L2.length + (L2.length > 1 ? ' bâtiments' : ' bâtiment') + ' · Voir ma ville');
+  const w = 440, h = 56, x = G.screen === 'checkpoint' ? 1240 : 740, y = G.screen === 'checkpoint' ? 990 : 980;
+  rr(x, y, w, h, h / 2); c.fillStyle = 'rgba(12,18,32,.88)'; c.fill(); c.strokeStyle = PAL.yellow; c.lineWidth = 2; c.stroke();
+  icon('build', x + 32, y + h / 2, 24, PAL.yellow); txt(lab, x + 60, y + 36, PAL.text, 21, 900);
+  G.buttons.push({ id: 'viNew:' + it.n, x, y, w, h });
 }
 if (typeof drawLevel === 'function') drawLevel = (prev => function () { prev.apply(this, arguments); try { if (G.screen === 'play') viToast(); } catch (e) {} })(drawLevel);
 if (typeof drawCheckpoint === 'function') drawCheckpoint = (prev => function () { prev.apply(this, arguments); try { viNewCard(); } catch (e) {} })(drawCheckpoint);
