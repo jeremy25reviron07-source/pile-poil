@@ -13265,7 +13265,7 @@ const VJOB = { ville: 3, haus: 4, ecole: 30, gare: 60, mairie: 80, musee: 40, bu
 
 // état de la carrière France (même si le joueur est au Japon ou en Égypte)
 function viData() {
-  const read = () => { const cur = careerLevel(), out = []; for (let n = 1; n <= 50; n++) { const rec = (save.lvl || {})[n], s = Math.max(rec ? rec.s || 0 : 0, (save.lvlPaid || {})[n] || 0);
+  const read = () => { let top = 0; for (let n = 1; n <= 50; n++) { const rec = (save.lvl || {})[n]; if ((rec && rec.s > 0) || (save.lvlPaid || {})[n] > 0) top = n; } const cur = Math.min(50, Math.max(careerLevel(), top + 1)), out = []; for (let n = 1; n <= 50; n++) { const rec = (save.lvl || {})[n], s = Math.max(rec ? rec.s || 0 : 0, (save.lvlPaid || {})[n] || 0);
     out.push({ n, s, st: s > 0 || n < cur ? 'd' : n === cur ? 'c' : 'l' }); } return out; };
   try { return typeof withRegionData === 'function' ? withRegionData('fr', read) : read(); } catch (e) { return read(); }
 }
