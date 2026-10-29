@@ -4769,7 +4769,7 @@ if (ACC.token) setTimeout(accPull, 600);
 setInterval(() => { if (ACC.token && document.visibilityState === 'visible') accPull(); }, 60000);
 // ---------- mise à jour automatique : plus besoin de supprimer/réinstaller le jeu ----------
 // à chaque publication, APP_VER et version.txt changent ; le jeu le voit et se recharge tout seul hors partie
-const APP_VER = '202610291657';
+const APP_VER = '202610291727';
 const UPD_SAFE = new Set(['title', 'regions', 'levels', 'career', 'hwmap', 'jpmap', 'egmap', 'settings', 'profile', 'board', 'friends', 'defis', 'epreuves', 'ville', 'shop', 'parrain', 'gameover', 'victory']);
 let updNew = null, updT = 0;
 async function updCheck(auto) { if (location.protocol !== 'https:' || Date.now() - updT < 20000) return; updT = Date.now();
