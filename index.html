@@ -10271,9 +10271,13 @@ width:min(calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right
 @supports (height:100dvh){#c{width:min(calc(100vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)),calc((100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)) * 16 / 9))!important}}
 html,body{width:100%;height:100%;margin:0;padding:0!important}`;
   document.head.appendChild(st2);
+  // zone réellement visible : sur iOS 26, clientHeight / 100dvh oublient la bande du bas (barre d'outils repliée) -> bande noire.
+  // On prend la plus grande mesure fiable (innerHeight / visualViewport) et on lit les marges de sécurité (encoche, barre d'accueil).
+  window.ppVP = () => { const de = document.documentElement, vv = window.visualViewport; const vw = Math.max(innerWidth || 0, vv ? Math.round(vv.width) : 0) || de.clientWidth, vh = Math.max(innerHeight || 0, vv ? Math.round(vv.height) : 0) || de.clientHeight;
+    const cs = getComputedStyle(probe), px = v => parseFloat(v) || 0; return { vw, vh, it: px(cs.paddingTop), ir: px(cs.paddingRight), ib: px(cs.paddingBottom), il: px(cs.paddingLeft) }; };
   function fit() {
     if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
-    const r = cv.getBoundingClientRect(), vw = document.documentElement.clientWidth || innerWidth, vh = document.documentElement.clientHeight || innerHeight;
+    const r = cv.getBoundingClientRect(), { vw, vh } = ppVP();
     window.GUT = { vw, vh, ox: 0, oy: 0, sl: 0, sr: 0, top: r.top, h: r.height, l: r.left, r: r.right, g: Math.min(r.left, vw - r.right) };
     window.SIDEPAD = TOUCH && window.GUT.g >= 100; if (window.ppPadSize) ppPadSize();
   }
@@ -10349,11 +10353,13 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
   window.CROP = 0; const TB0 = JSON.parse(JSON.stringify(TBTN)); let mode = '';
   function apply() {
     const want = TOUCH && G.screen === 'play' ? 'fill' : 'fit';
-    const vw = document.documentElement.clientWidth || innerWidth, vh = document.documentElement.clientHeight || innerHeight, key = want + vw + 'x' + vh;
+    const { vw, vh, il, ir, it, ib } = ppVP(), key = want + vw + 'x' + vh + 'x' + il + ir + it + ib;
     if (key === mode) return; mode = key;
-    if (want === 'fit' || vw / vh <= 16 / 9 + .02) { ['inset', 'left', 'top', 'width', 'height'].forEach(p => cv.style.removeProperty(p)); window.CROP = 0; }
+    const set = (p, v) => cv.style.setProperty(p, v, 'important');
+    if (want === 'fit' || vw / vh <= 16 / 9 + .02) { // tout l'écran visible, moins l'encoche et la barre d'accueil, au format 16:9
+      const aw = vw - il - ir, ah = vh - it - ib, w = Math.min(aw, ah * 16 / 9), h = w * 9 / 16; set('inset', 'auto'); set('width', w + 'px'); set('height', h + 'px'); set('left', (il + (aw - w) / 2) + 'px'); set('top', (it + (ah - h) / 2) + 'px'); window.CROP = 0; }
     else { let w = vw, h = vw * 9 / 16, crop = (h - vh) / 2 * 1080 / h; if (crop > 120) { crop = 120; h = vh * 1080 / 840; w = h * 16 / 9; }
-      const set = (p, v) => cv.style.setProperty(p, v, 'important'); set('inset', 'auto'); set('width', w + 'px'); set('height', h + 'px'); set('left', (vw - w) / 2 + 'px'); set('top', (vh - h) / 2 + 'px'); window.CROP = Math.round(crop); }
+      set('inset', 'auto'); set('width', w + 'px'); set('height', h + 'px'); set('left', (vw - w) / 2 + 'px'); set('top', (vh - h) / 2 + 'px'); window.CROP = Math.round(crop); }
     const k = window.CROP; for (const id in TB0) { const b = TB0[id].slice(); if (id !== 'pause') b[1] = b[1] - k; TBTN[id] = b; }
     if (window.ppFit) setTimeout(window.ppFit, 0);
   }
@@ -13533,7 +13539,7 @@ function drawVille() {
   const reg = viFocusReg(), cur = DA[reg].find(d => d.st === 'c');
   viFit(done); viInitLife(); viStepLife(Math.min(.05, G.dt || 1 / 60));
   const hits = []; VI.hits = hits;
-  viGround(t, built, done + ':' + VREG.map(r => (DA[r].find(d => d.st === 'c') || {}).n || 0).join(',')); viTrain(t);
+  viGround(t, built, done + ':' + VREG.map(r => (DA[r].find(d => d.st === 'c') || {}).n || 0).join(',')); viTrain(t); if (VI.afterGround) VI.afterGround();
   // sols des monuments plats (parc, jardin)
   VPLAN.items.forEach(it => { if (it.m === undefined || !['parc', 'jardin'].includes(it.k)) return; if (VMON[it.m].need()) viSprite('M' + it.m, it.cx, it.cz); });
   viBoats(); viBridge();
@@ -13560,6 +13566,7 @@ function drawVille() {
       const [lx, ly] = viP(it.x0, 0, it.z1), [rx, ry] = viP(it.x1, 0, it.z0), [, fy] = viP(it.x1, 0, it.z1); hits.push({ id: 'viM:' + it.m + ':' + (ok ? 1 : 0), x: lx, y: ry - 40, w: rx - lx, h: fy - ry + 40 }); }
     if (slots[i].length) drawDyn(slots[i]);
   });
+  if (VI.noUi) return;   // capture vidéo : ville seule
   ['jp', 'eg'].forEach(r => { if (!viUnl(r)) viLockSign(r); });
   if (!VI.ok) txt(viEN() ? 'Loading the city…' : 'Chargement de la ville…', 960, 540, PAL.text, 34, 900, 'center');
   // ---------- interface ----------
