@@ -4772,15 +4772,21 @@ setInterval(() => { if (ACC.token && document.visibilityState === 'visible') acc
 const APP_VER = '202610291657';
 const UPD_SAFE = new Set(['title', 'regions', 'levels', 'career', 'hwmap', 'jpmap', 'egmap', 'settings', 'profile', 'board', 'friends', 'defis', 'epreuves', 'ville', 'shop', 'parrain', 'gameover', 'victory']);
 let updNew = null, updT = 0;
-async function updCheck() { if (location.protocol !== 'https:' || Date.now() - updT < 20000) return; updT = Date.now();
-  try { const r = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; const v = (await r.text()).trim(); if (/^\d{8,}$/.test(v) && v !== APP_VER) updNew = v; } catch (e) {}
-  updApply(); }
+async function updCheck(auto) { if (location.protocol !== 'https:' || Date.now() - updT < 20000) return; updT = Date.now();
+  try { const r = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; const v = (await r.text()).trim(); if (/^\d{8,}$/.test(v) && v !== APP_VER) { updNew = v; updBanner(); } } catch (e) {}
+  if (auto) updApply(); }
+function updBanner() { if (!updNew || document.getElementById('ppUpd')) return; const b = document.createElement('button'); b.id = 'ppUpd';
+  const en = typeof save !== 'undefined' && save.lang === 'en'; b.innerHTML = en ? '🆕 <b>New version!</b> <span>Tap to update</span>' : '🆕 <b>Nouvelle version !</b> <span>Touche pour mettre à jour</span>';
+  b.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:99999;border:0;border-radius:16px;padding:7px 14px;background:#ffc229;color:#1d2230;font:800 13px system-ui,sans-serif;line-height:1.2;white-space:nowrap;box-shadow:0 5px 0 #c9921a,0 8px 20px rgba(0,0,0,.35);max-width:calc(100vw - 32px);cursor:pointer;animation:ppUpdIn .4s ease-out';
+  const st = document.createElement('style'); st.textContent = '@keyframes ppUpdIn{from{transform:translate(-50%,-140%)}to{transform:translate(-50%,0)}}#ppUpd span{font-weight:600;margin-left:4px}'; document.head.appendChild(st);
+  b.onclick = async ev => { ev.stopPropagation(); b.innerHTML = en ? '⏳ <b>Updating…</b>' : '⏳ <b>Mise à jour…</b>'; try { if (ACC.token && ACC.dirty) await accPush(); } catch (e) {} location.replace(location.pathname + location.search); };
+  document.body.appendChild(b); }
 async function updApply() { if (!updNew || !UPD_SAFE.has(G.screen) || G.paused) return; let done = ''; try { done = sessionStorage.getItem('ppUpd') || ''; } catch (e) {} if (done === updNew) return;
   try { sessionStorage.setItem('ppUpd', updNew); } catch (e) {} try { if (ACC.token && ACC.dirty) await accPush(); } catch (e) {}
   location.replace(location.pathname + location.search); }
-addEventListener('visibilitychange', () => { if (!document.hidden) updCheck(); }); addEventListener('pageshow', () => updCheck()); addEventListener('focus', () => updCheck());
-setInterval(() => { if (document.visibilityState === 'visible') { if (updNew) updApply(); else { updT = 0; updCheck(); } } }, 120000);
-setTimeout(updCheck, 4000);
+addEventListener('visibilitychange', () => { if (!document.hidden) { updT = 0; updCheck(true); } }); addEventListener('pageshow', () => updCheck(true));
+setInterval(() => { if (document.visibilityState === 'visible' && !updNew) { updT = 0; updCheck(false); } }, 120000);
+setTimeout(() => updCheck(true), 3000);
 
 // classements : un pseudo de compte ne peut être utilisé que par son propriétaire
 if (SB) {
