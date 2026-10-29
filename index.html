@@ -4767,6 +4767,20 @@ writeSave = (prev => function (o) { prev(o); if (ACC.token && !accImporting) { A
 addEventListener('visibilitychange', () => { if (document.hidden && ACC.dirty) accPush(); else if (!document.hidden) accPull(); });
 if (ACC.token) setTimeout(accPull, 600);
 setInterval(() => { if (ACC.token && document.visibilityState === 'visible') accPull(); }, 60000);
+// ---------- mise à jour automatique : plus besoin de supprimer/réinstaller le jeu ----------
+// à chaque publication, APP_VER et version.txt changent ; le jeu le voit et se recharge tout seul hors partie
+const APP_VER = '202610291653';
+const UPD_SAFE = new Set(['title', 'regions', 'levels', 'career', 'hwmap', 'jpmap', 'egmap', 'settings', 'profile', 'board', 'friends', 'defis', 'epreuves', 'ville', 'shop', 'parrain', 'gameover', 'victory']);
+let updNew = null, updT = 0;
+async function updCheck() { if (location.protocol !== 'https:' || Date.now() - updT < 20000) return; updT = Date.now();
+  try { const r = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; const v = (await r.text()).trim(); if (/^\d{8,}$/.test(v) && v !== APP_VER) updNew = v; } catch (e) {}
+  updApply(); }
+async function updApply() { if (!updNew || !UPD_SAFE.has(G.screen) || G.paused) return; let done = ''; try { done = sessionStorage.getItem('ppUpd') || ''; } catch (e) {} if (done === updNew) return;
+  try { sessionStorage.setItem('ppUpd', updNew); } catch (e) {} try { if (ACC.token && ACC.dirty) await accPush(); } catch (e) {}
+  location.replace(location.pathname + location.search); }
+addEventListener('visibilitychange', () => { if (!document.hidden) updCheck(); }); addEventListener('pageshow', () => updCheck()); addEventListener('focus', () => updCheck());
+setInterval(() => { if (document.visibilityState === 'visible') { if (updNew) updApply(); else { updT = 0; updCheck(); } } }, 120000);
+setTimeout(updCheck, 4000);
 
 // classements : un pseudo de compte ne peut être utilisé que par son propriétaire
 if (SB) {

@@ -44,3 +44,7 @@ La clé « anon » est faite pour être publique : la base n'accepte que les lec
 6. Supabase → Edge Functions → Secrets : `STRIPE_SECRET_KEY` (sk_…) et `STRIPE_WEBHOOK_SECRET` (whsec_…). Ces deux clés ne doivent JAMAIS aller dans GitHub ni dans config.js.
 7. Coller les 5 liens de paiement dans `config.js` (rubrique `shop`).
 8. Tester en mode test Stripe avec la carte 4242 4242 4242 4242.
+
+## Mise à jour automatique des joueurs
+Avant chaque publication : `python3 maj_version.py` (change `APP_VER` dans index.html et `version.txt`).
+Le jeu vérifie `version.txt` à chaque retour au premier plan et toutes les 2 min, et se recharge tout seul quand le joueur est dans un menu (jamais en pleine partie).
