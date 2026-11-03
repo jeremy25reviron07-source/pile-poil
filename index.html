@@ -3629,6 +3629,8 @@ function coinPill(x, y) {
   return w;
 }
 function price(x, y, n, ok, size = 19) { coinIcon(x + 11, y - 7, size * .58); txt(n.toLocaleString('fr-FR'), x + 28, y, ok ? '#ffd447' : 'rgba(255,212,71,.45)', size, 900); }
+function smallBtnF(id, x, y, w, h, label, kind, fs) { const cols = { go: ['#3cf29b', '#17a764', '#06210f'], off: ['rgba(255,255,255,.14)', 'rgba(255,255,255,.08)', 'rgba(255,255,255,.75)'] }[kind];
+  rr(x, y, w, h, h / 2); c.fillStyle = lg(0, y, 0, y + h, [[0, cols[0]], [1, cols[1]]]); c.fill(); txt(label, x + w / 2, y + h / 2 + fs * .36, cols[2], fs, 900, 'center'); if (kind !== 'off') G.buttons.push({ id, x, y, w, h }); }
 function smallBtn(id, x, y, w, h, label, kind) {
   const cols = { go: ['#3cf29b', '#17a764', '#06210f'], buy: ['#ffd447', '#c98d00', '#2a1a00'], off: ['rgba(255,255,255,.14)', 'rgba(255,255,255,.08)', 'rgba(255,255,255,.55)'], blue: ['#5fa8ff', '#2a62c4', '#061a3a'] }[kind];
   rr(x, y, w, h, h / 2); c.fillStyle = lg(0, y, 0, y + h, [[0, cols[0]], [1, cols[1]]]); c.fill();
@@ -4434,6 +4436,7 @@ function purchaseInfo(id) {
 act = (prev => function (id) {
   if (id === 'mo_no') { const f = MO && MO.onNo; MO = null; sfx.click(); if (f) f(); return; }
   if (id === 'mo_yes') { const f = MO && MO.onYes; MO = null; if (f) f(); return; }
+  if (id === 'mo_3') { const f = MO && MO.onThird; MO = null; sfx.click(); if (f) f(); return; }
   if (MO) return;
   if (id === 'shop') { sfx.click(); SH.from = G.screen === 'shop' ? SH.from : G.screen; G.screen = 'shop'; claimPurchases(false); return; }
   if (id === 'shopBack') { sfx.click(); G.screen = SH.from === 'garage' ? 'garage' : 'title'; return; }
@@ -4548,7 +4551,11 @@ function overlayLoop() {
     lines.forEach((l, i) => txt(l, 960, y + 116 + i * 34, i === 0 ? '#fff' : '#cfe0ff', i === 0 ? 26 : 20, i === 0 ? 900 : 700, 'center'));
     if (MO.price) { const py = y + 116 + lines.length * 34 + 20; c.font = '900 40px Inter'; const tw = c.measureText(MO.price.toLocaleString('fr-FR')).width; coinIcon(960 - tw / 2 - 30, py - 13, 20); txt(MO.price.toLocaleString('fr-FR'), 960 + 14, py, '#ffd447', 40, 900, 'center'); txt(`Solde après achat : ${(save.coins - MO.price).toLocaleString('fr-FR')}`, 960, py + 36, '#9fb7cf', 18, 700, 'center'); }
     const by = y + h - 96;
-    if (MO.no !== null) { smallBtn('mo_no', 610, by, 330, 70, MO.no || 'ANNULER', 'off'); G.buttons.push({ id: 'mo_no', x: 610, y: by, w: 330, h: 70 }); smallBtn('mo_yes', 980, by, 330, 70, MO.yes || 'OK', 'go'); }
+    if (MO.third) { // trois choix : [non] [3e choix sur 2 lignes] [oui]
+      smallBtnF('mo_no', 580, by, 200, 70, MO.no || 'ANNULER', 'off', 22); G.buttons.push({ id: 'mo_no', x: 580, y: by, w: 200, h: 70 });
+      rr(800, by, 290, 70, 35); c.fillStyle = lg(0, by, 0, by + 70, [[0, '#5fa8ff'], [1, '#2a62c4']]); c.fill(); txt(MO.third[0], 945, by + 33, '#061a3a', 21, 900, 'center'); txt(MO.third[1], 945, by + 56, '#061a3a', 16, 800, 'center'); G.buttons.push({ id: 'mo_3', x: 800, y: by, w: 290, h: 70 });
+      smallBtnF('mo_yes', 1110, by, 230, 70, MO.yes || 'OK', 'go', 21); }
+    else if (MO.no !== null) { smallBtn('mo_no', 610, by, 330, 70, MO.no || 'ANNULER', 'off'); G.buttons.push({ id: 'mo_no', x: 610, y: by, w: 330, h: 70 }); smallBtn('mo_yes', 980, by, 330, 70, MO.yes || 'OK', 'go'); }
     else smallBtn('mo_yes', 795, by, 330, 70, MO.yes || 'OK', 'go');
   }
   // notifications
@@ -4891,6 +4898,23 @@ Object.assign(EN, {
   'COMPTE CRÉÉ ✓': 'ACCOUNT CREATED ✓', 'CONNECTÉ ✓': 'SIGNED IN ✓', 'Ta progression est maintenant sauvegardée en ligne.': 'Your progress is now saved online.', 'Connecte-toi avec ce pseudo sur tes autres appareils.': 'Sign in with this nickname on your other devices.',
 });
 setInterval(() => { if (ACCO && !ACCO.hidden && G.screen === 'play' && !G.paused) ACCO.hidden = true; }, 300);
+// entraînement d'un nouvel appareil : un joueur qui a déjà un compte peut se connecter tout de suite
+(function () {
+  const b = document.createElement('button'); b.id = 'ppDeja'; b.hidden = true;
+  const st = document.createElement('style'); st.textContent = '#ppDeja{position:fixed;z-index:15;border:2px solid rgba(255,255,255,.5);border-radius:99px;padding:8px 16px;background:rgba(18,26,44,.9);color:#fff;font:800 14px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer;transform:translateX(-50%)}#ppDeja b{color:#ffc21a}#ppDeja[hidden]{display:none!important}';
+  document.head.appendChild(st); document.body.appendChild(b); let viaTuto = false;
+  b.addEventListener('pointerdown', e => e.stopPropagation());
+  b.onclick = e => { e.stopPropagation(); viaTuto = true; G.paused = true; b.hidden = true; try { sfx.click(); } catch (er) {} accForm('login'); };
+  setInterval(() => {
+    const show = G.screen === 'play' && !!G.tuto && !ACC.token && !MO && !G.paused && (!ACCO || ACCO.hidden);
+    if (show) { const r = cv.getBoundingClientRect(), k = r.width / W, en = save.lang === 'en';
+      const h = en ? 'Already have an account? <b>Sign in</b>' : 'Déjà un compte ? <b>Se connecter</b>'; if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; }
+      b.style.left = (r.left + r.width / 2) + 'px'; b.style.top = (r.top + (205 + (window.CROP || 0)) * k) + 'px'; }
+    if (b.hidden === show) b.hidden = !show;
+    // formulaire fermé : connecté -> menu avec sa progression ; sinon on reprend l'entraînement
+    if (viaTuto && ACCO && ACCO.hidden) { viaTuto = false; G.paused = false; if (ACC.token) { G.tuto = null; G.tip = null; G.screen = 'title'; } }
+  }, 200);
+})();
 
 // =====================================================================
 //  PILE POIL — LOGO, PARAMÈTRES, PAUSE ET NAVIGATION (boutons retour partout)
@@ -9870,6 +9894,7 @@ function bienvenue() {
   const en = save.lang === 'en', depuisSite = !!window.PP_ARRIVEE;
   if (depuisSite && !ACC.name && ++bvEssais < 12) return setTimeout(bienvenue, 500);   // connexion du compte du site en cours
   const nom = ACC.name || save.name;
+  if (!nom) return lancerTuto();   // nouveau joueur : il joue tout de suite (bouton « Déjà un compte ? » pendant l'entraînement)
   modal(nom ? {
     title: en ? `WELCOME, ${nom.toUpperCase()}!` : `BIENVENUE ${nom.toUpperCase()} !`,
     lines: [en ? 'Your account is signed in on this device.' : 'Ton compte est connecté sur cet appareil.',
@@ -9916,9 +9941,12 @@ startLevel = (prev => function (n) {
     if (typeof modal === 'function') {
       const en = save.lang === 'en'; G.paused = true;
       modal({ title: en ? 'PRACTICE DONE!' : 'ENTRAÎNEMENT RÉUSSI !',
-        lines: [en ? 'You know the basics.' : 'Tu connais les bases.', en ? 'Keep going with your career, or explore the menu' : 'Continue ta carrière, ou découvre le menu :', en ? '(duels, survival, garage, friends).' : 'duels, survie, garage, amis…'],
+        lines: ACC.token ? [en ? 'You know the basics.' : 'Tu connais les bases.', en ? 'Keep going with your career, or explore the menu' : 'Continue ta carrière, ou découvre le menu :', en ? '(duels, survival, garage, friends).' : 'duels, survie, garage, amis…']
+          : [en ? 'You know the basics.' : 'Tu connais les bases.', en ? 'Keep going with your career, or explore the menu.' : 'Continue ta carrière, ou découvre le menu.', en ? 'An account keeps your progress on all your devices.' : 'Un compte garde ta progression sur tous tes appareils.'],
         yes: en ? 'NEXT SITE' : 'CHANTIER SUIVANT', onYes: () => { G.paused = false; G.tip = { t: G.t }; },
-        no: en ? 'MENU' : 'MENU', onNo: () => { G.paused = false; G.screen = 'title'; } });
+        no: en ? 'MENU' : 'MENU', onNo: () => { G.paused = false; G.screen = 'title'; },
+        third: ACC.token ? null : [en ? 'CREATE ACCOUNT' : 'CRÉER UN COMPTE', en ? 'or sign in' : 'ou se connecter'],
+        onThird: () => { G.paused = false; G.screen = 'title'; if (typeof accForm === 'function') accForm('new'); } });
     }
   }
   else if (T && !tutoValide()) tutoAnnule();   // le tutoriel ne vit que sur le niveau 1 de la France, en carrière
