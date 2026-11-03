@@ -44,9 +44,37 @@ canvas{display:block;max-width:100%;max-height:100%;outline:none;touch-action:no
 @keyframes pprot{0%,25%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
 @media (prefers-reduced-motion:reduce){#rot .ph{animation:none;transform:rotate(-90deg)}}
 @media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
+#rotx{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:320px}#rotx p{margin:4px 0 2px;font:600 15px/1.4 Inter,system-ui,sans-serif;color:#cfd8e6}#rotx p b{font:800 15px Inter,system-ui,sans-serif;color:#fff;letter-spacing:0}#rotx small{font:600 12px Inter,system-ui,sans-serif;color:#8d9ab0}
+#rotx .rbtn{display:block;width:100%;box-sizing:border-box;border:0;border-radius:14px;padding:13px 16px;background:#ffc21a;color:#1d2230;font:900 16px Inter,system-ui,sans-serif;text-decoration:none;box-shadow:0 4px 0 #c9921a}#rotx .rbtn.sec{background:#26304a;color:#fff;box-shadow:0 4px 0 #141a2a}
 </style>
 </head><body>
-<div id="rot" role="alert"><div class="ph"></div><b>Tourne ton téléphone</b><span>PILE POIL se joue à l'horizontale</span></div>
+<div id="rot" role="alert"><div class="ph"></div><b>Tourne ton téléphone</b><span>PILE POIL se joue à l'horizontale</span><div id="rotx"></div></div>
+<script>
+// le téléphone ne tourne pas ? (verrou de rotation, ou navigateur intégré à LinkedIn / Instagram / Facebook / TikTok…)
+(function () { try {
+  var ua = navigator.userAgent || '', ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+  var inApp = /FBAN|FBAV|FB_IAB|Instagram|LinkedInApp|musical_ly|BytedanceWebview|TikTok|Snapchat|Line\/|Twitter|Pinterest|GSA\/|MicroMessenger/i.test(ua);
+  var en = /^en/i.test(navigator.language || '') && !/^fr/i.test(navigator.language || '');
+  var url = location.href.split('#')[0], box = document.getElementById('rotx');
+  var mq = window.matchMedia('(orientation: portrait) and (pointer: coarse)'), t = null;
+  function btn(txt, cls, fn, href) { var b = document.createElement(href ? 'a' : 'button'); b.textContent = txt; b.className = 'rbtn ' + (cls || ''); if (href) b.href = href; if (fn) b.onclick = fn; return b; }
+  function help() { if (!mq.matches || box.childNodes.length) return; var p = document.createElement('p');
+    if (inApp) {
+      p.innerHTML = en ? 'The game can\'t rotate inside this app.<br><b>Open it in your browser</b> to play.' : 'Le jeu ne peut pas tourner dans cette appli.<br><b>Ouvre-le dans ton navigateur</b> pour jouer.'; box.appendChild(p);
+      if (ios) box.appendChild(btn(en ? 'Open in Safari' : 'Ouvrir dans Safari', '', null, 'x-safari-' + url));
+      else if (android) box.appendChild(btn(en ? 'Open in Chrome' : 'Ouvrir dans Chrome', '', null, 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end'));
+      var c = btn(en ? 'Copy the link' : 'Copier le lien', 'sec', function () { try { navigator.clipboard.writeText(url).then(function () { c.textContent = en ? 'Link copied ✓' : 'Lien copié ✓'; }); } catch (e) {} }); box.appendChild(c);
+      var s = document.createElement('small'); s.textContent = en ? 'Or tap ••• then "Open in browser".' : 'Ou touche ••• puis « Ouvrir dans le navigateur ».'; box.appendChild(s);
+    } else {
+      p.innerHTML = ios ? (en ? 'Screen won\'t rotate? Swipe down from the top-right corner and turn off <b>Rotation Lock</b> 🔒.' : 'L\'écran ne tourne pas ? Glisse depuis le coin en haut à droite et désactive le <b>verrouillage de la rotation</b> 🔒.')
+        : (en ? 'Screen won\'t rotate? Turn on <b>Auto-rotate</b> in your quick settings, or:' : 'L\'écran ne tourne pas ? Active la <b>rotation auto</b> dans les réglages rapides, ou :'); box.appendChild(p);
+      if (!ios && document.documentElement.requestFullscreen && screen.orientation && screen.orientation.lock) box.appendChild(btn(en ? 'Play full screen' : 'Jouer en plein écran', '', function () {
+        document.documentElement.requestFullscreen().then(function () { return screen.orientation.lock('landscape'); }).catch(function () {}); }));
+    } }
+  function chk() { clearTimeout(t); if (mq.matches) t = setTimeout(help, 1500); }
+  if (mq.addEventListener) mq.addEventListener('change', chk); else mq.addListener(chk); chk();
+} catch (e) {} })();
+</script>
 <canvas id="c" width="1920" height="1080" tabindex="0" aria-label="Jeu Pile Poil : grue de chantier"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
