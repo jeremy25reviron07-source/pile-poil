@@ -2609,7 +2609,7 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => { if (e.code === 'Space') { releasePower(); return; } keys[e.key] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (G.screen === 'play' && G.mode !== 'live') G.paused = true; });
-function toGame(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; }
+function toGame(e) { const r = cv.getBoundingClientRect(), [px, py] = window.ppXY ? ppXY(e) : [e.clientX, e.clientY]; return [(px - r.left) * W / r.width, (py - r.top) * H / r.height]; }
 const pointerKey = {};
 cv.addEventListener('pointerdown', e => {
   startAmbience();
@@ -10356,7 +10356,7 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
   const pad = document.createElement('canvas'); pad.id = 'pad'; pad.setAttribute('aria-hidden', 'true');
   const st = document.createElement('style'); st.textContent = '#pad{position:fixed;left:0;top:0;width:100%;height:100%;z-index:0;touch-action:none}'; document.head.appendChild(st);
   document.body.insertBefore(pad, cv); const px = pad.getContext('2d'); let dpr = 1, B = {};
-  window.ppPadSize = () => { dpr = Math.min(2, window.devicePixelRatio || 1); pad.width = Math.round(innerWidth * dpr); pad.height = Math.round(innerHeight * dpr); layout(); };
+  window.ppPadSize = () => { dpr = Math.min(2, window.devicePixelRatio || 1); const v = window.PPROT ? ppVP() : { vw: innerWidth, vh: innerHeight }; pad.width = Math.round(v.vw * dpr); pad.height = Math.round(v.vh * dpr); layout(); };
   function layout() { // les boutons évitent le milieu des bords (encoche / Dynamic Island en paysage)
     const g = window.GUT; if (!g) return; const gl = g.l - g.ox, gr = g.ox + g.vw - g.r, lx = g.ox + gl / 2, rx = g.r + gr / 2, y = (k) => g.top + g.h * k;
     const side = gl >= 120, d = side ? Math.min(74, (gl - 12) / 2) : Math.max(40, Math.min(66, gl * .8)), D = Math.max(60, Math.min(130, gr * .84)), du = Math.max(40, Math.min(56, gr * .5));
@@ -10365,7 +10365,7 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
   addEventListener('resize', () => setTimeout(window.ppPadSize, 50)); window.ppPadSize();
   const act2 = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }, held = {};
   const hit = (x, y) => { for (const k in B) { const [bx, by, r] = B[k]; if (Math.hypot(x - bx, y - by) <= r + 14) return k; } return null; };
-  pad.addEventListener('pointerdown', e => { if (!window.SIDEPAD || G.screen !== 'play' || G.paused) return; const k = hit(e.clientX, e.clientY); if (!k) return; e.preventDefault(); pad.setPointerCapture(e.pointerId); held[e.pointerId] = k; try { startAmbience(); } catch (er) {} if (k === 'power') pressPower(); else keys[act2[k]] = true; });
+  pad.addEventListener('pointerdown', e => { if (!window.SIDEPAD || G.screen !== 'play' || G.paused) return; const [ex, ey] = window.ppXY ? ppXY(e) : [e.clientX, e.clientY], k = hit(ex, ey); if (!k) return; e.preventDefault(); pad.setPointerCapture(e.pointerId); held[e.pointerId] = k; try { startAmbience(); } catch (er) {} if (k === 'power') pressPower(); else keys[act2[k]] = true; });
   const up = e => { const k = held[e.pointerId]; if (!k) return; delete held[e.pointerId]; if (k === 'power') releasePower(); else keys[act2[k]] = false; };
   pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
   function btn(k, glyph, on) { const [x, y, r] = B[k].map((v, i) => i < 2 ? v * dpr : v * dpr); px.save(); px.globalAlpha = on ? 1 : .9; px.fillStyle = 'rgba(0,0,0,.35)'; px.beginPath(); px.arc(x, y + 3 * dpr, r, 0, 7); px.fill();
@@ -10413,6 +10413,36 @@ withShadow = (prev => function (col, blur, ox, oy, fn) { if (window.LOWFX && c.c
   }
   setInterval(apply, 150); addEventListener('resize', () => { mode = ''; setTimeout(apply, 60); });
   hud = (prev => function (lvl) { const k = window.CROP || 0; if (!k) return prev(lvl); c.save(); c.translate(0, k); try { prev(lvl); } finally { c.restore(); } })(hud);
+})();
+
+// =====================================================================
+//  TÉLÉPHONE QUI NE TOURNE PAS (verrou de rotation, navigateur de LinkedIn / Instagram…) :
+//  au bout d'1 s à la verticale, le jeu s'affiche couché, prêt à jouer téléphone tourné.
+//  Dès que l'écran passe vraiment à l'horizontale, tout redevient normal.
+// =====================================================================
+(function () {
+  if (!TOUCH) return;
+  const mq = matchMedia('(orientation: portrait) and (pointer: coarse)'); window.PPROT = false;
+  const raw = window.ppVP, scr = () => { const vv = window.visualViewport; return { w: Math.round(vv ? vv.width : innerWidth), h: Math.round(vv ? vv.height : innerHeight) }; };
+  // dimensions et marges vues depuis le jeu couché (le haut de l'écran devient la gauche du jeu)
+  window.ppVP = () => { const v = raw(); if (!window.PPROT) return v; const s = scr(); return { vw: s.h, vh: s.w, il: v.it, ir: v.ib, it: v.ir, ib: v.il }; };
+  // point touché -> coordonnées dans le jeu couché
+  window.ppXY = e => { if (!window.PPROT) return [e.clientX, e.clientY]; const s = scr(); return [e.clientY, s.w - e.clientX]; };
+  const gbr = cv.getBoundingClientRect.bind(cv);
+  cv.getBoundingClientRect = () => { if (!window.PPROT) return gbr(); const p = k => parseFloat(cv.style.getPropertyValue(k)) || 0, l = p('left'), tp = p('top'), w = p('width'), h = p('height');
+    return { left: l, top: tp, width: w, height: h, right: l + w, bottom: tp + h, x: l, y: tp }; };
+  const B = document.body;
+  function place() { if (!window.PPROT) return; const s = scr(); const set = (k, v) => B.style.setProperty(k, v, 'important');
+    set('position', 'fixed'); set('inset', 'auto'); set('left', s.w + 'px'); set('top', '0px'); set('width', s.h + 'px'); set('height', s.w + 'px'); set('transform-origin', '0 0'); set('transform', 'rotate(90deg)'); }
+  function on(v) { if (window.PPROT === v) return; window.PPROT = v; document.documentElement.classList.toggle('pprot', v);
+    if (v) place(); else ['position', 'inset', 'left', 'top', 'width', 'height', 'transform-origin', 'transform'].forEach(k => B.style.removeProperty(k));
+    dispatchEvent(new Event('resize')); if (window.ppFit) setTimeout(window.ppFit, 50); }
+  let since = 0; function chk() { const now = Date.now(); if (!mq.matches) { since = 0; return on(false); } if (!since) since = now; if (now - since >= 900) on(true); }
+  setInterval(chk, 300); (function raf() { chk(); requestAnimationFrame(raf); })();
+  const st = document.createElement('style'); st.textContent = 'html.pprot #rot{display:none!important}'; document.head.appendChild(st);
+  if (mq.addEventListener) mq.addEventListener('change', chk); else mq.addListener(chk);
+  addEventListener('resize', () => { if (window.PPROT) place(); }); if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (window.PPROT) place(); });
+  window.ppRot = on; chk();
 })();
 
 // =====================================================================
